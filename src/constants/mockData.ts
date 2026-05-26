@@ -3,6 +3,8 @@ export const COMMUNITIES = [
   { id: 2, name: 'Equity Options', members: '8.2k', time: '10:42 AM', active: false },
   { id: 3, name: 'Commodities', members: '5.1k', time: '10:42 AM', active: false },
   { id: 4, name: 'Swing Trades', members: '15k', time: '10:42 AM', active: false },
+  { id: 5, name: 'Free Alumini', members: '15k', time: '10:42 AM', active: false },
+  { id: 6, name: 'Paid Alumini', members: '5.1k', time: '10:42 AM', active: false },
 ];
 
 export const CURRENT_ANALYSIS = {

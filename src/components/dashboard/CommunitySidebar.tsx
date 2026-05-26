@@ -25,7 +25,7 @@ const CommunitySidebar = ({ communities }: CommunitySidebarProps) => {
     <section className="w-80 flex flex-col bg-white border-r border-slate-200 shrink-0">
       <div className="p-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white font-bold text-xs">
+          <div className="w-8 h-8 bg-emerald-500 rounded-xl flex items-center justify-center text-white font-bold text-xs">
             TG
           </div>
           <h2 className="font-bold text-slate-800">TG Levels</h2>
@@ -48,7 +48,7 @@ const CommunitySidebar = ({ communities }: CommunitySidebarProps) => {
       <CommunityFilters />
 
       <ScrollArea className="flex-1 px-4">
-        <div className="flex flex-col gap-3 pb-4">
+        <div className="flex flex-col gap-2 pb-4">
           {communities.map((comm) => (
             <CommunityCard key={comm.id} community={comm} />
           ))}
