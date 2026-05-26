@@ -21,30 +21,42 @@ const CommunityCard = ({ community }: CommunityCardProps) => {
   return (
     <Card 
       className={cn(
-        "p-4 border-slate-100 shadow-none rounded-2xl cursor-pointer transition-all hover:border-emerald-200",
+        "w-[287px] h-[74px] flex items-center px-3 bg-[#FDFDFD] border-[#E2E8F0] shadow-none rounded-[14px] cursor-pointer transition-all hover:border-emerald-200 relative group",
         community.active && "border-emerald-200 bg-emerald-50/30"
       )}
     >
-      <div className="flex justify-between items-start mb-1">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-emerald-500 border border-slate-100">
-            <TrendingUp className="w-4 h-4" />
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-slate-800 leading-tight">{community.name}</h3>
-            <div className="flex items-center gap-1 text-slate-400">
-              <Users className="w-3 h-3" />
-              <span className="text-[11px] font-medium">{community.members}</span>
-            </div>
+        {/* Left Icon Container */}
+        <div className="w-10 h-10 rounded-full bg-[#F1F5F9] flex items-center justify-center shrink-0">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M15 5.25H19.5V9.75" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M19.5 5.25L13.125 11.625L9.375 7.875L4.5 12.75" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+
+        {/* Center Content */}
+        <div className="ml-3 flex-1 min-w-0">
+          <h3 className="text-[13px] font-bold text-[#0F172A] truncate leading-tight">
+            {community.name}
+          </h3>
+          <div className="flex items-center gap-1 mt-0.5">
+            <Users className="w-3 h-3 text-[#64748B]" />
+            <span className="text-[11px] font-medium text-[#64748B]">{community.members}</span>
           </div>
         </div>
-        <span className="text-[10px] font-medium text-slate-400">{community.time}</span>
-      </div>
-      <div className="flex justify-end mt-2">
-        <ChevronDown className="w-4 h-4 text-slate-300" />
-      </div>
-    </Card>
+
+        {/* Right Content */}
+        <div className="flex flex-col items-end h-10 pr-10">
+          <span className="text-[10px] font-medium text-[#64748B]">{community.time}</span>
+        </div>
+
+        {/* Top Right Controls (Status Circle + Arrow) */}
+        <div className="absolute top-3 right-3 flex flex-col items-center gap-[15px]">
+          <div className="w-[15px] h-[15px] rounded-full border border-[#E2E8F0] bg-white" />
+          <ChevronDown className="w-4 h-4 text-[#64748B] mt-1" />
+        </div>
+      </Card>
   );
 };
+
 
 export default CommunityCard;
