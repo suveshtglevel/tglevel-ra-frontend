@@ -13,6 +13,13 @@ export interface CommunityAnalysis {
   time: string;
 }
 
+export interface SubCommunity {
+  id: number;
+  name: string;
+  members: string;
+  type: 'Free' | 'Paid';
+}
+
 export interface Community {
   id: number;
   name: string;
@@ -21,6 +28,7 @@ export interface Community {
   views: string;
   pinned: string;
   analysis: CommunityAnalysis;
+  subCommunities?: SubCommunity[];
 }
 
 const DISCLAIMER =
@@ -34,6 +42,11 @@ export const COMMUNITIES: Community[] = [
     time: '10:42 AM',
     views: '24.5k',
     pinned: 'Bank Nifty 44200 CE Buy Above 250',
+    subCommunities: [
+      { id: 101, name: 'NF1', members: '5.2k', type: 'Free' },
+      { id: 102, name: 'NF2', members: '4.1k', type: 'Free' },
+      { id: 103, name: 'NP1', members: '3.1k', type: 'Paid' },
+    ],
     analysis: {
       title: 'BUY NIFTY 12 MAY 24100 PE',
       entry: '180',
@@ -56,6 +69,11 @@ export const COMMUNITIES: Community[] = [
     time: '10:42 AM',
     views: '11.2k',
     pinned: 'RELIANCE 2900 CE Buy Above 42',
+    subCommunities: [
+      { id: 201, name: 'EF1', members: '3.8k', type: 'Free' },
+      { id: 202, name: 'EF2', members: '2.5k', type: 'Free' },
+      { id: 203, name: 'EP1', members: '1.9k', type: 'Paid' },
+    ],
     analysis: {
       title: 'BUY RELIANCE 2900 CE',
       entry: '42',
@@ -78,6 +96,11 @@ export const COMMUNITIES: Community[] = [
     time: '10:42 AM',
     views: '6.8k',
     pinned: 'GOLD MINI Buy Above 71500',
+    subCommunities: [
+      { id: 301, name: 'CF1', members: '2.9k', type: 'Free' },
+      { id: 302, name: 'CF2', members: '1.4k', type: 'Free' },
+      { id: 303, name: 'CP1', members: '0.8k', type: 'Paid' },
+    ],
     analysis: {
       title: 'BUY GOLD MINI FUT',
       entry: '71500',
@@ -100,6 +123,11 @@ export const COMMUNITIES: Community[] = [
     time: '10:42 AM',
     views: '31.0k',
     pinned: 'TATAMOTORS Positional Buy 980',
+    subCommunities: [
+      { id: 401, name: 'STF1', members: '6.2k', type: 'Free' },
+      { id: 402, name: 'STF2', members: '5.1k', type: 'Free' },
+      { id: 403, name: 'STP1', members: '3.7k', type: 'Paid' },
+    ],
     analysis: {
       title: 'BUY TATAMOTORS CASH',
       entry: '980',
