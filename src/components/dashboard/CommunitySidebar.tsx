@@ -7,20 +7,19 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import CommunityCard from './CommunityCard';
 import CommunityFilters from './CommunityFilters';
-
-interface Community {
-  id: number;
-  name: string;
-  members: string;
-  time: string;
-  active: boolean;
-}
+import type { Community } from '@/constants/mockData';
 
 interface CommunitySidebarProps {
   communities: Community[];
+  selectedCommunityId: number;
+  onSelectCommunity: (id: number) => void;
 }
 
-const CommunitySidebar = ({ communities }: CommunitySidebarProps) => {
+const CommunitySidebar = ({
+  communities,
+  selectedCommunityId,
+  onSelectCommunity,
+}: CommunitySidebarProps) => {
   return (
     <section className="w-80 flex flex-col bg-white border-r border-slate-200 shrink-0">
       <div className="p-4 flex items-center justify-between">
@@ -50,7 +49,12 @@ const CommunitySidebar = ({ communities }: CommunitySidebarProps) => {
       <ScrollArea className="flex-1 px-4">
         <div className="flex flex-col gap-2 pb-4">
           {communities.map((comm) => (
-            <CommunityCard key={comm.id} community={comm} />
+            <CommunityCard
+              key={comm.id}
+              community={comm}
+              active={comm.id === selectedCommunityId}
+              onSelect={() => onSelectCommunity(comm.id)}
+            />
           ))}
         </div>
       </ScrollArea>

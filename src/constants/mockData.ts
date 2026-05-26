@@ -1,23 +1,165 @@
-export const COMMUNITIES = [
-  { id: 1, name: 'Nifty & Bank Nifty', members: '12.4k', time: '10:42 AM', active: true },
-  { id: 2, name: 'Equity Options', members: '8.2k', time: '10:42 AM', active: false },
-  { id: 3, name: 'Commodities', members: '5.1k', time: '10:42 AM', active: false },
-  { id: 4, name: 'Swing Trades', members: '15k', time: '10:42 AM', active: false },
-  { id: 5, name: 'Free Alumini', members: '15k', time: '10:42 AM', active: false },
-  { id: 6, name: 'Paid Alumini', members: '5.1k', time: '10:42 AM', active: false },
+export interface CommunityAnalysis {
+  title: string;
+  entry: string;
+  sl: string;
+  target1: string;
+  target2: string;
+  disclaimer: string;
+  customerCare: string;
+  rationale: string;
+  confidence: string;
+  id: string;
+  tag: string;
+  time: string;
+}
+
+export interface Community {
+  id: number;
+  name: string;
+  members: string;
+  time: string;
+  views: string;
+  pinned: string;
+  analysis: CommunityAnalysis;
+}
+
+const DISCLAIMER =
+  'Disclaimer: Investments in the market are subject to market risk. Please read all related documents carefully before investing. Registration granted by SEBI, Enlistment as RA with Exchange and certification from NISM in no way guarantee performance of the intermediary or provide any assurance of returns to investors.';
+
+export const COMMUNITIES: Community[] = [
+  {
+    id: 1,
+    name: 'Nifty & Bank Nifty',
+    members: '12.4k',
+    time: '10:42 AM',
+    views: '24.5k',
+    pinned: 'Bank Nifty 44200 CE Buy Above 250',
+    analysis: {
+      title: 'BUY NIFTY 12 MAY 24100 PE',
+      entry: '180',
+      sl: '165',
+      target1: '195',
+      target2: '210',
+      disclaimer: DISCLAIMER,
+      customerCare: '77380 63455',
+      rationale: 'https://bit.ly/4tBVOrE',
+      confidence: 'Medium probability',
+      id: '123',
+      tag: 'Nifty',
+      time: '10:45 AM',
+    },
+  },
+  {
+    id: 2,
+    name: 'Equity Options',
+    members: '8.2k',
+    time: '10:42 AM',
+    views: '11.2k',
+    pinned: 'RELIANCE 2900 CE Buy Above 42',
+    analysis: {
+      title: 'BUY RELIANCE 2900 CE',
+      entry: '42',
+      sl: '36',
+      target1: '50',
+      target2: '58',
+      disclaimer: DISCLAIMER,
+      customerCare: '77380 63455',
+      rationale: 'https://bit.ly/4tBVOrE',
+      confidence: 'High probability',
+      id: '124',
+      tag: 'Equity',
+      time: '10:38 AM',
+    },
+  },
+  {
+    id: 3,
+    name: 'Commodities',
+    members: '5.1k',
+    time: '10:42 AM',
+    views: '6.8k',
+    pinned: 'GOLD MINI Buy Above 71500',
+    analysis: {
+      title: 'BUY GOLD MINI FUT',
+      entry: '71500',
+      sl: '71200',
+      target1: '71900',
+      target2: '72300',
+      disclaimer: DISCLAIMER,
+      customerCare: '77380 63455',
+      rationale: 'https://bit.ly/4tBVOrE',
+      confidence: 'Medium probability',
+      id: '125',
+      tag: 'Commodity',
+      time: '10:30 AM',
+    },
+  },
+  {
+    id: 4,
+    name: 'Swing Trades',
+    members: '15k',
+    time: '10:42 AM',
+    views: '31.0k',
+    pinned: 'TATAMOTORS Positional Buy 980',
+    analysis: {
+      title: 'BUY TATAMOTORS CASH',
+      entry: '980',
+      sl: '940',
+      target1: '1040',
+      target2: '1100',
+      disclaimer: DISCLAIMER,
+      customerCare: '77380 63455',
+      rationale: 'https://bit.ly/4tBVOrE',
+      confidence: 'High probability',
+      id: '126',
+      tag: 'Swing',
+      time: '09:45 AM',
+    },
+  },
+  {
+    id: 5,
+    name: 'Free Alumini',
+    members: '15k',
+    time: '10:42 AM',
+    views: '18.3k',
+    pinned: 'Weekly market outlook posted',
+    analysis: {
+      title: 'WEEKLY OUTLOOK - NIFTY',
+      entry: '—',
+      sl: '—',
+      target1: '24400',
+      target2: '24700',
+      disclaimer: DISCLAIMER,
+      customerCare: '77380 63455',
+      rationale: 'https://bit.ly/4tBVOrE',
+      confidence: 'Low probability',
+      id: '127',
+      tag: 'Outlook',
+      time: '08:15 AM',
+    },
+  },
+  {
+    id: 6,
+    name: 'Paid Alumini',
+    members: '5.1k',
+    time: '10:42 AM',
+    views: '4.2k',
+    pinned: 'Premium: HDFCBANK 1700 CE',
+    analysis: {
+      title: 'BUY HDFCBANK 1700 CE',
+      entry: '28',
+      sl: '22',
+      target1: '36',
+      target2: '44',
+      disclaimer: DISCLAIMER,
+      customerCare: '77380 63455',
+      rationale: 'https://bit.ly/4tBVOrE',
+      confidence: 'High probability',
+      id: '128',
+      tag: 'Premium',
+      time: '10:20 AM',
+    },
+  },
 ];
 
-export const CURRENT_ANALYSIS = {
-  title: 'BUY NIFTY 12 MAY 24100 PE',
-  entry: '180',
-  sl: '165',
-  target1: '195',
-  target2: '210',
-  disclaimer: 'Disclaimer: Investments in the market are subject to market risk. Please read all related documents carefully before investing. Registration granted by SEBI, Enlistment as RA with Exchange and certification from NISM in no way guarantee performance of the intermediary or provide any assurance of returns to investors.',
-  customerCare: '77380 63455',
-  rationale: 'https://bit.ly/4tBVOrE',
-  confidence: 'Medium probability',
-  id: '123',
-  tag: 'Nifty',
-  time: '10:45 AM'
-};
+// Kept for backwards compatibility; defaults to the first community's analysis.
+export const CURRENT_ANALYSIS = COMMUNITIES[0].analysis;

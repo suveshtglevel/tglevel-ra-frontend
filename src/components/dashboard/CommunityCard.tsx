@@ -1,28 +1,32 @@
 'use client';
 
 import React from 'react';
-import { TrendingUp, Users, ChevronDown } from 'lucide-react';
+import { Users, ChevronDown } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-
-interface Community {
-  id: number;
-  name: string;
-  members: string;
-  time: string;
-  active: boolean;
-}
+import type { Community } from '@/constants/mockData';
 
 interface CommunityCardProps {
   community: Community;
+  active: boolean;
+  onSelect: () => void;
 }
 
-const CommunityCard = ({ community }: CommunityCardProps) => {
+const CommunityCard = ({ community, active, onSelect }: CommunityCardProps) => {
   return (
-    <Card 
+    <Card
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
       className={cn(
         "w-[287px] h-[74px] flex items-center px-3 bg-[#FDFDFD] border-[#E2E8F0] shadow-none rounded-[14px] cursor-pointer transition-all hover:border-emerald-200 relative group",
-        community.active && "border-emerald-200 bg-emerald-50/30"
+        active && "border-emerald-200 bg-emerald-50/30"
       )}
     >
         {/* Left Icon Container */}
