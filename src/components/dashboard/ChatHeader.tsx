@@ -3,6 +3,7 @@
 import React from 'react';
 import { TrendingUp, Eye, FileSpreadsheet, MoreVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import MediaDocsPanel from './MediaDocsPanel';
 
 interface ChatHeaderProps {
   title: string;
@@ -11,6 +12,21 @@ interface ChatHeaderProps {
 }
 
 const ChatHeader = ({ title, members, views }: ChatHeaderProps) => {
+  const [showPanel, setShowPanel] = React.useState(false);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  React.useEffect(() => {
+    if (!showPanel) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowPanel(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showPanel]);
+
   return (
     <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0">
       <div className="flex items-center gap-3">
@@ -31,9 +47,26 @@ const ChatHeader = ({ title, members, views }: ChatHeaderProps) => {
           <FileSpreadsheet className="w-4 h-4" />
           Excel
         </Button>
-        <Button variant="ghost" size="icon" className="h-9 w-9">
-          <MoreVertical className="h-5 w-5 text-slate-400" />
-        </Button>
+        <div className="relative" ref={menuRef}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9"
+            onClick={() => setShowPanel((prev) => !prev)}
+          >
+            <MoreVertical className="h-5 w-5 text-slate-400" />
+          </Button>
+
+          {/* Dropdown Panel */}
+          {showPanel && (
+            <div className="absolute top-12 right-0 z-50 shadow-xl rounded-2xl overflow-hidden">
+              <MediaDocsPanel
+                title={title}
+                onClose={() => setShowPanel(false)}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

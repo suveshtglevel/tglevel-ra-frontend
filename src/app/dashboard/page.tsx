@@ -1,6 +1,5 @@
 'use client';
 
-import React from 'react';
 import Sidebar from '@/components/dashboard/Sidebar';
 import CommunitySidebar from '@/components/dashboard/CommunitySidebar';
 import ChatHeader from '@/components/dashboard/ChatHeader';

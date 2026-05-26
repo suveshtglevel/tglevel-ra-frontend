@@ -1,9 +1,11 @@
 'use client';
 
 import React from 'react';
-import { Zap } from 'lucide-react';
+import { Check, CheckCheck } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+
+type MessageStatus = 'sent' | 'delivered' | 'read';
 
 interface ResearchCardProps {
   analysis: {
@@ -20,17 +22,30 @@ interface ResearchCardProps {
     tag: string;
     time: string;
   };
+  status?: MessageStatus;
 }
 
-const ResearchCard = ({ analysis }: ResearchCardProps) => {
+const StatusTick = ({ status }: { status: MessageStatus }) => {
+  if (status === 'sent') {
+    return <Check className="w-4 h-4 text-[#94A3B8]" />;
+  }
+  if (status === 'delivered') {
+    return <CheckCheck className="w-4 h-4 text-[#94A3B8]" />;
+  }
+  return <CheckCheck className="w-4 h-4 text-[#3B82F6]" />;
+};
+
+const ResearchCard = ({ analysis, status = 'read' }: ResearchCardProps) => {
   return (
-    <Card className="w-full max-w-xl bg-[#E6F9F3] border-[#C2EDDF] p-6 rounded-3xl shadow-none">
+    <Card className="w-[448px] bg-[#E6F9F3] border-[#C2EDDF] p-6 rounded-3xl shadow-none">
       <div className="space-y-4 text-slate-800">
         <div className="font-bold flex items-center gap-2 text-[15px]">
-          ✅'RESEARCH ANALYSIS✅
+          ✅*RESEARCH ANALYSIS✅
         </div>
-        <div className="font-black text-lg lg:text-xl tracking-tight">{analysis.title}</div>
-        <div className="space-y-1.5 font-bold text-sm lg:text-[15px]">
+        <div className="font-bold text-[13px] leading-[18.57px] tracking-[0px]" style={{ fontFamily: 'Inter' }}>
+          {analysis.title}
+        </div>
+        <div className="space-y-1.5 font-medium text-[13px] leading-[18.57px] tracking-[0px]" style={{ fontFamily: 'Inter' }}>
           <p>Entry Above = {analysis.entry}</p>
           <p>SL = {analysis.sl}</p>
           <p>Target 1 = {analysis.target1}</p>
@@ -63,12 +78,9 @@ const ResearchCard = ({ analysis }: ResearchCardProps) => {
               {analysis.tag}
             </Badge>
           </div>
-          <div className="flex items-center gap-1.5 text-emerald-600 font-bold text-[10px]">
+          <div className="flex items-center gap-1.5 font-bold text-[10px] text-slate-500">
             {analysis.time}
-            <div className="flex">
-              <Zap className="w-3 h-3 fill-current" />
-              <Zap className="w-3 h-3 fill-current -ml-1" />
-            </div>
+            <StatusTick status={status} />
           </div>
         </div>
       </div>
