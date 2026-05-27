@@ -13,16 +13,21 @@ import type { Community } from '@/constants/mockData';
 interface CommunitySidebarProps {
   communities: Community[];
   selectedCommunityId: number;
+  selectedSubCommunityId: number | null;
   onSelectCommunity: (id: number) => void;
+  onSelectSubCommunity: (id: number) => void;
 }
 
 const CommunitySidebar = ({
   communities,
   selectedCommunityId,
+  selectedSubCommunityId,
   onSelectCommunity,
+  onSelectSubCommunity,
 }: CommunitySidebarProps) => {
   const [search, setSearch] = React.useState('');
   const [activeFilter, setActiveFilter] = React.useState<FilterType>('ALL');
+  const [expandedCommunityId, setExpandedCommunityId] = React.useState<number | null>(communities[0]?.id ?? null);
 
   const filteredCommunities = communities.filter((comm) => {
     // Search filter
@@ -75,13 +80,20 @@ const CommunitySidebar = ({
       <ScrollArea className="flex-1 px-4">
         <div className="flex flex-col gap-2 pb-4">
           {filteredCommunities.length > 0 ? (
-            filteredCommunities.map((comm) => (
-              <CommunityCard
-                key={comm.id}
-                community={comm}
-                active={comm.id === selectedCommunityId}
-                onSelect={() => onSelectCommunity(comm.id)}
-              />
+            filteredCommunities.map((comm, index) => (
+              <div key={comm.id}>
+                <CommunityCard
+                  community={comm}
+                  active={comm.id === selectedCommunityId}
+                  selectedSubCommunityId={selectedSubCommunityId}
+                  initialExpanded={index === 0}
+                  onSelect={() => {
+                    onSelectCommunity(comm.id);
+                    setExpandedCommunityId(comm.id);
+                  }}
+                  onSelectSubCommunity={onSelectSubCommunity}
+                />
+              </div>
             ))
           ) : (
             <div className="text-center py-8 text-slate-400 text-sm">

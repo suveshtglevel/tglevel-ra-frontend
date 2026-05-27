@@ -12,13 +12,18 @@ export default function DashboardPage() {
   const {
     communities,
     selectedCommunityId,
+    selectedSubCommunityId,
     selectedCommunity,
-    currentAnalysis,
+    selectedSubCommunity,
     currentMessages,
     handleSelectCommunity,
+    handleSelectSubCommunity,
     handleSendMessage,
     handleSendFile,
   } = useDashboard();
+
+  const headerTitle = selectedSubCommunity ? selectedSubCommunity.name : selectedCommunity.name;
+  const headerMembers = selectedSubCommunity ? `${selectedSubCommunity.members} members` : `${selectedCommunity.members} members`;
 
   return (
     <div className="flex h-screen w-full bg-[#F8FAFC] overflow-hidden">
@@ -26,14 +31,16 @@ export default function DashboardPage() {
       <CommunitySidebar
         communities={communities}
         selectedCommunityId={selectedCommunityId}
+        selectedSubCommunityId={selectedSubCommunityId}
         onSelectCommunity={handleSelectCommunity}
+        onSelectSubCommunity={handleSelectSubCommunity}
       />
 
       {/* Main Feed Area */}
       <main className="flex-1 flex flex-col min-w-0 bg-[#F8FAFC]">
         <ChatHeader
-          title={selectedCommunity.name}
-          members={`${selectedCommunity.members} members`}
+          title={headerTitle}
+          members={headerMembers}
           views={selectedCommunity.views}
         />
 
@@ -41,7 +48,6 @@ export default function DashboardPage() {
 
         {/* Feed Scroll Area */}
         <ChatFeed
-          analysis={currentAnalysis}
           views={selectedCommunity.views}
           messages={currentMessages}
         />

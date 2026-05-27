@@ -30,6 +30,7 @@ import {
   FileSpreadsheet,
   File as FileIcon
 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Card } from '@/components/ui/card';
@@ -385,14 +386,21 @@ const MessageComposer = ({ onSend, onSendFile }: MessageComposerProps) => {
           <Button
             variant="ghost"
             size="sm"
+            disabled={showBundle && !selectedMessageType}
+            title={showBundle && !selectedMessageType ? 'Select a message type first' : undefined}
             className={cn(
               "font-bold rounded-xl px-4 h-9 transition-colors cursor-pointer",
               showBundle
                 ? "text-white bg-emerald-600 hover:bg-emerald-700"
-                : "text-emerald-600 bg-emerald-50 hover:bg-emerald-100"
+                : "text-emerald-600 bg-emerald-50 hover:bg-emerald-100",
+              showBundle && !selectedMessageType && "opacity-50 cursor-not-allowed"
             )}
             onClick={() => {
               if (showBundle) {
+                if (!selectedMessageType) {
+                  toast.error('Please select a message type before sending');
+                  return;
+                }
                 // Send all bundled messages
                 bundleMessages.forEach((msg) => {
                   onSend?.(msg, { messageType: selectedMessageType ?? undefined, group: selectedGroup ?? undefined, notifyUsers });
@@ -407,8 +415,17 @@ const MessageComposer = ({ onSend, onSendFile }: MessageComposerProps) => {
             {showBundle ? `Send Bundle (${bundleMessages.length})` : '+ Bundle'}
           </Button>
           <Button
-            className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl px-6 font-bold h-10 gap-2 shadow-lg shadow-emerald-500/20 transition-all active:scale-95 cursor-pointer"
+            disabled={!selectedMessageType}
+            title={!selectedMessageType ? 'Select a message type first' : undefined}
+            className={cn(
+              "bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl px-6 font-bold h-10 gap-2 shadow-lg shadow-emerald-500/20 transition-all active:scale-95 cursor-pointer",
+              !selectedMessageType && "opacity-50 cursor-not-allowed hover:bg-emerald-500"
+            )}
             onClick={() => {
+              if (!selectedMessageType) {
+                toast.error('Please select a message type before sending');
+                return;
+              }
               const content = editor.getHTML();
               if (content !== '<p></p>') {
                 if (showBundle) {

@@ -9,7 +9,10 @@ import type { Community, SubCommunity } from '@/constants/mockData';
 interface CommunityCardProps {
   community: Community;
   active: boolean;
+  selectedSubCommunityId: number | null;
+  initialExpanded?: boolean;
   onSelect: () => void;
+  onSelectSubCommunity: (id: number) => void;
 }
 
 const CheckCircle = ({ checked, onClick }: { checked: boolean; onClick?: (e: React.MouseEvent) => void }) => (
@@ -36,18 +39,42 @@ const CheckCircle = ({ checked, onClick }: { checked: boolean; onClick?: (e: Rea
 interface SubCommunityRowProps {
   sub: SubCommunity;
   checked: boolean;
+  isSelected: boolean;
   onToggle: () => void;
+  onSelect: () => void;
 }
 
-const SubCommunityRow = ({ sub, checked, onToggle }: SubCommunityRowProps) => {
+const SubCommunityRow = ({ sub, checked, isSelected, onToggle, onSelect }: SubCommunityRowProps) => {
   return (
-    <div className="flex items-center h-[48px] px-4 bg-[#F8FAFC] rounded-[12px]">
-      <span className="text-[13px] font-bold text-[#0F172A] w-[50px]">{sub.name}</span>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          e.stopPropagation();
+          onSelect();
+        }
+      }}
+      className={cn(
+        "flex items-center h-[48px] px-4 bg-[#F8FAFC] rounded-[12px] cursor-pointer transition-all hover:bg-emerald-100/30",
+        isSelected && "bg-emerald-100 border border-emerald-300"
+      )}
+    >
+      <span className={cn("text-[13px] font-bold w-[50px]", isSelected ? "text-emerald-600" : "text-[#0F172A]")}>
+        {sub.name}
+      </span>
       <div className="flex items-center gap-1 ml-2 flex-1">
-        <Users className="w-3 h-3 text-[#94A3B8]" />
-        <span className="text-[11px] font-medium text-[#94A3B8]">{sub.members}</span>
+        <Users className={cn("w-3 h-3", isSelected ? "text-emerald-600" : "text-[#94A3B8]")} />
+        <span className={cn("text-[11px] font-medium", isSelected ? "text-emerald-600" : "text-[#94A3B8]")}>
+          {sub.members}
+        </span>
       </div>
-      <span className="text-[12px] font-medium text-[#64748B] mr-3">
+      <span className={cn("text-[12px] font-medium mr-3", isSelected ? "text-emerald-600" : "text-[#64748B]")}>
         {sub.type}
       </span>
       <CheckCircle
@@ -61,8 +88,8 @@ const SubCommunityRow = ({ sub, checked, onToggle }: SubCommunityRowProps) => {
   );
 };
 
-const CommunityCard = ({ community, active, onSelect }: CommunityCardProps) => {
-  const [expanded, setExpanded] = React.useState(false);
+const CommunityCard = ({ community, active, selectedSubCommunityId, initialExpanded = false, onSelect, onSelectSubCommunity }: CommunityCardProps) => {
+  const [expanded, setExpanded] = React.useState(initialExpanded);
   const subCommunities = community.subCommunities ?? [];
 
   // Track checked state per sub-community (default: Free = checked)
@@ -166,7 +193,9 @@ const CommunityCard = ({ community, active, onSelect }: CommunityCardProps) => {
               key={sub.id}
               sub={sub}
               checked={checkedMap[sub.id] ?? false}
+              isSelected={selectedSubCommunityId === sub.id}
               onToggle={() => toggleSub(sub.id)}
+              onSelect={() => onSelectSubCommunity(sub.id)}
             />
           ))}
         </div>

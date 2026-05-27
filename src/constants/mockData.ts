@@ -31,7 +31,7 @@ export interface Community {
   subCommunities?: SubCommunity[];
 }
 
-const DISCLAIMER =
+export const DISCLAIMER =
   'Disclaimer: Investments in the market are subject to market risk. Please read all related documents carefully before investing. Registration granted by SEBI, Enlistment as RA with Exchange and certification from NISM in no way guarantee performance of the intermediary or provide any assurance of returns to investors.';
 
 export const COMMUNITIES: Community[] = [
