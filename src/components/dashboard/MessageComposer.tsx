@@ -6,24 +6,25 @@ import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
-import { 
-  Bold, 
-  Italic, 
-  Strikethrough, 
-  Underline as UnderlineIcon, 
-  Type, 
-  Smile, 
-  AlignLeft, 
-  List, 
-  Image as ImageIcon, 
-  Paperclip, 
-  Video, 
-  BarChart2, 
-  Zap, 
-  Undo2, 
+import {
+  Bold,
+  Italic,
+  Strikethrough,
+  Underline as UnderlineIcon,
+  Type,
+  Smile,
+  AlignLeft,
+  List,
+  Image as ImageIcon,
+  Paperclip,
+  Video,
+  BarChart2,
+  Zap,
+  Undo2,
   Redo2,
   ChevronDown,
-  Send
+  Send,
+  X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -37,11 +38,20 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-interface MessageComposerProps {
-  onSend?: (content: string, options?: { messageType?: string; group?: string; notifyUsers?: boolean }) => void;
+export interface FilePreviewData {
+  name: string;
+  size: string;
+  fileType: 'image' | 'video' | 'pdf' | 'doc' | 'excel' | 'file';
+  url: string;
 }
 
-const MessageComposer = ({ onSend }: MessageComposerProps) => {
+interface MessageComposerProps {
+  onSend?: (content: string, options?: { messageType?: string; group?: string; notifyUsers?: boolean }) => void;
+  onSendFile?: (attachment: FilePreviewData, caption?: string) => void;
+  onFileSelect?: (file: FilePreviewData) => void;
+}
+
+const MessageComposer = ({ onSend, onSendFile, onFileSelect }: MessageComposerProps) => {
   const [isEditorEmpty, setIsEditorEmpty] = React.useState(true);
   const [selectedGroup, setSelectedGroup] = React.useState<string | null>(null);
   const [selectedMessageType, setSelectedMessageType] = React.useState<string | null>(null);
@@ -114,13 +124,24 @@ const MessageComposer = ({ onSend }: MessageComposerProps) => {
   const undo = () => editor.chain().focus().undo().run();
   const redo = () => editor.chain().focus().redo().run();
 
-  const handleFileInsert = (file: File, type: 'image' | 'file' | 'video') => {
-    const placeholder = type === 'image'
-      ? `📷 ${file.name}`
-      : type === 'video'
-        ? `🎬 ${file.name}`
-        : `📎 ${file.name}`;
-    editor.chain().focus().insertContent(`<p><strong>${placeholder}</strong> (${(file.size / 1024).toFixed(1)} KB)</p>`).run();
+  const handleFileSelect = (file: File, type: 'image' | 'file' | 'video') => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const url = reader.result as string;
+      const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+      let fileType: 'image' | 'video' | 'pdf' | 'doc' | 'excel' | 'file' = 'file';
+      if (type === 'image') fileType = 'image';
+      else if (type === 'video') fileType = 'video';
+      else if (ext === 'pdf') fileType = 'pdf';
+      else if (['doc', 'docx'].includes(ext)) fileType = 'doc';
+      else if (['xls', 'xlsx', 'csv'].includes(ext)) fileType = 'excel';
+
+      const sizeKB = file.size / 1024;
+      const size = sizeKB > 1024 ? `${(sizeKB / 1024).toFixed(1)} MB` : `${sizeKB.toFixed(1)} KB`;
+
+      onFileSelect?.({ name: file.name, size, fileType, url });
+    };
+    reader.readAsDataURL(file);
   };
 
   const insertChart = () => {
@@ -302,9 +323,9 @@ const MessageComposer = ({ onSend }: MessageComposerProps) => {
           <ToolbarButton onClick={toggleAlign}><AlignLeft className="h-4 w-4" /></ToolbarButton>
           <ToolbarButton onClick={toggleBulletList} active={editor.isActive('bulletList')}><List className="h-4 w-4" /></ToolbarButton>
           <div className="h-5 w-[1px] bg-slate-200 mx-2" />
-          <ToolbarButton onClick={() => imageInputRef.current?.click()}><ImageIcon className="h-4 w-4" /></ToolbarButton>
-          <ToolbarButton onClick={() => fileInputRef.current?.click()}><Paperclip className="h-4 w-4" /></ToolbarButton>
-          <ToolbarButton onClick={() => videoInputRef.current?.click()}><Video className="h-4 w-4" /></ToolbarButton>
+          <ToolbarButton onClick={() => { imageInputRef.current?.click(); }}><ImageIcon className="h-4 w-4" /></ToolbarButton>
+          <ToolbarButton onClick={() => { fileInputRef.current?.click(); }}><Paperclip className="h-4 w-4" /></ToolbarButton>
+          <ToolbarButton onClick={() => { videoInputRef.current?.click(); }}><Video className="h-4 w-4" /></ToolbarButton>
           <div className="h-5 w-[1px] bg-slate-200 mx-2" />
           <ToolbarButton onClick={insertChart}><BarChart2 className="h-4 w-4" /></ToolbarButton>
           <ToolbarButton onClick={insertQuickTrade}><Zap className="h-4 w-4" /></ToolbarButton>
@@ -316,7 +337,7 @@ const MessageComposer = ({ onSend }: MessageComposerProps) => {
       </div>
 
       {/* Editor Area */}
-      <div 
+      <div
         className={cn(
           "px-5 pt-3 pb-6 overflow-y-auto cursor-pointer",
           isEditorEmpty ? "flex-1" : "min-h-[80px]"
@@ -382,7 +403,7 @@ const MessageComposer = ({ onSend }: MessageComposerProps) => {
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) handleFileInsert(file, 'image');
+          if (file) handleFileSelect(file, 'image');
           e.target.value = '';
         }}
       />
@@ -393,7 +414,7 @@ const MessageComposer = ({ onSend }: MessageComposerProps) => {
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) handleFileInsert(file, 'file');
+          if (file) handleFileSelect(file, 'file');
           e.target.value = '';
         }}
       />
@@ -404,7 +425,7 @@ const MessageComposer = ({ onSend }: MessageComposerProps) => {
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) handleFileInsert(file, 'video');
+          if (file) handleFileSelect(file, 'video');
           e.target.value = '';
         }}
       />
