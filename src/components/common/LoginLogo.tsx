@@ -9,6 +9,7 @@ const LoginLogo = () => (
       fill
       className="object-contain"
       priority
+      
     />
   </div>
 );
