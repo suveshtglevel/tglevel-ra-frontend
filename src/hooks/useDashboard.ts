@@ -1,7 +1,8 @@
 import { toast } from 'react-hot-toast';
 import { useAppDispatch, useAppSelector } from '@/redux/hooks';
 import { selectCommunity } from '@/redux/slices/communitySlice';
-import { sendMessage, updateMessageStatus } from '@/redux/slices/messageSlice';
+import { sendMessage, sendFileMessage, updateMessageStatus } from '@/redux/slices/messageSlice';
+import type { FileAttachment } from '@/redux/slices/messageSlice';
 
 export const useDashboard = () => {
   const dispatch = useAppDispatch();
@@ -33,16 +34,16 @@ export const useDashboard = () => {
       notifyUsers: options?.notifyUsers,
     }));
 
-    // Simulate status progression: sent -> delivered -> read
-    const msgId = `msg-${selectedCommunityId}-${Date.now()}`;
-    setTimeout(() => {
-      dispatch(updateMessageStatus({ messageId: msgId, communityId: selectedCommunityId, status: 'delivered' }));
-    }, 1000);
-    setTimeout(() => {
-      dispatch(updateMessageStatus({ messageId: msgId, communityId: selectedCommunityId, status: 'read' }));
-    }, 2500);
-
     toast.success('Message sent successfully!');
+  };
+
+  const handleSendFile = (attachment: FileAttachment, caption?: string) => {
+    dispatch(sendFileMessage({
+      communityId: selectedCommunityId,
+      attachment,
+      caption,
+    }));
+    toast.success(`${attachment.name} sent!`);
   };
 
   return {
@@ -53,5 +54,6 @@ export const useDashboard = () => {
     currentMessages,
     handleSelectCommunity,
     handleSendMessage,
+    handleSendFile,
   };
 };

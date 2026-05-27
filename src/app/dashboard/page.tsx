@@ -17,6 +17,7 @@ export default function DashboardPage() {
     currentMessages,
     handleSelectCommunity,
     handleSendMessage,
+    handleSendFile,
   } = useDashboard();
 
   return (
@@ -48,7 +49,7 @@ export default function DashboardPage() {
         {/* Message Input Section */}
         <div className="p-6 bg-[#F8FAFC] shrink-0">
           <div className="max-w-[991px] mx-auto w-full">
-            <MessageComposer onSend={handleSendMessage} />
+            <MessageComposer onSend={handleSendMessage} onSendFile={handleSendFile} />
           </div>
         </div>
       </main>

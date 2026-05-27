@@ -1,5 +1,12 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
+export interface FileAttachment {
+  name: string;
+  size: string;
+  fileType: 'image' | 'video' | 'pdf' | 'doc' | 'excel' | 'file';
+  url: string; // base64 data URL or blob URL
+}
+
 export interface ChatMessage {
   id: string;
   communityId: number;
@@ -11,6 +18,7 @@ export interface ChatMessage {
   timestamp: string;
   status: 'sent' | 'delivered' | 'read';
   sender: string;
+  attachment?: FileAttachment;
 }
 
 interface MessageState {
@@ -138,6 +146,35 @@ const messageSlice = createSlice({
       // Simulate delivery after adding
       setTimeout(() => {}, 0);
     },
+    sendFileMessage: (state, action: PayloadAction<{
+      communityId: number;
+      attachment: FileAttachment;
+      caption?: string;
+    }>) => {
+      const { communityId, attachment, caption } = action.payload;
+      const now = new Date();
+      const h = now.getHours();
+      const m = now.getMinutes();
+      const period = h >= 12 ? 'PM' : 'AM';
+      const hr = h > 12 ? h - 12 : h === 0 ? 12 : h;
+      const timestamp = `${hr}:${m.toString().padStart(2, '0')} ${period}`;
+
+      const newMsg: ChatMessage = {
+        id: `msg-${communityId}-${Date.now()}`,
+        communityId,
+        content: caption || '',
+        type: 'sent',
+        timestamp,
+        status: 'sent',
+        sender: 'You',
+        attachment,
+      };
+
+      if (!state.messages[communityId]) {
+        state.messages[communityId] = [];
+      }
+      state.messages[communityId].push(newMsg);
+    },
     updateMessageStatus: (state, action: PayloadAction<{ messageId: string; communityId: number; status: 'sent' | 'delivered' | 'read' }>) => {
       const { messageId, communityId, status } = action.payload;
       const msgs = state.messages[communityId];
@@ -151,5 +188,5 @@ const messageSlice = createSlice({
   },
 });
 
-export const { sendMessage, updateMessageStatus } = messageSlice.actions;
+export const { sendMessage, sendFileMessage, updateMessageStatus } = messageSlice.actions;
 export default messageSlice.reducer;
