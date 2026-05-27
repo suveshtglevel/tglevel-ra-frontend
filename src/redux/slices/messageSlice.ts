@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { COMMUNITIES, CommunityAnalysis } from '@/constants/mockData';
 
 export interface FileAttachment {
   name: string;
@@ -19,91 +20,61 @@ export interface ChatMessage {
   status: 'sent' | 'delivered' | 'read';
   sender: string;
   attachment?: FileAttachment;
+  // Trade-card metadata (only present when messageType === 'Trade')
+  tradeTag?: string;
+  tradeRefId?: string;
 }
 
 interface MessageState {
   messages: Record<number, ChatMessage[]>;
 }
 
-// Dummy messages per community
-const now = new Date();
-const fmt = (h: number, m: number) => {
-  const period = h >= 12 ? 'PM' : 'AM';
-  const hr = h > 12 ? h - 12 : h;
-  return `${hr}:${m.toString().padStart(2, '0')} ${period}`;
-};
+// Build the HTML body of a Trade card from structured analysis data.
+const analysisToHtml = (a: CommunityAnalysis) =>
+  `<p><b>${a.title}</b></p>` +
+  `<p>Entry Above = ${a.entry}</p>` +
+  `<p>SL = ${a.sl}</p>` +
+  `<p>Target 1 = ${a.target1}</p>` +
+  `<p>Target 2 = ${a.target2}</p>` +
+  `<p>Our Customer Care:- ${a.customerCare}</p>` +
+  `<p>Rationale = <a href="${a.rationale}" target="_blank" rel="noopener noreferrer">${a.rationale}</a></p>` +
+  `<p>Confidence Level Trade: ${a.confidence}</p>`;
 
-const INITIAL_MESSAGES: Record<number, ChatMessage[]> = {
-  1: [
-    {
-      id: 'msg-1-1',
-      communityId: 1,
-      content: '',
-      type: 'received',
-      timestamp: fmt(10, 45),
-      status: 'read',
-      sender: 'RA Admin',
-    },
-  ],
-  2: [
-    {
-      id: 'msg-2-1',
-      communityId: 2,
-      content: '<p><b>RELIANCE 2900 CE</b> - Strong breakout above resistance. Entry at 42, SL 36, Target 50/58.</p>',
-      type: 'received',
-      timestamp: fmt(10, 38),
-      status: 'read',
-      sender: 'RA Admin',
-    },
-  ],
-  3: [
-    {
-      id: 'msg-3-1',
-      communityId: 3,
-      content: '<p><b>GOLD MINI FUT</b> - Bullish momentum continues. Entry 71500, SL 71200, Target 71900/72300.</p>',
-      type: 'received',
-      timestamp: fmt(10, 30),
-      status: 'read',
-      sender: 'RA Admin',
-    },
-  ],
-  4: [
-    {
-      id: 'msg-4-1',
-      communityId: 4,
-      content: '<p><b>TATAMOTORS Positional</b> - Buy at 980, SL 940, Target 1040/1100. Strong support at 960 zone.</p>',
-      type: 'received',
-      timestamp: fmt(9, 45),
-      status: 'read',
-      sender: 'RA Admin',
-    },
-  ],
-  5: [
-    {
-      id: 'msg-5-1',
-      communityId: 5,
-      content: '<p>Weekly market outlook: Nifty expected to trade in range 24000-24700. Key support at 24100, resistance at 24500.</p>',
-      type: 'received',
-      timestamp: fmt(8, 15),
-      status: 'read',
-      sender: 'RA Admin',
-    },
-  ],
-  6: [
-    {
-      id: 'msg-6-1',
-      communityId: 6,
-      content: '<p><b>Premium Call:</b> HDFCBANK 1700 CE - Entry 28, SL 22, Target 36/44. High confidence setup.</p>',
-      type: 'received',
-      timestamp: fmt(10, 20),
-      status: 'read',
-      sender: 'RA Admin',
-    },
-  ],
-};
+// One seed Trade card per chat (derived from the parent community's analysis).
+const seedTrade = (chatId: number, a: CommunityAnalysis): ChatMessage => ({
+  id: `seed-${chatId}`,
+  communityId: chatId,
+  content: analysisToHtml(a),
+  type: 'received',
+  messageType: 'Trade',
+  timestamp: a.time,
+  status: 'read',
+  sender: 'RA Admin',
+  tradeTag: a.tag,
+  tradeRefId: a.id,
+});
+
+// Every community and subcommunity starts with exactly one seed Trade card —
+// no random messages. Subcommunities inherit the parent community's analysis.
+const INITIAL_MESSAGES: Record<number, ChatMessage[]> = {};
+COMMUNITIES.forEach((c) => {
+  INITIAL_MESSAGES[c.id] = [seedTrade(c.id, c.analysis)];
+  c.subCommunities?.forEach((s) => {
+    INITIAL_MESSAGES[s.id] = [seedTrade(s.id, c.analysis)];
+  });
+});
 
 const initialState: MessageState = {
   messages: INITIAL_MESSAGES,
+};
+
+const formatNow = () => {
+  const now = new Date();
+  const h = now.getHours();
+  const m = now.getMinutes();
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hr = h > 12 ? h - 12 : h === 0 ? 12 : h;
+  return `${hr}:${m.toString().padStart(2, '0')} ${period}`;
 };
 
 const messageSlice = createSlice({
@@ -118,12 +89,7 @@ const messageSlice = createSlice({
       notifyUsers?: boolean;
     }>) => {
       const { communityId, content, messageType, group, notifyUsers } = action.payload;
-      const now = new Date();
-      const h = now.getHours();
-      const m = now.getMinutes();
-      const period = h >= 12 ? 'PM' : 'AM';
-      const hr = h > 12 ? h - 12 : h === 0 ? 12 : h;
-      const timestamp = `${hr}:${m.toString().padStart(2, '0')} ${period}`;
+      const isTrade = messageType === 'Trade';
 
       const newMsg: ChatMessage = {
         id: `msg-${communityId}-${Date.now()}`,
@@ -133,18 +99,17 @@ const messageSlice = createSlice({
         messageType,
         group,
         notifyUsers,
-        timestamp,
+        timestamp: formatNow(),
         status: 'sent',
         sender: 'You',
+        tradeTag: isTrade ? 'Trade' : undefined,
+        tradeRefId: isTrade ? String(Date.now()).slice(-4) : undefined,
       };
 
       if (!state.messages[communityId]) {
         state.messages[communityId] = [];
       }
       state.messages[communityId].push(newMsg);
-
-      // Simulate delivery after adding
-      setTimeout(() => {}, 0);
     },
     sendFileMessage: (state, action: PayloadAction<{
       communityId: number;
@@ -152,19 +117,13 @@ const messageSlice = createSlice({
       caption?: string;
     }>) => {
       const { communityId, attachment, caption } = action.payload;
-      const now = new Date();
-      const h = now.getHours();
-      const m = now.getMinutes();
-      const period = h >= 12 ? 'PM' : 'AM';
-      const hr = h > 12 ? h - 12 : h === 0 ? 12 : h;
-      const timestamp = `${hr}:${m.toString().padStart(2, '0')} ${period}`;
 
       const newMsg: ChatMessage = {
         id: `msg-${communityId}-${Date.now()}`,
         communityId,
         content: caption || '',
         type: 'sent',
-        timestamp,
+        timestamp: formatNow(),
         status: 'sent',
         sender: 'You',
         attachment,

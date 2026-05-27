@@ -3,13 +3,12 @@
 import React from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Check, CheckCheck, FileText, FileSpreadsheet, File, Play, X, Download } from 'lucide-react';
-import ResearchCard from './ResearchCard';
+import TradeCard from './TradeCard';
 import ViewedByPanel from './ViewedByPanel';
 import { cn } from '@/lib/utils';
 import type { ChatMessage, FileAttachment } from '@/redux/slices/messageSlice';
 
 interface ChatFeedProps {
-  analysis: any;
   views?: string;
   messages?: ChatMessage[];
 }
@@ -184,7 +183,7 @@ const MessageBubble = ({ message, onOpenFile }: { message: ChatMessage; onOpenFi
   );
 };
 
-const ChatFeed = ({ analysis, views = '42', messages = [] }: ChatFeedProps) => {
+const ChatFeed = ({ views = '42', messages = [] }: ChatFeedProps) => {
   const [showViewedBy, setShowViewedBy] = React.useState(false);
   const [viewingFile, setViewingFile] = React.useState<FileAttachment | null>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -209,17 +208,28 @@ const ChatFeed = ({ analysis, views = '42', messages = [] }: ChatFeedProps) => {
             <div className="flex-1 h-[1px] bg-slate-200" />
           </div>
 
-          {/* Analysis Card (first message for community 1) */}
-          <ResearchCard
-            analysis={analysis}
-            onTickClick={() => setShowViewedBy((prev) => !prev)}
-          />
-
-          {/* Additional messages */}
-          <div className="flex flex-col gap-3 w-full mt-4">
-            {messages.filter((m) => m.id !== 'msg-1-1').map((msg) => (
-              <MessageBubble key={msg.id} message={msg} onOpenFile={(att) => setViewingFile(att)} />
-            ))}
+          {/* Messages — Trade-type messages render as the green research card,
+              everything else renders as a normal chat bubble. */}
+          <div className="flex flex-col gap-3 w-full">
+            {messages.map((msg) =>
+              msg.messageType === 'Trade' ? (
+                <div
+                  key={msg.id}
+                  className={cn('flex w-full', msg.type === 'sent' ? 'justify-end' : 'justify-start')}
+                >
+                  <TradeCard
+                    content={msg.content}
+                    timestamp={msg.timestamp}
+                    status={msg.status}
+                    tag={msg.tradeTag}
+                    refId={msg.tradeRefId}
+                    onTickClick={() => setShowViewedBy((prev) => !prev)}
+                  />
+                </div>
+              ) : (
+                <MessageBubble key={msg.id} message={msg} onOpenFile={(att) => setViewingFile(att)} />
+              )
+            )}
           </div>
         </div>
       </ScrollArea>
