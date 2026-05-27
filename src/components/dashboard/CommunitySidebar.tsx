@@ -14,6 +14,7 @@ interface CommunitySidebarProps {
   communities: Community[];
   selectedCommunityId: number;
   selectedSubCommunityId: number | null;
+  onSelectCommunity: (id: number) => void;
   onSelectSubCommunity: (id: number) => void;
 }
 
@@ -21,6 +22,7 @@ const CommunitySidebar = ({
   communities,
   selectedCommunityId,
   selectedSubCommunityId,
+  onSelectCommunity,
   onSelectSubCommunity,
 }: CommunitySidebarProps) => {
   const [search, setSearch] = React.useState('');
@@ -84,6 +86,7 @@ const CommunitySidebar = ({
                   active={comm.id === selectedCommunityId}
                   selectedSubCommunityId={selectedSubCommunityId}
                   initialExpanded={index === 0}
+                  onSelectCommunity={onSelectCommunity}
                   onSelectSubCommunity={onSelectSubCommunity}
                 />
               </div>

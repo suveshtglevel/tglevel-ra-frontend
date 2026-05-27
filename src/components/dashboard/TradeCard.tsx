@@ -39,7 +39,7 @@ const TradeCard = ({ content, timestamp, status = 'read', tag, refId, onTickClic
         </div>
 
         <div
-          className="text-[13px] leading-[18.57px] font-medium space-y-1.5 [&_p]:my-0 [&_b]:font-bold [&_strong]:font-bold [&_a]:text-emerald-600 [&_a]:underline"
+          className="text-[13px] leading-[18.57px] font-medium space-y-1.5 [&_p]:my-0 [&_b]:font-bold [&_strong]:font-bold [&_a]:text-emerald-600 [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1 [&_li]:my-0.5"
           style={{ fontFamily: 'Inter' }}
           dangerouslySetInnerHTML={{ __html: content }}
         />

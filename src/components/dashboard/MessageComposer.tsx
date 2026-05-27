@@ -7,6 +7,7 @@ import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
+import TextAlign from '@tiptap/extension-text-align';
 import {
   Bold,
   Italic,
@@ -15,6 +16,9 @@ import {
   Type,
   Smile,
   AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
   List,
   Image as ImageIcon,
   Paperclip,
@@ -156,6 +160,9 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
       Link.configure({
         openOnClick: false,
       }),
+      TextAlign.configure({
+        types: ['heading', 'paragraph'],
+      }),
       Placeholder.configure({
         placeholder: 'Type your message here...',
       }),
@@ -187,10 +194,8 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
       editor.chain().focus().toggleHeading({ level: 2 }).run();
     }
   };
-  const toggleAlign = () => {
-    // Insert a horizontal rule as a visual separator
-    editor.chain().focus().setHorizontalRule().run();
-  };
+  const setAlign = (align: 'left' | 'center' | 'right' | 'justify') =>
+    editor.chain().focus().setTextAlign(align).run();
   const undo = () => editor.chain().focus().undo().run();
   const redo = () => editor.chain().focus().redo().run();
 
@@ -575,7 +580,10 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
             </PopoverContent>
           </Popover>
           <div className="h-5 w-[1px] bg-slate-200 mx-2" />
-          <ToolbarButton onClick={toggleAlign}><AlignLeft className="h-4 w-4" /></ToolbarButton>
+          <ToolbarButton onClick={() => setAlign('left')} active={editor.isActive({ textAlign: 'left' })}><AlignLeft className="h-4 w-4" /></ToolbarButton>
+          <ToolbarButton onClick={() => setAlign('center')} active={editor.isActive({ textAlign: 'center' })}><AlignCenter className="h-4 w-4" /></ToolbarButton>
+          <ToolbarButton onClick={() => setAlign('right')} active={editor.isActive({ textAlign: 'right' })}><AlignRight className="h-4 w-4" /></ToolbarButton>
+          <ToolbarButton onClick={() => setAlign('justify')} active={editor.isActive({ textAlign: 'justify' })}><AlignJustify className="h-4 w-4" /></ToolbarButton>
           <ToolbarButton onClick={toggleBulletList} active={editor.isActive('bulletList')}><List className="h-4 w-4" /></ToolbarButton>
           <div className="h-5 w-[1px] bg-slate-200 mx-2" />
           <ToolbarButton onClick={() => { imageInputRef.current?.click(); }}><ImageIcon className="h-4 w-4" /></ToolbarButton>
@@ -708,7 +716,7 @@ const ToolbarButton = React.forwardRef<
     disabled={disabled}
     className={cn(
       "h-8 w-8 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all rounded-lg cursor-pointer",
-      active && "text-white bg-emerald-500 hover:bg-emerald-600 shadow-sm",
+      active && "text-slate-800",
       className
     )}
   >

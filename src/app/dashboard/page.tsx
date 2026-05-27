@@ -17,6 +17,7 @@ export default function DashboardPage() {
     selectedSubCommunity,
     currentMessages,
     handleSelectSubCommunity,
+    handleSelectCommunity,
     handleSendMessage,
     handleSendFile,
   } = useDashboard();
@@ -31,6 +32,7 @@ export default function DashboardPage() {
         communities={communities}
         selectedCommunityId={selectedCommunityId}
         selectedSubCommunityId={selectedSubCommunityId}
+        onSelectCommunity={handleSelectCommunity}
         onSelectSubCommunity={handleSelectSubCommunity}
       />
 

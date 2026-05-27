@@ -11,6 +11,7 @@ interface CommunityCardProps {
   active: boolean;
   selectedSubCommunityId: number | null;
   initialExpanded?: boolean;
+  onSelectCommunity: (id: number) => void;
   onSelectSubCommunity: (id: number) => void;
 }
 
@@ -87,10 +88,22 @@ const SubCommunityRow = ({ sub, checked, isSelected, onToggle, onSelect }: SubCo
   );
 };
 
-const CommunityCard = ({ community, active, selectedSubCommunityId, initialExpanded = false, onSelectSubCommunity }: CommunityCardProps) => {
+const CommunityCard = ({ community, active, selectedSubCommunityId, initialExpanded = false, onSelectCommunity, onSelectSubCommunity }: CommunityCardProps) => {
   const [expanded, setExpanded] = React.useState(initialExpanded);
   const subCommunities = community.subCommunities ?? [];
   const toggleExpanded = () => setExpanded((prev) => !prev);
+
+  // Clicking the community header: if it has sub-communities, toggle the list
+  // AND open the first one's chat. If it has none (e.g. Free/Paid Alumini),
+  // open the community's own chat directly.
+  const handleHeaderClick = () => {
+    if (subCommunities.length > 0) {
+      toggleExpanded();
+      onSelectSubCommunity(subCommunities[0].id);
+    } else {
+      onSelectCommunity(community.id);
+    }
+  };
 
   // Track checked state per sub-community (default: Free = checked)
   const [checkedMap, setCheckedMap] = React.useState<Record<number, boolean>>(() => {
@@ -111,11 +124,11 @@ const CommunityCard = ({ community, active, selectedSubCommunityId, initialExpan
     <Card
       role="button"
       tabIndex={0}
-      onClick={toggleExpanded}
+      onClick={handleHeaderClick}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          toggleExpanded();
+          handleHeaderClick();
         }
       }}
       className={cn(

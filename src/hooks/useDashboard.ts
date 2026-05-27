@@ -1,6 +1,6 @@
 import { toast } from 'react-hot-toast';
 import { useAppDispatch, useAppSelector } from '@/redux/hooks';
-import { selectSubCommunity } from '@/redux/slices/communitySlice';
+import { selectCommunity, selectSubCommunity } from '@/redux/slices/communitySlice';
 import { sendMessage, sendFileMessage, updateMessageStatus } from '@/redux/slices/messageSlice';
 import type { FileAttachment } from '@/redux/slices/messageSlice';
 
@@ -26,6 +26,11 @@ export const useDashboard = () => {
 
   const handleSelectSubCommunity = (id: number) => {
     dispatch(selectSubCommunity(id));
+  };
+
+  // Used for communities that have no sub-communities (they are their own chat).
+  const handleSelectCommunity = (id: number) => {
+    dispatch(selectCommunity(id));
   };
 
   const handleSendMessage = (
@@ -78,6 +83,7 @@ export const useDashboard = () => {
     selectedSubCommunity,
     currentMessages,
     handleSelectSubCommunity,
+    handleSelectCommunity,
     handleSendMessage,
     handleSendFile,
   };
