@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -24,7 +25,10 @@ import {
   Redo2,
   ChevronDown,
   Send,
-  X
+  X,
+  FileText,
+  FileSpreadsheet,
+  File as FileIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -38,26 +42,43 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-export interface FilePreviewData {
-  name: string;
-  size: string;
-  fileType: 'image' | 'video' | 'pdf' | 'doc' | 'excel' | 'file';
-  url: string;
-}
-
 interface MessageComposerProps {
   onSend?: (content: string, options?: { messageType?: string; group?: string; notifyUsers?: boolean }) => void;
-  onSendFile?: (attachment: FilePreviewData, caption?: string) => void;
-  onFileSelect?: (file: FilePreviewData) => void;
+  onSendFile?: (attachment: { name: string; size: string; fileType: 'image' | 'video' | 'pdf' | 'doc' | 'excel' | 'file'; url: string }, caption?: string) => void;
 }
 
-const MessageComposer = ({ onSend, onSendFile, onFileSelect }: MessageComposerProps) => {
+const MessageComposer = ({ onSend, onSendFile }: MessageComposerProps) => {
   const [isEditorEmpty, setIsEditorEmpty] = React.useState(true);
   const [selectedGroup, setSelectedGroup] = React.useState<string | null>(null);
   const [selectedMessageType, setSelectedMessageType] = React.useState<string | null>(null);
   const [notifyUsers, setNotifyUsers] = React.useState(false);
   const [showBundle, setShowBundle] = React.useState(false);
   const [bundleMessages, setBundleMessages] = React.useState<string[]>([]);
+  const [filePreview, setFilePreview] = React.useState<{
+    name: string;
+    size: string;
+    fileType: 'image' | 'video' | 'pdf' | 'doc' | 'excel' | 'file';
+    url: string;
+  } | null>(null);
+  const [caption, setCaption] = React.useState('');
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && filePreview) {
+        setFilePreview(null);
+        setCaption('');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [filePreview]);
 
   const groups = [
     "Nifty free -[NF1, NF2]",
@@ -139,9 +160,18 @@ const MessageComposer = ({ onSend, onSendFile, onFileSelect }: MessageComposerPr
       const sizeKB = file.size / 1024;
       const size = sizeKB > 1024 ? `${(sizeKB / 1024).toFixed(1)} MB` : `${sizeKB.toFixed(1)} KB`;
 
-      onFileSelect?.({ name: file.name, size, fileType, url });
+      setFilePreview({ name: file.name, size, fileType, url });
+      setCaption('');
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleFileConfirmSend = () => {
+    if (filePreview) {
+      onSendFile?.(filePreview, caption || undefined);
+      setFilePreview(null);
+      setCaption('');
+    }
   };
 
   const insertChart = () => {
@@ -158,6 +188,106 @@ const MessageComposer = ({ onSend, onSendFile, onFileSelect }: MessageComposerPr
 
   const addEmoji = (emojiData: any) => {
     editor.chain().focus().insertContent(emojiData.emoji).run();
+  };
+
+  const renderPreviewModal = () => {
+    if (!filePreview || !mounted) return null;
+
+    const modalContent = (
+      <div className="fixed inset-0 z-[9999] bg-[#0b141a] text-white flex flex-col select-none animate-in fade-in duration-200">
+        {/* Header */}
+        <div className="h-16 flex items-center justify-between px-6 shrink-0 bg-[#0b141a] border-b border-white/10">
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => {
+                setFilePreview(null);
+                setCaption('');
+              }}
+              className="p-2 rounded-full hover:bg-white/10 text-[#aebac1] hover:text-white transition-colors cursor-pointer border-none bg-transparent flex items-center justify-center"
+              title="Cancel and close"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <span className="font-semibold text-lg text-[#e9edef]">Preview</span>
+          </div>
+          <div className="hidden md:flex flex-col items-end">
+            <span className="text-xs text-[#8696a0] max-w-[200px] truncate" title={filePreview.name}>
+              {filePreview.name}
+            </span>
+            <span className="text-[10px] text-[#8696a0] mt-0.5">
+              {filePreview.size}
+            </span>
+          </div>
+        </div>
+
+        {/* Preview Area */}
+        <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-12 overflow-y-auto bg-[#0b141a]/95">
+          {filePreview.fileType === 'image' ? (
+            <div className="relative max-h-[65vh] max-w-[85vw] flex items-center justify-center">
+              <img
+                src={filePreview.url}
+                alt={filePreview.name}
+                className="max-h-[65vh] max-w-[85vw] object-contain rounded-lg shadow-2xl border border-white/5"
+              />
+            </div>
+          ) : filePreview.fileType === 'video' ? (
+            <div className="relative max-h-[65vh] max-w-[85vw] flex items-center justify-center">
+              <video
+                src={filePreview.url}
+                controls
+                autoPlay
+                className="max-h-[65vh] max-w-[85vw] object-contain rounded-lg shadow-2xl border border-white/5"
+              />
+            </div>
+          ) : (
+            <div className="bg-[#111b21] border border-white/15 p-10 rounded-2xl max-w-md w-full flex flex-col items-center gap-6 text-center shadow-2xl">
+              <div className="w-24 h-24 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10">
+                {filePreview.fileType === 'pdf' && <FileText className="w-12 h-12 text-[#EF4444]" />}
+                {filePreview.fileType === 'doc' && <FileIcon className="w-12 h-12 text-[#3B82F6]" />}
+                {filePreview.fileType === 'excel' && <FileSpreadsheet className="w-12 h-12 text-[#10B981]" />}
+                {filePreview.fileType === 'file' && <FileIcon className="w-12 h-12 text-[#AEBAC1]" />}
+              </div>
+              <div className="px-4">
+                <h3 className="text-lg font-semibold text-[#e9edef] break-all leading-snug">{filePreview.name}</h3>
+                <p className="text-sm text-[#8696a0] mt-2 uppercase tracking-wide font-medium">
+                  {filePreview.fileType === 'file' ? 'Document' : `${filePreview.fileType} file`} &bull; {filePreview.size}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer caption & send area */}
+        <div className="bg-[#111b21] border-t border-white/5 py-5 px-6 shrink-0 flex items-center justify-center">
+          <div className="w-full max-w-[800px] flex items-center gap-4">
+            <div className="flex-1 bg-[#2a3942] rounded-xl flex items-center px-4 py-1.5 border border-white/5 focus-within:border-emerald-500/30 transition-all">
+              <input
+                type="text"
+                placeholder="Add a caption..."
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleFileConfirmSend();
+                }}
+                autoFocus
+                className="flex-1 bg-transparent border-none text-[#e9edef] placeholder-[#8696a0] focus:outline-none focus:ring-0 text-[15px] py-1.5"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleFileConfirmSend}
+              className="bg-[#00a884] hover:bg-[#008f72] active:scale-95 text-white rounded-full p-4 flex items-center justify-center shadow-lg transition-all cursor-pointer shrink-0 border-none"
+              title="Send"
+            >
+              <Send className="w-6 h-6 fill-current translate-x-[2px] text-white" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+
+    return createPortal(modalContent, document.body);
   };
 
   return (
@@ -335,6 +465,8 @@ const MessageComposer = ({ onSend, onSendFile, onFileSelect }: MessageComposerPr
           <ToolbarButton onClick={redo} disabled={!editor.can().redo()}><Redo2 className="h-4 w-4" /></ToolbarButton>
         </div>
       </div>
+
+      {renderPreviewModal()}
 
       {/* Editor Area */}
       <div
