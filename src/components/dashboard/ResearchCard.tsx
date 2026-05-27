@@ -23,6 +23,7 @@ interface ResearchCardProps {
     time: string;
   };
   status?: MessageStatus;
+  onTickClick?: () => void;
 }
 
 const StatusTick = ({ status }: { status: MessageStatus }) => {
@@ -35,10 +36,10 @@ const StatusTick = ({ status }: { status: MessageStatus }) => {
   return <CheckCheck className="w-4 h-4 text-[#3B82F6]" />;
 };
 
-const ResearchCard = ({ analysis, status = 'read' }: ResearchCardProps) => {
+const ResearchCard = ({ analysis, status = 'read', onTickClick }: ResearchCardProps) => {
   return (
-    <Card className="w-[448px] bg-[#E6F9F3] border-[#C2EDDF] p-6 rounded-3xl shadow-none">
-      <div className="space-y-4 text-slate-800">
+    <Card className="w-[380px] bg-[#E6F9F3] border-[#C2EDDF] p-5 rounded-3xl shadow-none">
+      <div className="space-y-3 text-slate-800">
         <div className="font-bold flex items-center gap-2 text-[15px]">
           ✅*RESEARCH ANALYSIS✅
         </div>
@@ -60,7 +61,7 @@ const ResearchCard = ({ analysis, status = 'read' }: ResearchCardProps) => {
 
         <div className="space-y-1.5 text-[13px] font-bold">
           <p>Our Customer Care:- {analysis.customerCare}</p>
-          <p>Rationale=<a href={analysis.rationale} className="text-emerald-600 underline" target="_blank" rel="noopener noreferrer">{analysis.rationale}</a></p>
+          <p>Rationale=<a href={analysis.rationale} className="text-emerald-600 underline cursor-pointer" target="_blank" rel="noopener noreferrer">{analysis.rationale}</a></p>
         </div>
 
         <div className="bg-white/60 p-4 rounded-2xl border border-emerald-100">
@@ -80,7 +81,13 @@ const ResearchCard = ({ analysis, status = 'read' }: ResearchCardProps) => {
           </div>
           <div className="flex items-center gap-1.5 font-bold text-[10px] text-slate-500">
             {analysis.time}
-            <StatusTick status={status} />
+            <button
+              type="button"
+              onClick={onTickClick}
+              className="bg-transparent border-none p-0 cursor-pointer"
+            >
+              <StatusTick status={status} />
+            </button>
           </div>
         </div>
       </div>

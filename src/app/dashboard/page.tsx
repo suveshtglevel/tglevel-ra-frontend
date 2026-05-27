@@ -14,6 +14,7 @@ export default function DashboardPage() {
     selectedCommunityId,
     selectedCommunity,
     currentAnalysis,
+    currentMessages,
     handleSelectCommunity,
     handleSendMessage,
   } = useDashboard();
@@ -38,7 +39,11 @@ export default function DashboardPage() {
         <PinnedAlert message={selectedCommunity.pinned} />
 
         {/* Feed Scroll Area */}
-        <ChatFeed analysis={currentAnalysis} />
+        <ChatFeed
+          analysis={currentAnalysis}
+          views={selectedCommunity.views}
+          messages={currentMessages}
+        />
 
         {/* Message Input Section */}
         <div className="p-6 bg-[#F8FAFC] shrink-0">

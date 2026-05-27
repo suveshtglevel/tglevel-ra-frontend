@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import CommunityCard from './CommunityCard';
 import CommunityFilters from './CommunityFilters';
+import type { FilterType } from './CommunityFilters';
 import type { Community } from '@/constants/mockData';
 
 interface CommunitySidebarProps {
@@ -20,6 +21,29 @@ const CommunitySidebar = ({
   selectedCommunityId,
   onSelectCommunity,
 }: CommunitySidebarProps) => {
+  const [search, setSearch] = React.useState('');
+  const [activeFilter, setActiveFilter] = React.useState<FilterType>('ALL');
+
+  const filteredCommunities = communities.filter((comm) => {
+    // Search filter
+    if (search && !comm.name.toLowerCase().includes(search.toLowerCase())) {
+      return false;
+    }
+    // Type filter
+    if (activeFilter === 'Free') {
+      // Communities with sub-communities that have free ones, or "Free Alumini"
+      const hasFree = comm.subCommunities?.some((s) => s.type === 'Free') ?? false;
+      const isFreeByName = comm.name.toLowerCase().includes('free');
+      return hasFree || isFreeByName;
+    }
+    if (activeFilter === 'Premium') {
+      const hasPaid = comm.subCommunities?.some((s) => s.type === 'Paid') ?? false;
+      const isPaidByName = comm.name.toLowerCase().includes('paid');
+      return hasPaid || isPaidByName;
+    }
+    return true;
+  });
+
   return (
     <section className="w-80 flex flex-col bg-white border-r border-slate-200 shrink-0">
       <div className="p-4 flex items-center justify-between">
@@ -29,7 +53,7 @@ const CommunitySidebar = ({
           </div>
           <h2 className="font-bold text-slate-800">TG Levels</h2>
         </div>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
+        <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer">
           <MoreVertical className="h-4 w-4" />
         </Button>
       </div>
@@ -37,30 +61,37 @@ const CommunitySidebar = ({
       <div className="px-4 mb-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <Input 
-            placeholder="Search For Community" 
+          <Input
+            placeholder="Search For Community"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             className="pl-9 h-10 bg-slate-50 border-none rounded-xl text-sm"
           />
         </div>
       </div>
 
-      <CommunityFilters />
+      <CommunityFilters activeFilter={activeFilter} onFilterChange={setActiveFilter} />
 
       <ScrollArea className="flex-1 px-4">
         <div className="flex flex-col gap-2 pb-4">
-          {communities.map((comm) => (
-            <CommunityCard
-              key={comm.id}
-              community={comm}
-              active={comm.id === selectedCommunityId}
-              onSelect={() => onSelectCommunity(comm.id)}
-            />
-          ))}
+          {filteredCommunities.length > 0 ? (
+            filteredCommunities.map((comm) => (
+              <CommunityCard
+                key={comm.id}
+                community={comm}
+                active={comm.id === selectedCommunityId}
+                onSelect={() => onSelectCommunity(comm.id)}
+              />
+            ))
+          ) : (
+            <div className="text-center py-8 text-slate-400 text-sm">
+              No communities found
+            </div>
+          )}
         </div>
       </ScrollArea>
     </section>
   );
 };
-
 
 export default CommunitySidebar;

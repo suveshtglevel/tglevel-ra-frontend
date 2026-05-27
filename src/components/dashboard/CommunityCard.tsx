@@ -19,7 +19,7 @@ const CheckCircle = ({ checked, onClick }: { checked: boolean; onClick?: (e: Rea
     aria-pressed={checked}
     onClick={onClick}
     className={cn(
-      "w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center transition-colors shrink-0",
+      "w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center transition-colors shrink-0 cursor-pointer",
       checked
         ? "border-emerald-500 bg-emerald-500"
         : "border-[#D1D5DB] bg-white"
@@ -33,9 +33,13 @@ const CheckCircle = ({ checked, onClick }: { checked: boolean; onClick?: (e: Rea
   </button>
 );
 
-const SubCommunityRow = ({ sub }: { sub: SubCommunity }) => {
-  const [checked, setChecked] = React.useState(sub.type === 'Free');
+interface SubCommunityRowProps {
+  sub: SubCommunity;
+  checked: boolean;
+  onToggle: () => void;
+}
 
+const SubCommunityRow = ({ sub, checked, onToggle }: SubCommunityRowProps) => {
   return (
     <div className="flex items-center h-[48px] px-4 bg-[#F8FAFC] rounded-[12px]">
       <span className="text-[13px] font-bold text-[#0F172A] w-[50px]">{sub.name}</span>
@@ -50,7 +54,7 @@ const SubCommunityRow = ({ sub }: { sub: SubCommunity }) => {
         checked={checked}
         onClick={(e) => {
           e.stopPropagation();
-          setChecked((prev) => !prev);
+          onToggle();
         }}
       />
     </div>
@@ -60,6 +64,21 @@ const SubCommunityRow = ({ sub }: { sub: SubCommunity }) => {
 const CommunityCard = ({ community, active, onSelect }: CommunityCardProps) => {
   const [expanded, setExpanded] = React.useState(false);
   const subCommunities = community.subCommunities ?? [];
+
+  // Track checked state per sub-community (default: Free = checked)
+  const [checkedMap, setCheckedMap] = React.useState<Record<number, boolean>>(() => {
+    const map: Record<number, boolean> = {};
+    subCommunities.forEach((s) => {
+      map[s.id] = s.type === 'Free';
+    });
+    return map;
+  });
+
+  const selectedCount = Object.values(checkedMap).filter(Boolean).length;
+
+  const toggleSub = (subId: number) => {
+    setCheckedMap((prev) => ({ ...prev, [subId]: !prev[subId] }));
+  };
 
   return (
     <Card
@@ -77,7 +96,7 @@ const CommunityCard = ({ community, active, onSelect }: CommunityCardProps) => {
         active && "border-emerald-200 bg-emerald-50/30"
       )}
     >
-      {/* Header Row — original design */}
+      {/* Header Row */}
       <div className="flex items-center h-[74px] shrink-0">
         {/* Left Icon Container */}
         <div className="w-10 h-10 rounded-full bg-[#F1F5F9] flex items-center justify-center shrink-0">
@@ -103,26 +122,38 @@ const CommunityCard = ({ community, active, onSelect }: CommunityCardProps) => {
           <span className="text-[10px] font-medium text-[#64748B]">{community.time}</span>
         </div>
 
-        {/* Top Right Controls (Status Circle + Arrow) */}
+        {/* Top Right Controls */}
         <div className="absolute top-3 right-3 flex flex-col items-center gap-[15px]">
-          <div className="w-[15px] h-[15px] rounded-full border border-[#E2E8F0] bg-white" />
-          {subCommunities.length > 0 && (
-            <button
-              type="button"
-              aria-label="Toggle dropdown"
-              onClick={(e) => {
-                e.stopPropagation();
-                setExpanded((prev) => !prev);
-              }}
-              className="p-0 bg-transparent border-none cursor-pointer"
-            >
-              <ChevronDown
-                className={cn(
-                  "w-4 h-4 text-[#64748B] mt-1 transition-transform duration-200",
-                  expanded && "rotate-180"
-                )}
-              />
-            </button>
+          {subCommunities.length > 0 ? (
+            <>
+              {/* Selected count badge */}
+              {selectedCount > 0 && (
+                <div className="w-[18px] h-[18px] rounded-full bg-emerald-500 flex items-center justify-center">
+                  <span className="text-[9px] font-bold text-white">{selectedCount}</span>
+                </div>
+              )}
+              {selectedCount === 0 && (
+                <div className="w-[15px] h-[15px] rounded-full border border-[#E2E8F0] bg-white" />
+              )}
+              <button
+                type="button"
+                aria-label="Toggle dropdown"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpanded((prev) => !prev);
+                }}
+                className="p-0 bg-transparent border-none cursor-pointer"
+              >
+                <ChevronDown
+                  className={cn(
+                    "w-4 h-4 text-[#64748B] mt-1 transition-transform duration-200",
+                    expanded && "rotate-180"
+                  )}
+                />
+              </button>
+            </>
+          ) : (
+            <div className="w-[15px] h-[15px] rounded-full border border-[#E2E8F0] bg-white" />
           )}
         </div>
       </div>
@@ -131,13 +162,17 @@ const CommunityCard = ({ community, active, onSelect }: CommunityCardProps) => {
       {expanded && subCommunities.length > 0 && (
         <div className="flex flex-col gap-2 pb-3">
           {subCommunities.map((sub) => (
-            <SubCommunityRow key={sub.id} sub={sub} />
+            <SubCommunityRow
+              key={sub.id}
+              sub={sub}
+              checked={checkedMap[sub.id] ?? false}
+              onToggle={() => toggleSub(sub.id)}
+            />
           ))}
         </div>
       )}
     </Card>
   );
 };
-
 
 export default CommunityCard;
