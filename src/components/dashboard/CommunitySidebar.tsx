@@ -14,7 +14,6 @@ interface CommunitySidebarProps {
   communities: Community[];
   selectedCommunityId: number;
   selectedSubCommunityId: number | null;
-  onSelectCommunity: (id: number) => void;
   onSelectSubCommunity: (id: number) => void;
 }
 
@@ -22,12 +21,10 @@ const CommunitySidebar = ({
   communities,
   selectedCommunityId,
   selectedSubCommunityId,
-  onSelectCommunity,
   onSelectSubCommunity,
 }: CommunitySidebarProps) => {
   const [search, setSearch] = React.useState('');
   const [activeFilter, setActiveFilter] = React.useState<FilterType>('ALL');
-  const [expandedCommunityId, setExpandedCommunityId] = React.useState<number | null>(communities[0]?.id ?? null);
 
   const filteredCommunities = communities.filter((comm) => {
     // Search filter
@@ -87,10 +84,6 @@ const CommunitySidebar = ({
                   active={comm.id === selectedCommunityId}
                   selectedSubCommunityId={selectedSubCommunityId}
                   initialExpanded={index === 0}
-                  onSelect={() => {
-                    onSelectCommunity(comm.id);
-                    setExpandedCommunityId(comm.id);
-                  }}
                   onSelectSubCommunity={onSelectSubCommunity}
                 />
               </div>

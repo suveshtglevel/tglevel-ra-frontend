@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -42,19 +42,35 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Check } from 'lucide-react';
+import type { Community } from '@/constants/mockData';
+
+// A bundle is a combination of sub-communities that all belong to the SAME
+// parent community (no cross-community mixing). Sending to a bundle broadcasts
+// the message to every sub-community in it.
+interface Bundle {
+  id: string;
+  name: string;
+  communityId: number;
+  subIds: number[];
+}
 
 interface MessageComposerProps {
-  onSend?: (content: string, options?: { messageType?: string; group?: string; notifyUsers?: boolean }) => void;
+  communities: Community[];
+  onSend?: (content: string, options?: { messageType?: string; group?: string; notifyUsers?: boolean; targetCommunityIds?: number[] }) => void;
   onSendFile?: (attachment: { name: string; size: string; fileType: 'image' | 'video' | 'pdf' | 'doc' | 'excel' | 'file'; url: string }, caption?: string) => void;
 }
 
-const MessageComposer = ({ onSend, onSendFile }: MessageComposerProps) => {
+const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerProps) => {
   const [isEditorEmpty, setIsEditorEmpty] = React.useState(true);
-  const [selectedGroup, setSelectedGroup] = React.useState<string | null>(null);
+  const [selectedBundleId, setSelectedBundleId] = React.useState<string | null>(null);
   const [selectedMessageType, setSelectedMessageType] = React.useState<string | null>(null);
   const [notifyUsers, setNotifyUsers] = React.useState(false);
-  const [showBundle, setShowBundle] = React.useState(false);
-  const [bundleMessages, setBundleMessages] = React.useState<string[]>([]);
+  // RA-created bundles + the in-progress draft for the bundle builder.
+  const [bundles, setBundles] = React.useState<Bundle[]>([]);
+  const [bundleOpen, setBundleOpen] = React.useState(false);
+  const [draftCommunityId, setDraftCommunityId] = React.useState<number | null>(null);
+  const [draftSubIds, setDraftSubIds] = React.useState<number[]>([]);
   const [filePreview, setFilePreview] = React.useState<{
     name: string;
     size: string;
@@ -64,11 +80,11 @@ const MessageComposer = ({ onSend, onSendFile }: MessageComposerProps) => {
   const [caption, setCaption] = React.useState('');
   const [mounted, setMounted] = React.useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     setMounted(true);
   }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && filePreview) {
         setFilePreview(null);
@@ -81,13 +97,45 @@ const MessageComposer = ({ onSend, onSendFile }: MessageComposerProps) => {
     };
   }, [filePreview]);
 
-  const groups = [
-    "Nifty free -[NF1, NF2]",
-    "Nifty free -[NF1, NP1]",
-    "Community free -[CF1, CF2]",
-    "Swing free -[SF1, SF2]",
-    "Equity -[EF1, EF2]",
-  ];
+  // Only communities that actually have sub-communities can be bundled.
+  const bundleableCommunities = communities.filter((c) => (c.subCommunities?.length ?? 0) > 0);
+  const selectedBundle = bundles.find((b) => b.id === selectedBundleId) ?? null;
+
+  // Toggle a sub-community in the draft. A draft is locked to one parent
+  // community — picking a sub from a different community is disallowed.
+  const toggleDraftSub = (communityId: number, subId: number) => {
+    if (draftCommunityId !== null && draftCommunityId !== communityId) return;
+    setDraftCommunityId(communityId);
+    setDraftSubIds((prev) =>
+      prev.includes(subId) ? prev.filter((id) => id !== subId) : [...prev, subId]
+    );
+  };
+
+  const resetDraft = () => {
+    setDraftCommunityId(null);
+    setDraftSubIds([]);
+  };
+
+  const saveBundle = () => {
+    if (draftCommunityId === null || draftSubIds.length === 0) {
+      toast.error('Pick at least one sub-community');
+      return;
+    }
+    const community = communities.find((c) => c.id === draftCommunityId);
+    const subs = community?.subCommunities?.filter((s) => draftSubIds.includes(s.id)) ?? [];
+    const name = subs.map((s) => s.name).join(', ');
+    const bundle: Bundle = {
+      id: `bundle-${Date.now()}`,
+      name,
+      communityId: draftCommunityId,
+      subIds: [...draftSubIds],
+    };
+    setBundles((prev) => [...prev, bundle]);
+    setSelectedBundleId(bundle.id);
+    resetDraft();
+    setBundleOpen(false);
+    toast.success(`Bundle "${name}" created`);
+  };
 
   const messageTypes = [
     "Trade",
@@ -307,34 +355,41 @@ const MessageComposer = ({ onSend, onSendFile }: MessageComposerProps) => {
                 variant="outline"
                 size="sm"
                 className={cn(
-                  "h-9 rounded-xl border-slate-200 bg-white text-slate-600 gap-2 font-bold px-4 hover:bg-slate-50 transition-colors shadow-none cursor-pointer",
-                  selectedGroup && "bg-[#0F172A] text-white border-[#0F172A] hover:bg-[#1E293B] hover:text-white"
+                  "h-9 rounded-xl border-slate-200 bg-white text-slate-600 gap-2 font-bold px-4 hover:bg-slate-50 transition-colors shadow-none cursor-pointer max-w-[220px]",
+                  selectedBundle && "bg-[#0F172A] text-white border-[#0F172A] hover:bg-[#1E293B] hover:text-white"
                 )}
               >
-                {selectedGroup || "Select Group"} <ChevronDown className={cn("w-4 h-4 text-slate-400", selectedGroup && "text-white/70")} />
+                <span className="truncate">{selectedBundle ? selectedBundle.name : "Select Group"}</span>
+                <ChevronDown className={cn("w-4 h-4 text-slate-400 shrink-0", selectedBundle && "text-white/70")} />
               </Button>
             </PopoverTrigger>
             <PopoverContent
-              className="w-auto min-w-[142.88px] max-w-[300px] p-0 bg-[#FDFDFD] border-[1.97px] border-[#E2E8F0] text-[11.75px] rounded-[6.73px] shadow-lg overflow-hidden"
+              className="w-auto min-w-[160px] max-w-[300px] p-0 bg-[#FDFDFD] border-[1.97px] border-[#E2E8F0] text-[11.75px] rounded-[6.73px] shadow-lg overflow-hidden"
               align="start"
               side="bottom"
               sideOffset={8}
               avoidCollisions={false}
             >
-              <div className="flex flex-col py-0">
-                {groups.map((group, index) => (
-                  <button
-                    key={group}
-                    onClick={() => setSelectedGroup(group)}
-                    className={cn(
-                      "w-full text-left px-[12px] py-[5.38px] text-[11.75px] font-normal transition-colors border-b border-[#E2E8F0] last:border-none hover:bg-slate-50 flex items-center whitespace-nowrap cursor-pointer",
-                      selectedGroup === group ? "bg-[#CFDCE8] text-[#0F172A]" : "text-[#0F172A]"
-                    )}
-                    style={{ height: group === "Nifty free -[NF1, NP1]" ? "29.77px" : "23.77px" }}
-                  >
-                    {group}
-                  </button>
-                ))}
+              <div className="flex flex-col py-0 max-h-[260px] overflow-y-auto">
+                {bundles.length === 0 ? (
+                  <div className="px-3 py-3 text-[11.5px] text-slate-400 font-medium text-center">
+                    No bundles yet.<br />Create one with <span className="font-bold text-emerald-600">+ Bundle</span>.
+                  </div>
+                ) : (
+                  bundles.map((bundle) => (
+                    <button
+                      key={bundle.id}
+                      onClick={() => setSelectedBundleId(bundle.id)}
+                      className={cn(
+                        "w-full text-left px-[12px] py-[7px] text-[11.75px] font-medium transition-colors border-b border-[#E2E8F0] last:border-none hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer",
+                        selectedBundleId === bundle.id ? "bg-[#CFDCE8] text-[#0F172A]" : "text-[#0F172A]"
+                      )}
+                    >
+                      {selectedBundleId === bundle.id && <Check className="w-3 h-3 text-emerald-600 shrink-0" />}
+                      <span className="truncate">{bundle.name}</span>
+                    </button>
+                  ))
+                )}
               </div>
             </PopoverContent>
           </Popover>
@@ -383,37 +438,92 @@ const MessageComposer = ({ onSend, onSendFile }: MessageComposerProps) => {
           </div>
         </div>
         <div className="flex items-center gap-2.5">
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={showBundle && !selectedMessageType}
-            title={showBundle && !selectedMessageType ? 'Select a message type first' : undefined}
-            className={cn(
-              "font-bold rounded-xl px-4 h-9 transition-colors cursor-pointer",
-              showBundle
-                ? "text-white bg-emerald-600 hover:bg-emerald-700"
-                : "text-emerald-600 bg-emerald-50 hover:bg-emerald-100",
-              showBundle && !selectedMessageType && "opacity-50 cursor-not-allowed"
-            )}
-            onClick={() => {
-              if (showBundle) {
-                if (!selectedMessageType) {
-                  toast.error('Please select a message type before sending');
-                  return;
-                }
-                // Send all bundled messages
-                bundleMessages.forEach((msg) => {
-                  onSend?.(msg, { messageType: selectedMessageType ?? undefined, group: selectedGroup ?? undefined, notifyUsers });
-                });
-                setBundleMessages([]);
-                setShowBundle(false);
-              } else {
-                setShowBundle(true);
-              }
-            }}
-          >
-            {showBundle ? `Send Bundle (${bundleMessages.length})` : '+ Bundle'}
-          </Button>
+          <Popover open={bundleOpen} onOpenChange={(open) => { setBundleOpen(open); if (!open) resetDraft(); }}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="font-bold rounded-xl px-4 h-9 transition-colors cursor-pointer text-emerald-600 bg-emerald-50 hover:bg-emerald-100"
+              >
+                + Bundle
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-[280px] p-0 bg-white border-[1.5px] border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden"
+              align="end"
+              side="top"
+              sideOffset={8}
+              avoidCollisions={false}
+            >
+              <div className="px-3 py-2.5 border-b border-slate-100 bg-slate-50">
+                <p className="text-[12px] font-bold text-slate-700">Create a bundle</p>
+                <p className="text-[10.5px] text-slate-400 font-medium">Pick sub-communities from one community.</p>
+              </div>
+              <div className="max-h-[280px] overflow-y-auto py-1">
+                {bundleableCommunities.map((c) => {
+                  const locked = draftCommunityId !== null && draftCommunityId !== c.id;
+                  return (
+                    <div key={c.id} className="px-2 py-1">
+                      <p className={cn("px-2 py-1 text-[11px] font-bold uppercase tracking-wide", locked ? "text-slate-300" : "text-slate-500")}>
+                        {c.name}
+                      </p>
+                      <div className="flex flex-col">
+                        {c.subCommunities!.map((s) => {
+                          const checked = draftSubIds.includes(s.id);
+                          return (
+                            <button
+                              key={s.id}
+                              type="button"
+                              disabled={locked}
+                              onClick={() => toggleDraftSub(c.id, s.id)}
+                              className={cn(
+                                "flex items-center gap-2 px-2 py-1.5 rounded-lg text-[12px] font-medium transition-colors text-left",
+                                locked ? "text-slate-300 cursor-not-allowed" : "text-slate-700 hover:bg-slate-50 cursor-pointer",
+                                checked && "bg-emerald-50"
+                              )}
+                            >
+                              <span className={cn(
+                                "w-[18px] h-[18px] rounded-md border-2 flex items-center justify-center shrink-0 transition-colors",
+                                checked ? "border-emerald-500 bg-emerald-500" : locked ? "border-slate-200" : "border-slate-300"
+                              )}>
+                                {checked && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                              </span>
+                              <span className="flex-1">{s.name}</span>
+                              <span className={cn("text-[10px] font-semibold", locked ? "text-slate-300" : "text-slate-400")}>{s.type}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-t border-slate-100 bg-slate-50">
+                <button
+                  type="button"
+                  onClick={resetDraft}
+                  disabled={draftSubIds.length === 0}
+                  className={cn(
+                    "text-[11.5px] font-bold transition-colors",
+                    draftSubIds.length === 0 ? "text-slate-300 cursor-not-allowed" : "text-slate-500 hover:text-slate-700 cursor-pointer"
+                  )}
+                >
+                  Clear
+                </button>
+                <Button
+                  size="sm"
+                  onClick={saveBundle}
+                  disabled={draftSubIds.length === 0}
+                  className={cn(
+                    "h-8 rounded-lg px-4 font-bold text-[12px] bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer",
+                    draftSubIds.length === 0 && "opacity-50 cursor-not-allowed hover:bg-emerald-500"
+                  )}
+                >
+                  Save bundle ({draftSubIds.length})
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
           <Button
             disabled={!selectedMessageType}
             title={!selectedMessageType ? 'Select a message type first' : undefined}
@@ -427,23 +537,21 @@ const MessageComposer = ({ onSend, onSendFile }: MessageComposerProps) => {
                 return;
               }
               const content = editor.getHTML();
-              if (content !== '<p></p>') {
-                if (showBundle) {
-                  setBundleMessages((prev) => [...prev, content]);
-                  editor.commands.clearContent();
-                  setIsEditorEmpty(true);
-                } else {
-                  onSend?.(content, { messageType: selectedMessageType ?? undefined, group: selectedGroup ?? undefined, notifyUsers });
-                  editor.commands.clearContent();
-                  setIsEditorEmpty(true);
-                  setSelectedGroup(null);
-                  setSelectedMessageType(null);
-                  setNotifyUsers(false);
-                }
-              }
+              if (content === '<p></p>') return;
+              onSend?.(content, {
+                messageType: selectedMessageType ?? undefined,
+                group: selectedBundle?.name,
+                notifyUsers,
+                targetCommunityIds: selectedBundle?.subIds,
+              });
+              editor.commands.clearContent();
+              setIsEditorEmpty(true);
+              setSelectedBundleId(null);
+              setSelectedMessageType(null);
+              setNotifyUsers(false);
             }}
           >
-            {showBundle ? 'Add to Bundle' : 'Send'} <Send className="w-4 h-4 fill-current" />
+            Send <Send className="w-4 h-4 fill-current" />
           </Button>
         </div>
       </div>

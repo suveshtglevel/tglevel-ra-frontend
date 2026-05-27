@@ -11,7 +11,6 @@ interface CommunityCardProps {
   active: boolean;
   selectedSubCommunityId: number | null;
   initialExpanded?: boolean;
-  onSelect: () => void;
   onSelectSubCommunity: (id: number) => void;
 }
 
@@ -88,9 +87,10 @@ const SubCommunityRow = ({ sub, checked, isSelected, onToggle, onSelect }: SubCo
   );
 };
 
-const CommunityCard = ({ community, active, selectedSubCommunityId, initialExpanded = false, onSelect, onSelectSubCommunity }: CommunityCardProps) => {
+const CommunityCard = ({ community, active, selectedSubCommunityId, initialExpanded = false, onSelectSubCommunity }: CommunityCardProps) => {
   const [expanded, setExpanded] = React.useState(initialExpanded);
   const subCommunities = community.subCommunities ?? [];
+  const toggleExpanded = () => setExpanded((prev) => !prev);
 
   // Track checked state per sub-community (default: Free = checked)
   const [checkedMap, setCheckedMap] = React.useState<Record<number, boolean>>(() => {
@@ -111,11 +111,11 @@ const CommunityCard = ({ community, active, selectedSubCommunityId, initialExpan
     <Card
       role="button"
       tabIndex={0}
-      onClick={onSelect}
+      onClick={toggleExpanded}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          onSelect();
+          toggleExpanded();
         }
       }}
       className={cn(

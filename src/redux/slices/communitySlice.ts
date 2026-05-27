@@ -7,10 +7,13 @@ interface CommunityState {
   selectedSubCommunityId: number | null;
 }
 
+// Chats only exist for sub-communities, so open the first community's
+// first sub-community by default (never a main community chat).
+const firstCommunity = COMMUNITIES[0];
 const initialState: CommunityState = {
   communities: COMMUNITIES,
-  selectedCommunityId: COMMUNITIES[0]?.id ?? 0,
-  selectedSubCommunityId: null,
+  selectedCommunityId: firstCommunity?.id ?? 0,
+  selectedSubCommunityId: firstCommunity?.subCommunities?.[0]?.id ?? null,
 };
 
 const communitySlice = createSlice({

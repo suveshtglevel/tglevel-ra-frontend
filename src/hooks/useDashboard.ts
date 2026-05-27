@@ -1,6 +1,6 @@
 import { toast } from 'react-hot-toast';
 import { useAppDispatch, useAppSelector } from '@/redux/hooks';
-import { selectCommunity, selectSubCommunity } from '@/redux/slices/communitySlice';
+import { selectSubCommunity } from '@/redux/slices/communitySlice';
 import { sendMessage, sendFileMessage, updateMessageStatus } from '@/redux/slices/messageSlice';
 import type { FileAttachment } from '@/redux/slices/messageSlice';
 
@@ -24,28 +24,41 @@ export const useDashboard = () => {
   const activeChatId = selectedSubCommunityId ?? selectedCommunityId;
   const currentMessages = allMessages[activeChatId] ?? [];
 
-  const handleSelectCommunity = (id: number) => {
-    dispatch(selectCommunity(id));
-  };
-
   const handleSelectSubCommunity = (id: number) => {
     dispatch(selectSubCommunity(id));
   };
 
-  const handleSendMessage = (content: string, options?: { messageType?: string; group?: string; notifyUsers?: boolean }) => {
+  const handleSendMessage = (
+    content: string,
+    options?: { messageType?: string; group?: string; notifyUsers?: boolean; targetCommunityIds?: number[] }
+  ) => {
     if (!content || content === '<p></p>') {
       toast.error('Please enter a message');
       return;
     }
-    dispatch(sendMessage({
-      communityId: activeChatId,
-      content,
-      messageType: options?.messageType,
-      group: options?.group,
-      notifyUsers: options?.notifyUsers,
-    }));
 
-    toast.success('Message sent successfully!');
+    // When a bundle is selected, broadcast to every sub-community in it;
+    // otherwise send to the currently open chat.
+    const targets =
+      options?.targetCommunityIds && options.targetCommunityIds.length > 0
+        ? options.targetCommunityIds
+        : [activeChatId];
+
+    targets.forEach((id) => {
+      dispatch(sendMessage({
+        communityId: id,
+        content,
+        messageType: options?.messageType,
+        group: options?.group,
+        notifyUsers: options?.notifyUsers,
+      }));
+    });
+
+    toast.success(
+      targets.length > 1
+        ? `Message sent to ${targets.length} communities!`
+        : 'Message sent successfully!'
+    );
   };
 
   const handleSendFile = (attachment: FileAttachment, caption?: string) => {
@@ -64,7 +77,6 @@ export const useDashboard = () => {
     selectedCommunity,
     selectedSubCommunity,
     currentMessages,
-    handleSelectCommunity,
     handleSelectSubCommunity,
     handleSendMessage,
     handleSendFile,

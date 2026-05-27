@@ -54,11 +54,10 @@ const seedTrade = (chatId: number, a: CommunityAnalysis): ChatMessage => ({
   tradeRefId: a.id,
 });
 
-// Every community and subcommunity starts with exactly one seed Trade card —
-// no random messages. Subcommunities inherit the parent community's analysis.
+// Only sub-communities are chattable — each starts with exactly one seed
+// Trade card (no random messages). Main communities have no chat of their own.
 const INITIAL_MESSAGES: Record<number, ChatMessage[]> = {};
 COMMUNITIES.forEach((c) => {
-  INITIAL_MESSAGES[c.id] = [seedTrade(c.id, c.analysis)];
   c.subCommunities?.forEach((s) => {
     INITIAL_MESSAGES[s.id] = [seedTrade(s.id, c.analysis)];
   });

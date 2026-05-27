@@ -16,7 +16,6 @@ export default function DashboardPage() {
     selectedCommunity,
     selectedSubCommunity,
     currentMessages,
-    handleSelectCommunity,
     handleSelectSubCommunity,
     handleSendMessage,
     handleSendFile,
@@ -32,7 +31,6 @@ export default function DashboardPage() {
         communities={communities}
         selectedCommunityId={selectedCommunityId}
         selectedSubCommunityId={selectedSubCommunityId}
-        onSelectCommunity={handleSelectCommunity}
         onSelectSubCommunity={handleSelectSubCommunity}
       />
 
@@ -55,7 +53,7 @@ export default function DashboardPage() {
         {/* Message Input Section */}
         <div className="p-6 bg-[#F8FAFC] shrink-0">
           <div className="max-w-[991px] mx-auto w-full">
-            <MessageComposer onSend={handleSendMessage} onSendFile={handleSendFile} />
+            <MessageComposer communities={communities} onSend={handleSendMessage} onSendFile={handleSendFile} />
           </div>
         </div>
       </main>
