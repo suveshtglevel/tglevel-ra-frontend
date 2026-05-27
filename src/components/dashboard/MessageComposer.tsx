@@ -36,7 +36,7 @@ import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import dynamic from 'next/dynamic';
 const EmojiPicker = dynamic(() => import('emoji-picker-react'), { ssr: false });
-import { 
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -291,20 +291,20 @@ const MessageComposer = ({ onSend, onSendFile }: MessageComposerProps) => {
   };
 
   return (
-    <Card 
+    <Card
       className={cn(
         "w-full max-w-[1100px] bg-white border-slate-200 shadow-sm rounded-[14px] overflow-hidden flex flex-col transition-all duration-300 focus-within:border-emerald-300/50 focus-within:ring-4 focus-within:ring-emerald-500/5 opacity-100 rotate-0 border-[1px]",
         isEditorEmpty ? "h-[160px]" : "min-h-[200px] h-auto max-h-[85vh]"
       )}
     >
       {/* Top Control Bar */}
-   <div className="px-5 py-2 flex items-center justify-between border-b border-[#E2E8F0] shrink-0 bg-[#F8FAFC]">
+      <div className="px-5 py-2 flex items-center justify-between border-b border-[#E2E8F0] shrink-0 bg-[#F8FAFC]">
         <div className="flex items-center gap-2.5">
           <Popover>
             <PopoverTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 className={cn(
                   "h-9 rounded-xl border-slate-200 bg-white text-slate-600 gap-2 font-bold px-4 hover:bg-slate-50 transition-colors shadow-none cursor-pointer",
                   selectedGroup && "bg-[#0F172A] text-white border-[#0F172A] hover:bg-[#1E293B] hover:text-white"
@@ -313,8 +313,8 @@ const MessageComposer = ({ onSend, onSendFile }: MessageComposerProps) => {
                 {selectedGroup || "Select Group"} <ChevronDown className={cn("w-4 h-4 text-slate-400", selectedGroup && "text-white/70")} />
               </Button>
             </PopoverTrigger>
-            <PopoverContent 
-              className="w-auto min-w-[142.88px] max-w-[300px] p-0 bg-[#FDFDFD] border-[1.97px] border-[#E2E8F0] text-[11.75px] rounded-[6.73px] shadow-lg overflow-hidden" 
+            <PopoverContent
+              className="w-auto min-w-[142.88px] max-w-[300px] p-0 bg-[#FDFDFD] border-[1.97px] border-[#E2E8F0] text-[11.75px] rounded-[6.73px] shadow-lg overflow-hidden"
               align="start"
               side="bottom"
               sideOffset={8}
@@ -340,9 +340,9 @@ const MessageComposer = ({ onSend, onSendFile }: MessageComposerProps) => {
 
           <Popover>
             <PopoverTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 className={cn(
                   "h-9 rounded-xl border-slate-200 bg-white text-slate-600 gap-2 font-bold px-4 hover:bg-slate-50 transition-colors shadow-none cursor-pointer",
                   selectedMessageType && "bg-[#0F172A] text-white border-[#0F172A] hover:bg-[#1E293B] hover:text-white"
@@ -351,8 +351,8 @@ const MessageComposer = ({ onSend, onSendFile }: MessageComposerProps) => {
                 {selectedMessageType || "Select Message Type"} <ChevronDown className={cn("w-4 h-4 text-slate-400", selectedMessageType && "text-white/70")} />
               </Button>
             </PopoverTrigger>
-            <PopoverContent 
-              className="w-auto min-w-[142.88px] max-w-[300px] p-0 bg-[#FDFDFD] border-[1.97px] border-[#E2E8F0] rounded-[6.73px] shadow-lg overflow-hidden" 
+            <PopoverContent
+              className="w-auto min-w-[142.88px] max-w-[300px] p-0 bg-[#FDFDFD] border-[1.97px] border-[#E2E8F0] rounded-[6.73px] shadow-lg overflow-hidden"
               align="start"
               side="bottom"
               sideOffset={8}
@@ -567,18 +567,18 @@ const MessageComposer = ({ onSend, onSendFile }: MessageComposerProps) => {
 
 const ToolbarButton = React.forwardRef<
   HTMLButtonElement,
-  { 
-    children: React.ReactNode; 
-    onClick?: () => void; 
+  {
+    children: React.ReactNode;
+    onClick?: () => void;
     active?: boolean;
     disabled?: boolean;
     className?: string;
   }
 >(({ children, onClick, active = false, disabled = false, className }, ref) => (
-  <Button 
+  <Button
     ref={ref}
-    variant="ghost" 
-    size="icon" 
+    variant="ghost"
+    size="icon"
     onClick={onClick}
     disabled={disabled}
     className={cn(
