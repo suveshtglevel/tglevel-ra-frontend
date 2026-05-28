@@ -381,7 +381,7 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
     <Card
       className={cn(
         "w-full max-w-[1100px] bg-white border-slate-200 shadow-sm rounded-[14px] overflow-hidden flex flex-col transition-all duration-300 focus-within:border-emerald-300/50 focus-within:ring-4 focus-within:ring-emerald-500/5 opacity-100 rotate-0 border-[1px]",
-        isEditorEmpty ? "min-h-[150px] h-auto" : "min-h-[200px] h-auto max-h-[85vh]"
+        isEditorEmpty ? "min-h-[150px] h-auto" : "min-h-[200px] h-auto max-h-[330px]"
       )}
     >
       {/* Top Control Bar */}

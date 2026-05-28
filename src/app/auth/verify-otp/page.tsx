@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -17,6 +18,7 @@ const otpSchema = z.object({
 type OtpFormValues = z.infer<typeof otpSchema>;
 
 export default function VerifyOtpPage() {
+  const router = useRouter();
   const [timer, setTimer] = useState(30);
 
   useEffect(() => {
@@ -36,6 +38,7 @@ export default function VerifyOtpPage() {
 
   function onSubmit(values: OtpFormValues) {
     console.log(values);
+    router.push('/dashboard');
   }
 
   const formatTime = (seconds: number) => {
