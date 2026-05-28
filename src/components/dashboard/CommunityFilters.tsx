@@ -19,7 +19,7 @@ const FILTERS: { label: string; value: FilterType }[] = [
 
 const CommunityFilters = ({ activeFilter, onFilterChange }: CommunityFiltersProps) => {
   return (
-    <div className="px-4 flex gap-2 mb-6">
+    <div className="px-4 flex flex-wrap gap-2 mb-6 shrink-0">
       {FILTERS.map((f) => (
         <Badge
           key={f.value}

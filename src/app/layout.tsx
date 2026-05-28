@@ -8,6 +8,7 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
+
 export const metadata: Metadata = {
   title: "Research Analyst Panel",
   description: "Securely manage trade alerts, subscribers, and research operations.",

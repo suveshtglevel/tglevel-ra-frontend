@@ -381,12 +381,12 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
     <Card
       className={cn(
         "w-full max-w-[1100px] bg-white border-slate-200 shadow-sm rounded-[14px] overflow-hidden flex flex-col transition-all duration-300 focus-within:border-emerald-300/50 focus-within:ring-4 focus-within:ring-emerald-500/5 opacity-100 rotate-0 border-[1px]",
-        isEditorEmpty ? "h-[160px]" : "min-h-[200px] h-auto max-h-[85vh]"
+        isEditorEmpty ? "min-h-[150px] h-auto" : "min-h-[200px] h-auto max-h-[85vh]"
       )}
     >
       {/* Top Control Bar */}
-      <div className="px-5 py-2 flex items-center justify-between border-b border-[#E2E8F0] shrink-0 bg-[#F8FAFC]">
-        <div className="flex items-center gap-2.5">
+      <div className="px-3 sm:px-5 py-2 flex flex-wrap items-center justify-between gap-2 border-b border-[#E2E8F0] shrink-0 bg-[#F8FAFC]">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -469,13 +469,13 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
               </div>
             </PopoverContent>
           </Popover>
-          <div className="h-6 w-[1px] bg-slate-100 mx-1.5" />
-          <div className="flex items-center gap-2.5">
+          <div className="hidden sm:block h-6 w-[1px] bg-slate-100 mx-1.5" />
+          <div className="flex items-center gap-2 sm:gap-2.5">
             <Switch checked={notifyUsers} onCheckedChange={setNotifyUsers} className="data-[state=checked]:bg-emerald-500 cursor-pointer" />
-            <span className="text-[13px] font-bold text-slate-500 tracking-tight">Notify Users</span>
+            <span className="text-[13px] font-bold text-slate-500 tracking-tight whitespace-nowrap">Notify Users</span>
           </div>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2 sm:gap-2.5">
           <Popover open={bundleOpen} onOpenChange={(open) => { setBundleOpen(open); if (!open) resetDraft(); }}>
             <PopoverTrigger asChild>
               <Button
@@ -565,7 +565,7 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
           <Button
             title={!selectedMessageType ? 'Select a message type first' : undefined}
             className={cn(
-              "bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl px-6 font-bold h-10 gap-2 shadow-lg shadow-emerald-500/20 transition-all active:scale-95 cursor-pointer",
+              "bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl px-4 sm:px-6 font-bold h-10 gap-2 shadow-lg shadow-emerald-500/20 transition-all active:scale-95 cursor-pointer",
               !selectedMessageType && "opacity-50"
             )}
             onClick={handleSend}
@@ -576,8 +576,8 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
       </div>
 
       {/* Middle Toolbar */}
-      <div className="px-5 py-1.5 flex items-center justify-between bg-slate-50/30 border-b border-[#E2E8F0] shrink-0">
-        <div className="flex items-center gap-0.5">
+      <div className="px-3 sm:px-5 py-1.5 flex items-center gap-2 bg-slate-50/30 border-b border-[#E2E8F0] shrink-0">
+        <div className="flex items-center gap-0.5 flex-1 min-w-0 overflow-x-auto">
           <ToolbarButton onClick={toggleBold} active={editor.isActive('bold')}><Bold className="h-4 w-4" /></ToolbarButton>
           <ToolbarButton onClick={toggleItalic} active={editor.isActive('italic')}><Italic className="h-4 w-4" /></ToolbarButton>
           <ToolbarButton onClick={toggleStrike} active={editor.isActive('strike')}><Strikethrough className="h-4 w-4" /></ToolbarButton>
@@ -607,7 +607,7 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
           <ToolbarButton onClick={insertChart}><BarChart2 className="h-4 w-4" /></ToolbarButton>
           <ToolbarButton onClick={insertQuickTrade}><Zap className="h-4 w-4" /></ToolbarButton>
         </div>
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-0.5 shrink-0">
           <ToolbarButton onClick={undo} disabled={!editor.can().undo()}><Undo2 className="h-4 w-4" /></ToolbarButton>
           <ToolbarButton onClick={redo} disabled={!editor.can().redo()}><Redo2 className="h-4 w-4" /></ToolbarButton>
         </div>
@@ -618,7 +618,7 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
       {/* Editor Area */}
       <div
         className={cn(
-          "px-5 pt-3 pb-6 overflow-y-auto cursor-pointer",
+          "px-3 sm:px-5 pt-3 pb-6 overflow-y-auto cursor-pointer",
           isEditorEmpty ? "flex-1" : "min-h-[80px]"
         )}
         onClick={() => editor.commands.focus()}

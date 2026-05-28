@@ -33,15 +33,15 @@ const StatusTick = ({ status }: { status: MessageStatus }) => {
 // HTML was typed/seeded; the header, disclaimer and footer are fixed chrome.
 const TradeCard = ({ content, timestamp, status = 'read', tag, refId, pinned, onTickClick }: TradeCardProps) => {
   return (
-    <Card className="w-[380px] bg-[#E6F9F3] border-[#C2EDDF] p-5 rounded-3xl shadow-none">
+    <Card className="w-[380px] max-w-full bg-[#E6F9F3] border-[#C2EDDF] p-4 sm:p-5 rounded-3xl shadow-none">
       <div className="space-y-3 text-slate-800">
-        <div className="font-bold flex items-center justify-between gap-2 text-[15px]">
+        <div className="font-bold flex items-center justify-between gap-2 text-[14px] sm:text-[15px]">
           <span>✅*RESEARCH ANALYSIS✅</span>
           {pinned && <Pin className="w-3.5 h-3.5 text-emerald-500 rotate-45 shrink-0" />}
         </div>
 
         <div
-          className="text-[13px] leading-[18.57px] font-medium space-y-1.5 [&_p]:my-0 [&_b]:font-bold [&_strong]:font-bold [&_a]:text-emerald-600 [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1 [&_li]:my-0.5"
+          className="text-[13px] leading-[18.57px] font-medium space-y-1.5 break-words [&_p]:my-0 [&_b]:font-bold [&_strong]:font-bold [&_a]:text-emerald-600 [&_a]:underline [&_a]:break-all [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1 [&_li]:my-0.5"
           style={{ fontFamily: 'Inter' }}
           dangerouslySetInnerHTML={{ __html: content }}
         />

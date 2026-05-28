@@ -127,7 +127,7 @@ const Sidebar = () => {
 
         {/* Settings Profile Card */}
         {showSettings && (
-          <div className="absolute bottom-0 left-16 w-[280px] bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden">
+          <div className="absolute bottom-0 left-16 w-[280px] max-w-[calc(100vw-5rem)] bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden">
             <div className="flex flex-col items-center pt-8 pb-5 px-6">
               {/* Profile Image */}
               <div className="w-[90px] h-[90px] rounded-full border-[3px] border-slate-200 overflow-hidden mb-4">

@@ -5,7 +5,7 @@ import LoginLogo from '@/components/common/LoginLogo';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen w-full flex-col lg:flex-row overflow-hidden bg-white">
+    <div className="flex min-h-screen w-full flex-col lg:flex-row overflow-x-hidden bg-white">
       {/* Left Section - Hero (Shared) */}
       <div 
         className="relative flex flex-col lg:w-[40%] xl:w-[576px] lg:min-h-screen w-full text-[#124150]"
@@ -31,17 +31,12 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       </div>
 
       {/* Right Section - Content Container (Shared) */}
-      <div 
-        className="flex flex-col flex-1 lg:min-h-screen w-full items-center justify-between bg-[#F9F9FF]"
-        style={{
-          padding: '0 40px 32px 40px'
-        }}
-      >
-        <div className="flex-1 flex items-center justify-center w-full scale-[0.85] xl:scale-[0.9] transition-transform origin-center">
+      <div className="flex flex-col flex-1 lg:min-h-screen w-full items-center justify-between bg-[#F9F9FF] px-5 sm:px-10 pb-8 pt-8 lg:pt-0">
+        <div className="flex-1 flex items-center justify-center w-full sm:scale-[0.85] xl:scale-[0.9] transition-transform origin-center">
           {children}
         </div>
-        
-        <p className="text-center text-slate-400 text-sm font-medium tracking-wide">
+
+        <p className="text-center text-slate-400 text-xs sm:text-sm font-medium tracking-wide mt-6">
           © 2026 TGLevels Research Platform
         </p>
       </div>

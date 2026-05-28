@@ -4,6 +4,7 @@ import React from 'react';
 import { X, Search, Eye, Download } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useDebounce } from '@/hooks/useDebounce';
 
 interface ViewedByPanelProps {
   totalViews: string;
@@ -39,13 +40,14 @@ const AVATAR_COLORS = [
 
 const ViewedByPanel = ({ totalViews, onClose }: ViewedByPanelProps) => {
   const [search, setSearch] = React.useState('');
+  const debouncedSearch = useDebounce(search, 300);
 
   const filteredViewers = MOCK_VIEWERS.filter((viewer) =>
-    search ? viewer.name.toLowerCase().includes(search.toLowerCase()) : true
+    debouncedSearch ? viewer.name.toLowerCase().includes(debouncedSearch.toLowerCase()) : true
   );
 
   return (
-    <div className="w-[340px] h-[450px] bg-white border border-slate-200 rounded-2xl flex flex-col shadow-lg">
+    <div className="w-[90vw] max-w-[340px] h-[70vh] max-h-[450px] bg-white border border-slate-200 rounded-2xl flex flex-col shadow-lg">
       {/* Header */}
       <div className="px-5 pt-5 pb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">

@@ -1,45 +1,56 @@
 'use client';
 
 import React from 'react';
-import { X, Search, FileText, FileSpreadsheet, File } from 'lucide-react';
+import { X, Search, FileText, FileSpreadsheet, File, Play, Link as LinkIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { useDebounce } from '@/hooks/useDebounce';
+import FileViewer from './FileViewer';
+import type { ChatMessage, FileAttachment } from '@/redux/slices/messageSlice';
 
 interface MediaDocsPanelProps {
   title: string;
+  messages: ChatMessage[];
   onClose: () => void;
 }
 
 const TABS = ['Media', 'Docs', 'Links'] as const;
 type Tab = (typeof TABS)[number];
 
-const FILTERS = ['All', 'PDF', 'Excel', 'Docs'] as const;
-type Filter = (typeof FILTERS)[number];
+const DOC_FILTERS = ['All', 'PDF', 'Excel', 'Docs'] as const;
+type DocFilter = (typeof DOC_FILTERS)[number];
 
-interface DocItem {
-  id: number;
-  name: string;
-  type: 'PDF' | 'Excel' | 'Word';
-  size: string;
-  date: string;
-}
+interface MediaEntry { id: string; name: string; size: string; url: string; fileType: 'image' | 'video'; }
+interface DocEntry { id: string; name: string; size: string; url: string; fileType: 'pdf' | 'doc' | 'excel' | 'file'; }
+interface LinkEntry { id: string; url: string; text: string; }
 
-const MOCK_DOCS: DocItem[] = [
-  { id: 1, name: 'Weekly Market Analysis_Oct.pdf', type: 'PDF', size: '2.4 MB', date: '24 Oct, 2023' },
-  { id: 2, name: 'Portfolio_Tracker_Q3.xlsx', type: 'Excel', size: '1.1 MB', date: '22 Oct, 2023' },
-  { id: 3, name: 'Trading_Rules_Guidelines.docx', type: 'Word', size: '845 KB', date: '15 Oct, 2023' },
-];
+// Pull every <a href> out of a message's HTML content.
+const LINK_REGEX = /<a[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/gi;
+const extractLinks = (messages: ChatMessage[]): LinkEntry[] => {
+  const links: LinkEntry[] = [];
+  messages.forEach((m) => {
+    if (!m.content) return;
+    LINK_REGEX.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = LINK_REGEX.exec(m.content)) !== null) {
+      const url = match[1];
+      const text = match[2].replace(/<[^>]*>/g, '').trim() || url;
+      links.push({ id: `${m.id}-${links.length}`, url, text });
+    }
+  });
+  return links;
+};
 
-const DocIcon = ({ type }: { type: DocItem['type'] }) => {
-  if (type === 'PDF') {
+const DocIcon = ({ fileType }: { fileType: DocEntry['fileType'] }) => {
+  if (fileType === 'pdf') {
     return (
       <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center shrink-0">
         <FileText className="w-5 h-5 text-red-500" />
       </div>
     );
   }
-  if (type === 'Excel') {
+  if (fileType === 'excel') {
     return (
       <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
         <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
@@ -53,34 +64,63 @@ const DocIcon = ({ type }: { type: DocItem['type'] }) => {
   );
 };
 
-const MediaDocsPanel = ({ title, onClose }: MediaDocsPanelProps) => {
-  const [activeTab, setActiveTab] = React.useState<Tab>('Docs');
-  const [activeFilter, setActiveFilter] = React.useState<Filter>('All');
-  const [search, setSearch] = React.useState('');
+const EmptyState = ({ text }: { text: string }) => (
+  <div className="py-12 text-center text-slate-400 text-sm">{text}</div>
+);
 
-  const filteredDocs = MOCK_DOCS.filter((doc) => {
-    if (activeFilter === 'All') return true;
-    if (activeFilter === 'PDF') return doc.type === 'PDF';
-    if (activeFilter === 'Excel') return doc.type === 'Excel';
-    if (activeFilter === 'Docs') return doc.type === 'Word';
-    return true;
-  }).filter((doc) =>
-    search ? doc.name.toLowerCase().includes(search.toLowerCase()) : true
+const MediaDocsPanel = ({ title, messages, onClose }: MediaDocsPanelProps) => {
+  const [activeTab, setActiveTab] = React.useState<Tab>('Media');
+  const [docFilter, setDocFilter] = React.useState<DocFilter>('All');
+  const [search, setSearch] = React.useState('');
+  const [viewingFile, setViewingFile] = React.useState<FileAttachment | null>(null);
+  const debouncedSearch = useDebounce(search, 300);
+  const q = debouncedSearch.trim().toLowerCase();
+
+  // Derive media / docs / links from this chat's messages.
+  const { media, docs, links } = React.useMemo(() => {
+    const media: MediaEntry[] = [];
+    const docs: DocEntry[] = [];
+    messages.forEach((m) => {
+      const a = m.attachment;
+      if (!a) return;
+      if (a.fileType === 'image' || a.fileType === 'video') {
+        media.push({ id: m.id, name: a.name, size: a.size, url: a.url, fileType: a.fileType });
+      } else {
+        docs.push({ id: m.id, name: a.name, size: a.size, url: a.url, fileType: a.fileType });
+      }
+    });
+    return { media, docs, links: extractLinks(messages) };
+  }, [messages]);
+
+  const filteredMedia = media.filter((m) => (q ? m.name.toLowerCase().includes(q) : true));
+  const filteredDocs = docs
+    .filter((d) => {
+      if (docFilter === 'PDF') return d.fileType === 'pdf';
+      if (docFilter === 'Excel') return d.fileType === 'excel';
+      if (docFilter === 'Docs') return d.fileType === 'doc' || d.fileType === 'file';
+      return true;
+    })
+    .filter((d) => (q ? d.name.toLowerCase().includes(q) : true));
+  const filteredLinks = links.filter((l) =>
+    q ? l.text.toLowerCase().includes(q) || l.url.toLowerCase().includes(q) : true
   );
 
+  const searchPlaceholder =
+    activeTab === 'Media' ? 'Search media' : activeTab === 'Docs' ? 'Search documents' : 'Search links';
+
   return (
-    <div className="w-[380px] max-h-[520px] bg-white border border-slate-200 rounded-2xl flex flex-col">
+    <div className="w-[90vw] max-w-[380px] max-h-[520px] bg-white border border-slate-200 rounded-2xl flex flex-col">
       {/* Header */}
-      <div className="px-5 pt-5 pb-3">
+      <div className="px-5 pt-5 pb-3 shrink-0">
         <div className="flex items-center justify-between mb-1">
-          <div>
-            <h2 className="font-bold text-[16px] text-slate-800">{title}</h2>
+          <div className="min-w-0">
+            <h2 className="font-bold text-[16px] text-slate-800 truncate">{title}</h2>
             <p className="text-[12px] text-slate-400 font-medium">Media, links, and docs</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 bg-transparent border-none cursor-pointer rounded-full hover:bg-slate-100 transition-colors"
+            className="p-1 bg-transparent border-none cursor-pointer rounded-full hover:bg-slate-100 transition-colors shrink-0"
           >
             <X className="w-5 h-5 text-slate-500" />
           </button>
@@ -88,91 +128,146 @@ const MediaDocsPanel = ({ title, onClose }: MediaDocsPanelProps) => {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-200">
-        {TABS.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setActiveTab(tab)}
-            className={cn(
-              "flex-1 py-3 text-[13px] font-medium bg-transparent border-none cursor-pointer transition-colors",
-              activeTab === tab
-                ? "text-emerald-600 border-b-2 border-emerald-500"
-                : "text-slate-400 hover:text-slate-600"
-            )}
-          >
-            {tab}
-          </button>
-        ))}
+      <div className="flex border-b border-slate-200 shrink-0">
+        {TABS.map((tab) => {
+          const count = tab === 'Media' ? media.length : tab === 'Docs' ? docs.length : links.length;
+          return (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={cn(
+                "flex-1 py-3 text-[13px] font-medium bg-transparent border-none cursor-pointer transition-colors",
+                activeTab === tab
+                  ? "text-emerald-600 border-b-2 border-emerald-500"
+                  : "text-slate-400 hover:text-slate-600"
+              )}
+            >
+              {tab}{count > 0 && <span className="ml-1 text-[11px]">({count})</span>}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Content */}
+      {/* Search (debounced) */}
+      <div className="px-5 pt-4 pb-3 shrink-0">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input
+            placeholder={searchPlaceholder}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 h-10 bg-white border-slate-200 rounded-full text-sm"
+          />
+        </div>
+      </div>
+
+      {/* Doc filters (Docs tab only) */}
       {activeTab === 'Docs' && (
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Search */}
-          <div className="px-5 pt-4 pb-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="Search Documents"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-10 bg-white border-slate-200 rounded-full text-sm"
-              />
+        <div className="px-5 pb-3 flex flex-wrap gap-2 shrink-0">
+          {DOC_FILTERS.map((filter) => (
+            <button
+              key={filter}
+              type="button"
+              onClick={() => setDocFilter(filter)}
+              className={cn(
+                "px-4 py-1.5 rounded-full text-[12px] font-medium border cursor-pointer transition-colors",
+                docFilter === filter
+                  ? "bg-emerald-50 text-emerald-600 border-emerald-200"
+                  : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+              )}
+            >
+              {filter}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Content */}
+      <ScrollArea className="flex-1 min-h-0 px-5">
+        {activeTab === 'Media' && (
+          filteredMedia.length > 0 ? (
+            <div className="grid grid-cols-3 gap-2 pb-4">
+              {filteredMedia.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  title={m.name}
+                  onClick={() => setViewingFile(m)}
+                  className="relative aspect-square rounded-xl overflow-hidden bg-slate-100 border border-slate-200 hover:opacity-90 transition-opacity cursor-pointer p-0"
+                >
+                  {m.fileType === 'image' ? (
+                    <img src={m.url} alt={m.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <>
+                      <video src={m.url} className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                        <Play className="w-6 h-6 text-white" fill="currentColor" />
+                      </div>
+                    </>
+                  )}
+                </button>
+              ))}
             </div>
-          </div>
+          ) : (
+            <EmptyState text="No media shared yet" />
+          )
+        )}
 
-          {/* Filters */}
-          <div className="px-5 pb-3 flex gap-2">
-            {FILTERS.map((filter) => (
-              <button
-                key={filter}
-                type="button"
-                onClick={() => setActiveFilter(filter)}
-                className={cn(
-                  "px-4 py-1.5 rounded-full text-[12px] font-medium border cursor-pointer transition-colors",
-                  activeFilter === filter
-                    ? "bg-emerald-50 text-emerald-600 border-emerald-200"
-                    : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
-                )}
-              >
-                {filter}
-              </button>
-            ))}
-          </div>
-
-          {/* Doc List */}
-          <ScrollArea className="flex-1 px-5">
+        {activeTab === 'Docs' && (
+          filteredDocs.length > 0 ? (
             <div className="flex flex-col gap-3 pb-4">
               {filteredDocs.map((doc) => (
-                <div
+                <button
                   key={doc.id}
-                  className="flex items-center gap-3 p-4 bg-[#F8FAFC] border border-slate-200 rounded-2xl cursor-pointer hover:border-slate-300 transition-colors"
+                  type="button"
+                  onClick={() => setViewingFile(doc)}
+                  className="flex items-center gap-3 p-4 bg-[#F8FAFC] border border-slate-200 rounded-2xl cursor-pointer hover:border-slate-300 transition-colors text-left w-full"
                 >
-                  <DocIcon type={doc.type} />
+                  <DocIcon fileType={doc.fileType} />
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-bold text-slate-800 truncate">{doc.name}</p>
                     <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-                      {doc.type} &bull; {doc.size} &bull; {doc.date}
+                      {doc.fileType.toUpperCase()} &bull; {doc.size}
                     </p>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
-          </ScrollArea>
-        </div>
-      )}
+          ) : (
+            <EmptyState text="No documents shared yet" />
+          )
+        )}
 
-      {activeTab === 'Media' && (
-        <div className="h-[300px] flex items-center justify-center text-slate-400 text-sm">
-          No media files
-        </div>
-      )}
+        {activeTab === 'Links' && (
+          filteredLinks.length > 0 ? (
+            <div className="flex flex-col gap-2 pb-4">
+              {filteredLinks.map((l) => (
+                <a
+                  key={l.id}
+                  href={l.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-3 bg-[#F8FAFC] border border-slate-200 rounded-2xl cursor-pointer hover:border-slate-300 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center shrink-0">
+                    <LinkIcon className="w-5 h-5 text-indigo-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-bold text-slate-800 truncate">{l.text}</p>
+                    <p className="text-[11px] text-indigo-500 font-medium truncate">{l.url}</p>
+                  </div>
+                </a>
+              ))}
+            </div>
+          ) : (
+            <EmptyState text="No links shared" />
+          )
+        )}
+      </ScrollArea>
 
-      {activeTab === 'Links' && (
-        <div className="h-[300px] flex items-center justify-center text-slate-400 text-sm">
-          No links shared
-        </div>
+      {viewingFile && (
+        <FileViewer attachment={viewingFile} onClose={() => setViewingFile(null)} />
       )}
     </div>
   );

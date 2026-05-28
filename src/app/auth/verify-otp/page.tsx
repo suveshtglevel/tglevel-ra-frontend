@@ -69,7 +69,7 @@ export default function VerifyOtpPage() {
                           key={index}
                           type="text"
                           maxLength={1}
-                          className="w-full h-20 bg-[#F1F3FF] border-none rounded-[20px] text-center text-3xl font-bold text-[#0F172A] focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all shadow-sm"
+                          className="w-full h-16 sm:h-20 bg-[#F1F3FF] border-none rounded-[16px] sm:rounded-[20px] text-center text-2xl sm:text-3xl font-bold text-[#0F172A] focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all shadow-sm"
                           value={field.value[index] || ''}
                           onChange={(e) => {
                             const val = e.target.value;
