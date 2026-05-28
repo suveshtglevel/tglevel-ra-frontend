@@ -1,6 +1,6 @@
 'use client';
 
-import React,{useState, useRef} from 'react';
+import React,{useState, useRef, useEffect} from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { MessageSquare, MonitorPlay, Settings, Pencil, LogOut, Mail, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -35,7 +35,7 @@ const Sidebar = () => {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (pathname?.startsWith('/webinar')) {
       setActiveTab('webinar');
     } else if (pathname?.startsWith('/dashboard')) {
