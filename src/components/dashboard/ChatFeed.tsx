@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Check, CheckCheck, FileText, FileSpreadsheet, File, Play, X, Download } from 'lucide-react';
+import { FileText, FileSpreadsheet, File, Play, X, Download, MoreVertical, Pin } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import TradeCard from './TradeCard';
 import ViewedByPanel from './ViewedByPanel';
 import { cn } from '@/lib/utils';
@@ -11,7 +12,33 @@ import type { ChatMessage, FileAttachment } from '@/redux/slices/messageSlice';
 interface ChatFeedProps {
   views?: string;
   messages?: ChatMessage[];
+  onTogglePin?: (messageId: string) => void;
 }
+
+// Three-dots menu overlaid at the top-right of every message; offers pin/unpin.
+const MessageMenu = ({ pinned, onTogglePin }: { pinned: boolean; onTogglePin: () => void }) => (
+  <Popover>
+    <PopoverTrigger asChild>
+      <button
+        type="button"
+        aria-label="Message options"
+        className="absolute top-2 right-2 z-10 p-1 rounded-full bg-white/90 text-slate-500 border border-slate-200 shadow-sm hover:bg-white hover:text-slate-700 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity cursor-pointer"
+      >
+        <MoreVertical className="w-4 h-4" />
+      </button>
+    </PopoverTrigger>
+    <PopoverContent className="w-40 p-1 rounded-xl border border-slate-200 shadow-lg" align="end" side="bottom" sideOffset={4}>
+      <button
+        type="button"
+        onClick={onTogglePin}
+        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors"
+      >
+        <Pin className={cn("w-4 h-4", pinned ? "text-emerald-500 rotate-45" : "text-slate-400")} />
+        {pinned ? 'Unpin message' : 'Pin message'}
+      </button>
+    </PopoverContent>
+  </Popover>
+);
 
 // Full-screen file viewer modal
 const FileViewerModal = ({ attachment, onClose }: { attachment: FileAttachment; onClose: () => void }) => {
@@ -132,61 +159,43 @@ const FileAttachmentView = ({ attachment, isSent, onOpen }: { attachment: NonNul
   );
 };
 
+// Every message renders as a left-aligned post (like the seed messages),
+// regardless of who sent it or its type.
 const MessageBubble = ({ message, onOpenFile }: { message: ChatMessage; onOpenFile: (attachment: FileAttachment) => void }) => {
-  const isSent = message.type === 'sent';
-
-  const StatusIcon = () => {
-    if (message.status === 'sent') return <Check className="w-3 h-3 text-slate-400" />;
-    if (message.status === 'delivered') return <CheckCheck className="w-3 h-3 text-slate-400" />;
-    return <CheckCheck className="w-3 h-3 text-blue-500" />;
-  };
-
   return (
-    <div className={cn("flex w-full", isSent ? "justify-end" : "justify-start")}>
-      <div
-        className={cn(
-          "max-w-[380px] rounded-2xl px-4 py-3 shadow-sm",
-          isSent
-            ? "bg-emerald-500 text-white rounded-br-sm"
-            : "bg-white border border-slate-200 text-slate-800 rounded-bl-sm"
-        )}
-      >
-        {!isSent && (
-          <p className="text-[10px] font-bold text-emerald-600 mb-1">{message.sender}</p>
-        )}
+    <div className="max-w-[380px] rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm bg-white border border-slate-200 text-slate-800">
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <p className="text-[10px] font-bold text-emerald-600">{message.sender}</p>
+        {message.pinned && <Pin className="w-3 h-3 text-emerald-500 rotate-45 shrink-0" />}
+      </div>
 
-        {/* File attachment */}
-        {message.attachment && (
-          <FileAttachmentView attachment={message.attachment} isSent={isSent} onOpen={() => onOpenFile(message.attachment!)} />
-        )}
+      {/* File attachment */}
+      {message.attachment && (
+        <FileAttachmentView attachment={message.attachment} isSent={false} onOpen={() => onOpenFile(message.attachment!)} />
+      )}
 
-        {/* Text content */}
-        {message.content && (
-          <div
-            className={cn(
-              "text-[13px] leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1 [&_li]:my-0.5 [&_a]:underline",
-              isSent ? "text-white" : "text-slate-700"
-            )}
-            dangerouslySetInnerHTML={{ __html: message.content }}
-          />
-        )}
+      {/* Text content */}
+      {message.content && (
+        <div
+          className="text-[13px] leading-relaxed text-slate-700 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1 [&_li]:my-0.5 [&_a]:underline"
+          dangerouslySetInnerHTML={{ __html: message.content }}
+        />
+      )}
 
-        <div className={cn("flex items-center justify-end gap-1 mt-1", isSent ? "text-white/70" : "text-slate-400")}>
-          {message.group && (
-            <span className="text-[9px] font-medium mr-1 bg-white/20 px-1.5 py-0.5 rounded">{message.group}</span>
-          )}
-          {message.messageType && (
-            <span className="text-[9px] font-medium mr-1 bg-white/20 px-1.5 py-0.5 rounded">{message.messageType}</span>
-          )}
-          <span className="text-[10px] font-medium">{message.timestamp}</span>
-          {isSent && <StatusIcon />}
-        </div>
+      <div className="flex items-center justify-end gap-1 mt-1 text-slate-400">
+        {message.group && (
+          <span className="text-[9px] font-medium mr-1 bg-slate-100 px-1.5 py-0.5 rounded">{message.group}</span>
+        )}
+        {message.messageType && (
+          <span className="text-[9px] font-medium mr-1 bg-slate-100 px-1.5 py-0.5 rounded">{message.messageType}</span>
+        )}
+        <span className="text-[10px] font-medium">{message.timestamp}</span>
       </div>
     </div>
   );
 };
 
-const ChatFeed = ({ views = '42', messages = [] }: ChatFeedProps) => {
+const ChatFeed = ({ views = '42', messages = [], onTogglePin }: ChatFeedProps) => {
   const [showViewedBy, setShowViewedBy] = React.useState(false);
   const [viewingFile, setViewingFile] = React.useState<FileAttachment | null>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -212,27 +221,27 @@ const ChatFeed = ({ views = '42', messages = [] }: ChatFeedProps) => {
           </div>
 
           {/* Messages — Trade-type messages render as the green research card,
-              everything else renders as a normal chat bubble. */}
+              everything else renders as a normal chat bubble. Each row carries
+              a three-dots menu for pinning. */}
           <div className="flex flex-col gap-3 w-full">
-            {messages.map((msg) =>
-              msg.messageType === 'Trade' ? (
-                <div
-                  key={msg.id}
-                  className={cn('flex w-full', msg.type === 'sent' ? 'justify-end' : 'justify-start')}
-                >
+            {messages.map((msg) => (
+              <div key={msg.id} id={`feed-msg-${msg.id}`} className="group relative w-fit max-w-full scroll-mt-4">
+                {msg.messageType === 'Trade' ? (
                   <TradeCard
                     content={msg.content}
                     timestamp={msg.timestamp}
                     status={msg.status}
                     tag={msg.tradeTag}
                     refId={msg.tradeRefId}
+                    pinned={msg.pinned}
                     onTickClick={() => setShowViewedBy((prev) => !prev)}
                   />
-                </div>
-              ) : (
-                <MessageBubble key={msg.id} message={msg} onOpenFile={(att) => setViewingFile(att)} />
-              )
-            )}
+                ) : (
+                  <MessageBubble message={msg} onOpenFile={(att) => setViewingFile(att)} />
+                )}
+                <MessageMenu pinned={!!msg.pinned} onTogglePin={() => onTogglePin?.(msg.id)} />
+              </div>
+            ))}
           </div>
         </div>
       </ScrollArea>

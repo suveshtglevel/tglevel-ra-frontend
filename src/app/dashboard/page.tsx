@@ -16,10 +16,15 @@ export default function DashboardPage() {
     selectedCommunity,
     selectedSubCommunity,
     currentMessages,
+    pinnedItems,
+    checkboxTargets,
+    toggleSubTarget,
+    toggleCommunityTargets,
     handleSelectSubCommunity,
     handleSelectCommunity,
     handleSendMessage,
     handleSendFile,
+    handleTogglePin,
   } = useDashboard();
 
   const headerTitle = selectedSubCommunity ? selectedSubCommunity.name : selectedCommunity.name;
@@ -32,8 +37,12 @@ export default function DashboardPage() {
         communities={communities}
         selectedCommunityId={selectedCommunityId}
         selectedSubCommunityId={selectedSubCommunityId}
+        targetCommunityId={checkboxTargets.communityId}
+        targetSubIds={checkboxTargets.subIds}
         onSelectCommunity={handleSelectCommunity}
         onSelectSubCommunity={handleSelectSubCommunity}
+        onToggleSubTarget={toggleSubTarget}
+        onToggleCommunityTargets={toggleCommunityTargets}
       />
 
       {/* Main Feed Area */}
@@ -44,12 +53,13 @@ export default function DashboardPage() {
           views={selectedCommunity.views}
         />
 
-        <PinnedAlert message={selectedCommunity.pinned} />
+        <PinnedAlert pinnedMessages={pinnedItems} />
 
         {/* Feed Scroll Area */}
         <ChatFeed
           views={selectedCommunity.views}
           messages={currentMessages}
+          onTogglePin={handleTogglePin}
         />
 
         {/* Message Input Section */}

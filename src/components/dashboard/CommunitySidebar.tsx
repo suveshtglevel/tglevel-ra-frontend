@@ -14,16 +14,24 @@ interface CommunitySidebarProps {
   communities: Community[];
   selectedCommunityId: number;
   selectedSubCommunityId: number | null;
+  targetCommunityId: number | null;
+  targetSubIds: number[];
   onSelectCommunity: (id: number) => void;
   onSelectSubCommunity: (id: number) => void;
+  onToggleSubTarget: (communityId: number, subId: number) => void;
+  onToggleCommunityTargets: (communityId: number, allSubIds: number[]) => void;
 }
 
 const CommunitySidebar = ({
   communities,
   selectedCommunityId,
   selectedSubCommunityId,
+  targetCommunityId,
+  targetSubIds,
   onSelectCommunity,
   onSelectSubCommunity,
+  onToggleSubTarget,
+  onToggleCommunityTargets,
 }: CommunitySidebarProps) => {
   const [search, setSearch] = React.useState('');
   const [activeFilter, setActiveFilter] = React.useState<FilterType>('ALL');
@@ -82,9 +90,12 @@ const CommunitySidebar = ({
                   community={comm}
                   active={comm.id === selectedCommunityId}
                   selectedSubCommunityId={selectedSubCommunityId}
+                  targetSubIds={targetCommunityId === comm.id ? targetSubIds : []}
                   initialExpanded={index === 0}
                   onSelectCommunity={onSelectCommunity}
                   onSelectSubCommunity={onSelectSubCommunity}
+                  onToggleSubTarget={onToggleSubTarget}
+                  onToggleCommunityTargets={onToggleCommunityTargets}
                 />
               </div>
             ))
