@@ -1,24 +1,24 @@
 'use client';
 
-import React from 'react';
+import React,{useState, useRef} from 'react';
 import { useRouter } from 'next/navigation';
 import { MessageSquare, MonitorPlay, Settings, Pencil, LogOut, Mail, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'react-hot-toast';
 
-type SidebarTab = 'chat' | 'monitor' | 'settings';
+type SidebarTab = 'chat' | 'webinar' | 'settings';
 
 const Sidebar = () => {
   const router = useRouter();
-  const [activeTab, setActiveTab] = React.useState<SidebarTab>('chat');
-  const [showProfile, setShowProfile] = React.useState(false);
-  const [showSettings, setShowSettings] = React.useState(false);
-  const [profileImage, setProfileImage] = React.useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<SidebarTab>('chat');
+  const [showProfile, setShowProfile] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
 
-  const profileRef = React.useRef<HTMLDivElement>(null);
-  const settingsRef = React.useRef<HTMLDivElement>(null);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
+  const settingsRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Close popups on outside click
   React.useEffect(() => {
@@ -41,9 +41,9 @@ const Sidebar = () => {
       setShowSettings(false);
       router.push('/dashboard');
     }
-    if (tab === 'monitor') {
+    if (tab === 'webinar') {
       setShowSettings(false);
-      router.push('/monitor');
+      router.push('/webinar');
     }
     if (tab === 'settings') {
       setShowSettings((prev) => !prev);
@@ -87,12 +87,11 @@ const Sidebar = () => {
           variant="ghost"
           size="icon"
           onClick={() => 
-            // handleTabClick('monitor')
-            router.push('/webinar')
+            handleTabClick('webinar')
           }
           className={cn(
             "cursor-pointer transition-colors",
-            activeTab === 'monitor' ? "text-emerald-600 bg-emerald-50 hover:bg-emerald-100" : "text-slate-400 hover:text-slate-600"
+            activeTab === 'webinar' ? "text-emerald-600 bg-emerald-50 hover:bg-emerald-100" : "text-slate-400 hover:text-slate-600"
           )}
         >
           <MonitorPlay className="w-6 h-6" />
