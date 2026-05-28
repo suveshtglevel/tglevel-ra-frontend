@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import Sidebar from '@/components/common/Sidebar';
 import CommunitySidebar from '@/components/dashboard/CommunitySidebar';
 import ChatHeader from '@/components/dashboard/ChatHeader';
 import PinnedAlert from '@/components/dashboard/PinnedAlert';
@@ -45,9 +44,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="flex h-screen w-full bg-[#F8FAFC] overflow-hidden">
-      <Sidebar />
-
+    <>
       <CommunitySidebar
         communities={communities}
         selectedCommunityId={selectedCommunityId}
@@ -87,6 +84,6 @@ export default function DashboardPage() {
           </div>
         </div>
       </main>
-    </div>
+    </>
   );
 }
