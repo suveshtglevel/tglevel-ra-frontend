@@ -163,7 +163,10 @@ const MessageBubble = ({ message, onOpenFile }: { message: ChatMessage; onOpenFi
         {/* Text content */}
         {message.content && (
           <div
-            className={cn("text-[13px] leading-relaxed", isSent ? "text-white" : "text-slate-700")}
+            className={cn(
+              "text-[13px] leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1 [&_li]:my-0.5 [&_a]:underline",
+              isSent ? "text-white" : "text-slate-700"
+            )}
             dangerouslySetInnerHTML={{ __html: message.content }}
           />
         )}
