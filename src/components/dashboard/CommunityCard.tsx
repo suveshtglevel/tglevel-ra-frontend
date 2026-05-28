@@ -10,9 +10,12 @@ interface CommunityCardProps {
   community: Community;
   active: boolean;
   selectedSubCommunityId: number | null;
+  targetSubIds: number[];
   initialExpanded?: boolean;
   onSelectCommunity: (id: number) => void;
   onSelectSubCommunity: (id: number) => void;
+  onToggleSubTarget: (communityId: number, subId: number) => void;
+  onToggleCommunityTargets: (communityId: number, allSubIds: number[]) => void;
 }
 
 const CheckCircle = ({ checked, onClick }: { checked: boolean; onClick?: (e: React.MouseEvent) => void }) => (
@@ -22,7 +25,7 @@ const CheckCircle = ({ checked, onClick }: { checked: boolean; onClick?: (e: Rea
     aria-pressed={checked}
     onClick={onClick}
     className={cn(
-      "w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center transition-colors shrink-0 cursor-pointer",
+      "w-[16px] h-[16px] rounded-full border-1 flex items-center justify-center transition-colors shrink-0 cursor-pointer",
       checked
         ? "border-emerald-500 bg-emerald-500"
         : "border-[#D1D5DB] bg-white"
@@ -88,7 +91,7 @@ const SubCommunityRow = ({ sub, checked, isSelected, onToggle, onSelect }: SubCo
   );
 };
 
-const CommunityCard = ({ community, active, selectedSubCommunityId, initialExpanded = false, onSelectCommunity, onSelectSubCommunity }: CommunityCardProps) => {
+const CommunityCard = ({ community, active, selectedSubCommunityId, targetSubIds, initialExpanded = false, onSelectCommunity, onSelectSubCommunity, onToggleSubTarget, onToggleCommunityTargets }: CommunityCardProps) => {
   const [expanded, setExpanded] = React.useState(initialExpanded);
   const subCommunities = community.subCommunities ?? [];
   const toggleExpanded = () => setExpanded((prev) => !prev);
@@ -105,20 +108,11 @@ const CommunityCard = ({ community, active, selectedSubCommunityId, initialExpan
     }
   };
 
-  // Track checked state per sub-community (default: Free = checked)
-  const [checkedMap, setCheckedMap] = React.useState<Record<number, boolean>>(() => {
-    const map: Record<number, boolean> = {};
-    subCommunities.forEach((s) => {
-      map[s.id] = s.type === 'Free';
-    });
-    return map;
-  });
-
-  const selectedCount = Object.values(checkedMap).filter(Boolean).length;
-
-  const toggleSub = (subId: number) => {
-    setCheckedMap((prev) => ({ ...prev, [subId]: !prev[subId] }));
-  };
+  // Checked state is driven by the parent (one community selectable at a time).
+  const selectedCount = targetSubIds.length;
+  const allSelected = subCommunities.length > 0 && selectedCount === subCommunities.length;
+  // Communities without sub-communities are targeted by their own id.
+  const selfSelected = targetSubIds.includes(community.id);
 
   return (
     <Card
@@ -141,8 +135,8 @@ const CommunityCard = ({ community, active, selectedSubCommunityId, initialExpan
         {/* Left Icon Container */}
         <div className="w-10 h-10 rounded-full bg-[#F1F5F9] flex items-center justify-center shrink-0">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M15 5.25H19.5V9.75" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M19.5 5.25L13.125 11.625L9.375 7.875L4.5 12.75" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M15 5.25H19.5V9.75" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M19.5 5.25L13.125 11.625L9.375 7.875L4.5 12.75" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
 
@@ -160,21 +154,26 @@ const CommunityCard = ({ community, active, selectedSubCommunityId, initialExpan
         {/* Right Content */}
         <div className="flex flex-col items-end h-10 pr-10">
           <span className="text-[10px] font-medium text-[#64748B]">{community.time}</span>
+          {subCommunities.length > 0 && selectedCount > 0 && (
+            <div className="mt-1 w-[18px] h-[18px] rounded-full bg-emerald-500 flex items-center justify-center">
+              <span className="text-[9px] font-bold text-white">{selectedCount}</span>
+            </div>
+          )}
         </div>
 
         {/* Top Right Controls */}
         <div className="absolute top-3 right-3 flex flex-col items-center gap-[15px]">
           {subCommunities.length > 0 ? (
             <>
-              {/* Selected count badge */}
-              {selectedCount > 0 && (
-                <div className="w-[18px] h-[18px] rounded-full bg-emerald-500 flex items-center justify-center">
-                  <span className="text-[9px] font-bold text-white">{selectedCount}</span>
-                </div>
-              )}
-              {selectedCount === 0 && (
-                <div className="w-[15px] h-[15px] rounded-full border border-[#E2E8F0] bg-white" />
-              )}
+              {/* Master checkbox: selects/clears all sub-communities. The
+                  selected count is shown under the timestamp. */}
+              <CheckCircle
+                checked={allSelected}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleCommunityTargets(community.id, subCommunities.map((s) => s.id));
+                }}
+              />
               <button
                 type="button"
                 aria-label="Toggle dropdown"
@@ -193,7 +192,13 @@ const CommunityCard = ({ community, active, selectedSubCommunityId, initialExpan
               </button>
             </>
           ) : (
-            <div className="w-[15px] h-[15px] rounded-full border border-[#E2E8F0] bg-white" />
+            <CheckCircle
+              checked={selfSelected}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleCommunityTargets(community.id, [community.id]);
+              }}
+            />
           )}
         </div>
       </div>
@@ -205,9 +210,9 @@ const CommunityCard = ({ community, active, selectedSubCommunityId, initialExpan
             <SubCommunityRow
               key={sub.id}
               sub={sub}
-              checked={checkedMap[sub.id] ?? false}
+              checked={targetSubIds.includes(sub.id)}
               isSelected={selectedSubCommunityId === sub.id}
-              onToggle={() => toggleSub(sub.id)}
+              onToggle={() => onToggleSubTarget(community.id, sub.id)}
               onSelect={() => onSelectSubCommunity(sub.id)}
             />
           ))}

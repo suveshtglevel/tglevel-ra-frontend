@@ -19,6 +19,7 @@ export interface ChatMessage {
   timestamp: string;
   status: 'sent' | 'delivered' | 'read';
   sender: string;
+  pinned?: boolean;
   attachment?: FileAttachment;
   // Trade-card metadata (only present when messageType === 'Trade')
   tradeTag?: string;
@@ -138,6 +139,13 @@ const messageSlice = createSlice({
       }
       state.messages[communityId].push(newMsg);
     },
+    togglePin: (state, action: PayloadAction<{ communityId: number; messageId: string }>) => {
+      const { communityId, messageId } = action.payload;
+      const msg = state.messages[communityId]?.find((m) => m.id === messageId);
+      if (msg) {
+        msg.pinned = !msg.pinned;
+      }
+    },
     updateMessageStatus: (state, action: PayloadAction<{ messageId: string; communityId: number; status: 'sent' | 'delivered' | 'read' }>) => {
       const { messageId, communityId, status } = action.payload;
       const msgs = state.messages[communityId];
@@ -151,5 +159,5 @@ const messageSlice = createSlice({
   },
 });
 
-export const { sendMessage, sendFileMessage, updateMessageStatus } = messageSlice.actions;
+export const { sendMessage, sendFileMessage, togglePin, updateMessageStatus } = messageSlice.actions;
 export default messageSlice.reducer;

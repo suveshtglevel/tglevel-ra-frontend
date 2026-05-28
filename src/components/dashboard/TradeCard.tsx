@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Check, CheckCheck } from 'lucide-react';
+import { Check, CheckCheck, Pin } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { DISCLAIMER } from '@/constants/mockData';
@@ -14,6 +14,7 @@ interface TradeCardProps {
   status?: MessageStatus;
   tag?: string;
   refId?: string;
+  pinned?: boolean;
   onTickClick?: () => void;
 }
 
@@ -30,12 +31,13 @@ const StatusTick = ({ status }: { status: MessageStatus }) => {
 // Green "RESEARCH ANALYSIS" card used for every Trade-type message —
 // both seed cards and free-text trades RA sends. The body is whatever
 // HTML was typed/seeded; the header, disclaimer and footer are fixed chrome.
-const TradeCard = ({ content, timestamp, status = 'read', tag, refId, onTickClick }: TradeCardProps) => {
+const TradeCard = ({ content, timestamp, status = 'read', tag, refId, pinned, onTickClick }: TradeCardProps) => {
   return (
     <Card className="w-[380px] bg-[#E6F9F3] border-[#C2EDDF] p-5 rounded-3xl shadow-none">
       <div className="space-y-3 text-slate-800">
-        <div className="font-bold flex items-center gap-2 text-[15px]">
-          ✅*RESEARCH ANALYSIS✅
+        <div className="font-bold flex items-center justify-between gap-2 text-[15px]">
+          <span>✅*RESEARCH ANALYSIS✅</span>
+          {pinned && <Pin className="w-3.5 h-3.5 text-emerald-500 rotate-45 shrink-0" />}
         </div>
 
         <div

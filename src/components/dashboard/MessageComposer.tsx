@@ -152,6 +152,9 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
   const imageInputRef = React.useRef<HTMLInputElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const videoInputRef = React.useRef<HTMLInputElement>(null);
+  // Holds the latest send handler so the editor's keydown (set up once) always
+  // calls the current closure instead of a stale one.
+  const handleSendRef = React.useRef<() => void>(() => {});
 
   const editor = useEditor({
     extensions: [
@@ -175,12 +178,42 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
       attributes: {
         class: 'focus:outline-none max-w-full text-slate-700 font-medium text-[15px] leading-relaxed min-h-full',
       },
+      // Enter sends the message; Shift+Enter falls through to a line break.
+      handleKeyDown: (_view, event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+          event.preventDefault();
+          handleSendRef.current();
+          return true;
+        }
+        return false;
+      },
     },
   });
 
   if (!editor) {
     return null;
   }
+
+  const handleSend = () => {
+    if (!selectedMessageType) {
+      toast.error('Please select a message type before sending');
+      return;
+    }
+    const content = editor.getHTML();
+    if (content === '<p></p>') return;
+    onSend?.(content, {
+      messageType: selectedMessageType ?? undefined,
+      group: selectedBundle?.name,
+      notifyUsers,
+      targetCommunityIds: selectedBundle?.subIds,
+    });
+    editor.commands.clearContent();
+    setIsEditorEmpty(true);
+    setSelectedBundleId(null);
+    setSelectedMessageType(null);
+    setNotifyUsers(false);
+  };
+  handleSendRef.current = handleSend;
 
   const toggleBold = () => editor.chain().focus().toggleBold().run();
   const toggleItalic = () => editor.chain().focus().toggleItalic().run();
@@ -530,31 +563,12 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
             </PopoverContent>
           </Popover>
           <Button
-            disabled={!selectedMessageType}
             title={!selectedMessageType ? 'Select a message type first' : undefined}
             className={cn(
               "bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl px-6 font-bold h-10 gap-2 shadow-lg shadow-emerald-500/20 transition-all active:scale-95 cursor-pointer",
-              !selectedMessageType && "opacity-50 cursor-not-allowed hover:bg-emerald-500"
+              !selectedMessageType && "opacity-50"
             )}
-            onClick={() => {
-              if (!selectedMessageType) {
-                toast.error('Please select a message type before sending');
-                return;
-              }
-              const content = editor.getHTML();
-              if (content === '<p></p>') return;
-              onSend?.(content, {
-                messageType: selectedMessageType ?? undefined,
-                group: selectedBundle?.name,
-                notifyUsers,
-                targetCommunityIds: selectedBundle?.subIds,
-              });
-              editor.commands.clearContent();
-              setIsEditorEmpty(true);
-              setSelectedBundleId(null);
-              setSelectedMessageType(null);
-              setNotifyUsers(false);
-            }}
+            onClick={handleSend}
           >
             Send <Send className="w-4 h-4 fill-current" />
           </Button>
