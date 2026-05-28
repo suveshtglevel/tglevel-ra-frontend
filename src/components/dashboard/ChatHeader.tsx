@@ -9,10 +9,9 @@ import MediaDocsPanel from './MediaDocsPanel';
 interface ChatHeaderProps {
   title: string;
   members: string;
-  views: string;
 }
 
-const ChatHeader = ({ title, members, views }: ChatHeaderProps) => {
+const ChatHeader = ({ title, members }: ChatHeaderProps) => {
   const [showPanel, setShowPanel] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
@@ -30,9 +29,9 @@ const ChatHeader = ({ title, members, views }: ChatHeaderProps) => {
   const handleExcelExport = () => {
     // Generate CSV content from dummy data
     const csvContent = [
-      ['Community', 'Members', 'Views', 'Status'],
-      [title, members, views, 'Active'],
-      ['', '', '', ''],
+      ['Community', 'Members', 'Status'],
+      [title, members, 'Active'],
+      ['', '', ''],
       ['Trade History', '', '', ''],
       ['Date', 'Type', 'Symbol', 'Entry', 'SL', 'Target 1', 'Target 2', 'Status'],
       ['2023-10-24', 'BUY', 'NIFTY 24100 PE', '180', '165', '195', '210', 'Target 1 Hit'],
@@ -63,10 +62,6 @@ const ChatHeader = ({ title, members, views }: ChatHeaderProps) => {
         </div>
       </div>
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2 text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
-          <Eye className="w-4 h-4" />
-          <span className="text-xs font-bold text-slate-600">Views: {views}</span>
-        </div>
         <Button
           variant="outline"
           size="sm"
