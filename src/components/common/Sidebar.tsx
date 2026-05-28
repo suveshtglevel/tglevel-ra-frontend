@@ -5,10 +5,12 @@ import { MessageSquare, MonitorPlay, Settings, Pencil, LogOut, Mail, Phone } fro
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
 
 type SidebarTab = 'chat' | 'monitor' | 'settings';
 
 const Sidebar = () => {
+  const router = useRouter();
   const [activeTab, setActiveTab] = React.useState<SidebarTab>('chat');
   const [showProfile, setShowProfile] = React.useState(false);
   const [showSettings, setShowSettings] = React.useState(false);
@@ -76,7 +78,10 @@ const Sidebar = () => {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => handleTabClick('monitor')}
+          onClick={() => 
+            // handleTabClick('monitor')
+            router.push('/webinar')
+          }
           className={cn(
             "cursor-pointer transition-colors",
             activeTab === 'monitor' ? "text-emerald-600 bg-emerald-50 hover:bg-emerald-100" : "text-slate-400 hover:text-slate-600"
