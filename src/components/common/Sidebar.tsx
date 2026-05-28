@@ -1,7 +1,7 @@
 'use client';
 
 import React,{useState, useRef} from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { MessageSquare, MonitorPlay, Settings, Pencil, LogOut, Mail, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -11,6 +11,7 @@ type SidebarTab = 'chat' | 'webinar' | 'settings';
 
 const Sidebar = () => {
   const router = useRouter();
+  const pathname = usePathname();
   const [activeTab, setActiveTab] = useState<SidebarTab>('chat');
   const [showProfile, setShowProfile] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -34,6 +35,13 @@ const Sidebar = () => {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
+  React.useEffect(() => {
+    if (pathname?.startsWith('/webinar')) {
+      setActiveTab('webinar');
+    } else if (pathname?.startsWith('/dashboard')) {
+      setActiveTab('chat');
+    }
+  }, [pathname]);
 
   const handleTabClick = (tab: SidebarTab) => {
     setActiveTab(tab);
@@ -73,22 +81,22 @@ const Sidebar = () => {
 
   return (
     <aside className="w-16 flex flex-col items-center py-6 bg-white border-r border-slate-200 gap-8 shrink-0">
-      <div
-        onClick={() => handleTabClick('chat')}
-        className={cn(
-          "w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer transition-colors",
-          activeTab === 'chat' ? "bg-emerald-50 text-emerald-600" : "bg-slate-50 text-slate-400 hover:text-slate-600"
-        )}
-      >
-        <MessageSquare className="w-6 h-6" />
-      </div>
       <nav className="flex flex-col gap-6 flex-1">
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => 
-            handleTabClick('webinar')
-          }
+          onClick={() => handleTabClick('chat')}
+          className={cn(
+            "cursor-pointer transition-colors",
+            activeTab === 'chat' ? "text-emerald-600 bg-emerald-50 hover:bg-emerald-100" : "text-slate-400 hover:text-slate-600"
+          )}
+        >
+          <MessageSquare className="w-6 h-6" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => handleTabClick('webinar')}
           className={cn(
             "cursor-pointer transition-colors",
             activeTab === 'webinar' ? "text-emerald-600 bg-emerald-50 hover:bg-emerald-100" : "text-slate-400 hover:text-slate-600"
