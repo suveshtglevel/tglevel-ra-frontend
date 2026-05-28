@@ -1,6 +1,7 @@
 'use client';
 
-import Sidebar from '@/components/dashboard/Sidebar';
+import React from 'react';
+import Sidebar from '@/components/common/Sidebar';
 import CommunitySidebar from '@/components/dashboard/CommunitySidebar';
 import ChatHeader from '@/components/dashboard/ChatHeader';
 import PinnedAlert from '@/components/dashboard/PinnedAlert';
@@ -27,20 +28,36 @@ export default function DashboardPage() {
     handleTogglePin,
   } = useDashboard();
 
+  // Community list is an off-canvas drawer below `lg`; static side-by-side at lg+.
+  const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false);
+
   const headerTitle = selectedSubCommunity ? selectedSubCommunity.name : selectedCommunity.name;
   const headerMembers = selectedSubCommunity ? `${selectedSubCommunity.members} members` : `${selectedCommunity.members} members`;
+
+  // On mobile, picking a chat should also close the drawer.
+  const selectSubCommunity = (id: number) => {
+    handleSelectSubCommunity(id);
+    setMobileSidebarOpen(false);
+  };
+  const selectCommunity = (id: number) => {
+    handleSelectCommunity(id);
+    setMobileSidebarOpen(false);
+  };
 
   return (
     <div className="flex h-screen w-full bg-[#F8FAFC] overflow-hidden">
       <Sidebar />
+
       <CommunitySidebar
         communities={communities}
         selectedCommunityId={selectedCommunityId}
         selectedSubCommunityId={selectedSubCommunityId}
         targetCommunityId={checkboxTargets.communityId}
         targetSubIds={checkboxTargets.subIds}
-        onSelectCommunity={handleSelectCommunity}
-        onSelectSubCommunity={handleSelectSubCommunity}
+        open={mobileSidebarOpen}
+        onClose={() => setMobileSidebarOpen(false)}
+        onSelectCommunity={selectCommunity}
+        onSelectSubCommunity={selectSubCommunity}
         onToggleSubTarget={toggleSubTarget}
         onToggleCommunityTargets={toggleCommunityTargets}
       />
@@ -50,7 +67,8 @@ export default function DashboardPage() {
         <ChatHeader
           title={headerTitle}
           members={headerMembers}
-          views={selectedCommunity.views}
+          messages={currentMessages}
+          onMenuClick={() => setMobileSidebarOpen(true)}
         />
 
         <PinnedAlert pinnedMessages={pinnedItems} />
@@ -63,7 +81,7 @@ export default function DashboardPage() {
         />
 
         {/* Message Input Section */}
-        <div className="p-6 bg-[#F8FAFC] shrink-0">
+        <div className="p-3 sm:p-4 lg:p-6 bg-[#F8FAFC] shrink-0">
           <div className="max-w-[991px] mx-auto w-full">
             <MessageComposer communities={communities} onSend={handleSendMessage} onSendFile={handleSendFile} />
           </div>

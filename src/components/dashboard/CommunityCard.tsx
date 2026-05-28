@@ -126,7 +126,7 @@ const CommunityCard = ({ community, active, selectedSubCommunityId, targetSubIds
         }
       }}
       className={cn(
-        "w-[287px] flex flex-col px-3 bg-[#FDFDFD] border-[#E2E8F0] shadow-none rounded-[14px] cursor-pointer transition-all hover:border-emerald-200 relative group overflow-hidden",
+        "w-full flex flex-col px-3 bg-[#FDFDFD] border-[#E2E8F0] shadow-none rounded-[14px] cursor-pointer transition-all hover:border-emerald-200 relative group overflow-hidden",
         active && "border-emerald-200 bg-emerald-50/30"
       )}
     >

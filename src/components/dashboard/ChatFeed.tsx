@@ -2,10 +2,11 @@
 
 import React from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FileText, FileSpreadsheet, File, Play, X, Download, MoreVertical, Pin } from 'lucide-react';
+import { FileText, FileSpreadsheet, File, Play, MoreVertical, Pin } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import TradeCard from './TradeCard';
 import ViewedByPanel from './ViewedByPanel';
+import FileViewer from './FileViewer';
 import { cn } from '@/lib/utils';
 import type { ChatMessage, FileAttachment } from '@/redux/slices/messageSlice';
 
@@ -39,56 +40,6 @@ const MessageMenu = ({ pinned, onTogglePin }: { pinned: boolean; onTogglePin: ()
     </PopoverContent>
   </Popover>
 );
-
-// Full-screen file viewer modal
-const FileViewerModal = ({ attachment, onClose }: { attachment: FileAttachment; onClose: () => void }) => {
-  const handleDownload = () => {
-    const link = document.createElement('a');
-    link.href = attachment.url;
-    link.download = attachment.name;
-    link.click();
-  };
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80" onClick={onClose}>
-      <div className="absolute top-4 right-4 flex items-center gap-3 z-10">
-        <button onClick={(e) => { e.stopPropagation(); handleDownload(); }} className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer transition-colors">
-          <Download className="w-5 h-5 text-white" />
-        </button>
-        <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer transition-colors">
-          <X className="w-5 h-5 text-white" />
-        </button>
-      </div>
-      <div className="absolute top-4 left-4 z-10">
-        <p className="text-white text-sm font-medium">{attachment.name}</p>
-        <p className="text-white/60 text-xs">{attachment.size}</p>
-      </div>
-      <div onClick={(e) => e.stopPropagation()} className="max-w-[90vw] max-h-[85vh] flex items-center justify-center">
-        {attachment.fileType === 'image' && (
-          <img src={attachment.url} alt={attachment.name} className="max-w-full max-h-[85vh] object-contain rounded-lg" />
-        )}
-        {attachment.fileType === 'video' && (
-          <video src={attachment.url} controls autoPlay className="max-w-full max-h-[85vh] rounded-lg" />
-        )}
-        {attachment.fileType === 'pdf' && (
-          <iframe src={attachment.url} className="w-[80vw] h-[85vh] rounded-lg bg-white" title={attachment.name} />
-        )}
-        {(attachment.fileType === 'doc' || attachment.fileType === 'excel' || attachment.fileType === 'file') && (
-          <div className="bg-white rounded-2xl p-10 flex flex-col items-center gap-4 text-center">
-            <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center">
-              {attachment.fileType === 'excel' ? <FileSpreadsheet className="w-8 h-8 text-emerald-600" /> : <FileText className="w-8 h-8 text-blue-500" />}
-            </div>
-            <p className="text-lg font-bold text-slate-800">{attachment.name}</p>
-            <p className="text-sm text-slate-500">{attachment.fileType.toUpperCase()} &bull; {attachment.size}</p>
-            <button onClick={handleDownload} className="px-6 py-2.5 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 cursor-pointer transition-colors">
-              Download File
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
 
 const FileAttachmentView = ({ attachment, isSent, onOpen }: { attachment: NonNullable<ChatMessage['attachment']>; isSent: boolean; onOpen: () => void }) => {
   if (attachment.fileType === 'image') {
@@ -177,7 +128,7 @@ const MessageBubble = ({ message, onOpenFile }: { message: ChatMessage; onOpenFi
       {/* Text content */}
       {message.content && (
         <div
-          className="text-[13px] leading-relaxed text-slate-700 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1 [&_li]:my-0.5 [&_a]:underline"
+          className="text-[13px] leading-relaxed text-slate-700 break-words [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1 [&_li]:my-0.5 [&_a]:underline"
           dangerouslySetInnerHTML={{ __html: message.content }}
         />
       )}
@@ -213,8 +164,8 @@ const ChatFeed = ({ views = '42', messages = [], onTogglePin }: ChatFeedProps) =
   return (
     <div className="flex-1 flex min-h-0 relative">
       <ScrollArea className="flex-1" ref={scrollRef}>
-        <div className="max-w-4xl py-8 px-6 flex flex-col items-start">
-          <div className="mb-8 flex items-center gap-4 w-full">
+        <div className="w-full max-w-4xl py-4 sm:py-8 px-3 sm:px-6 flex flex-col items-start">
+          <div className="mb-6 sm:mb-8 flex items-center gap-4 w-full">
             <div className="flex-1 h-[1px] bg-slate-200" />
             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Today</span>
             <div className="flex-1 h-[1px] bg-slate-200" />
@@ -258,7 +209,7 @@ const ChatFeed = ({ views = '42', messages = [], onTogglePin }: ChatFeedProps) =
 
       {/* File Viewer Modal */}
       {viewingFile && (
-        <FileViewerModal attachment={viewingFile} onClose={() => setViewingFile(null)} />
+        <FileViewer attachment={viewingFile} onClose={() => setViewingFile(null)} />
       )}
     </div>
   );
