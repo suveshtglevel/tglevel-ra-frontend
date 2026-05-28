@@ -32,3 +32,27 @@ body {
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
 }
+
+/* Opt-in slim scrollbar (overrides the global hide) for scroll areas where a
+   visible scrollbar helps, e.g. the message input box. */
+.custom-scrollbar {
+  scrollbar-width: thin;                      /* Firefox */
+  scrollbar-color: #cbd5e1 transparent;       /* thumb / track */
+}
+.custom-scrollbar::-webkit-scrollbar {
+  display: block;
+  width: 8px;
+  height: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8;
+}

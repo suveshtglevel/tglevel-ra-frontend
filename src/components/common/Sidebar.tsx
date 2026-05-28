@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { MessageSquare, MonitorPlay, Settings, Pencil, LogOut, Mail, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -32,9 +33,18 @@ const Sidebar = () => {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
+  const router = useRouter();
+
   const handleTabClick = (tab: SidebarTab) => {
     setActiveTab(tab);
-    if (tab === 'monitor') toast('Live monitor coming soon!', { icon: '📺' });
+    if (tab === 'chat') {
+      setShowSettings(false);
+      router.push('/dashboard');
+    }
+    if (tab === 'monitor') {
+      setShowSettings(false);
+      router.push('/monitor');
+    }
     if (tab === 'settings') {
       setShowSettings((prev) => !prev);
     }
@@ -64,7 +74,7 @@ const Sidebar = () => {
   return (
     <aside className="w-16 flex flex-col items-center py-6 bg-white border-r border-slate-200 gap-8 shrink-0">
       <div
-        onClick={() => { setActiveTab('chat'); setShowSettings(false); }}
+        onClick={() => handleTabClick('chat')}
         className={cn(
           "w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer transition-colors",
           activeTab === 'chat' ? "bg-emerald-50 text-emerald-600" : "bg-slate-50 text-slate-400 hover:text-slate-600"
