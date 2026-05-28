@@ -1,6 +1,7 @@
 'use client';
 
 import React,{useState, useRef} from 'react';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { MessageSquare, MonitorPlay, Settings, Pencil, LogOut, Mail, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,6 @@ type SidebarTab = 'chat' | 'webinar' | 'settings';
 const Sidebar = () => {
   const router = useRouter();
   const pathname = usePathname();
-  const [activeTab, setActiveTab] = useState<SidebarTab>('chat');
   const [showProfile, setShowProfile] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
@@ -35,16 +35,13 @@ const Sidebar = () => {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  React.useEffect(() => {
-    if (pathname?.startsWith('/webinar')) {
-      setActiveTab('webinar');
-    } else if (pathname?.startsWith('/dashboard')) {
-      setActiveTab('chat');
-    }
-  }, [pathname]);
+  const activeTab: SidebarTab = showSettings
+    ? 'settings'
+    : pathname?.startsWith('/webinar')
+    ? 'webinar'
+    : 'chat';
 
   const handleTabClick = (tab: SidebarTab) => {
-    setActiveTab(tab);
     if (tab === 'chat') {
       setShowSettings(false);
       router.push('/dashboard');
@@ -113,7 +110,15 @@ const Sidebar = () => {
           )}
         >
           {profileImage ? (
-            <img src={profileImage} alt="Profile" className="w-10 h-10 rounded-full object-cover" />
+            <div className="relative w-10 h-10 rounded-full overflow-hidden">
+              <Image
+                src={profileImage}
+                alt="Profile"
+                fill
+                className="object-cover"
+                unoptimized
+              />
+            </div>
           ) : (
             <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center font-bold text-xs">
               TJ
@@ -150,9 +155,15 @@ const Sidebar = () => {
           <div className="absolute bottom-0 left-16 w-[280px] max-w-[calc(100vw-5rem)] bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden">
             <div className="flex flex-col items-center pt-8 pb-5 px-6">
               {/* Profile Image */}
-              <div className="w-[90px] h-[90px] rounded-full border-[3px] border-slate-200 overflow-hidden mb-4">
+              <div className="w-[90px] h-[90px] rounded-full border-[3px] border-slate-200 overflow-hidden mb-4 relative">
                 {profileImage ? (
-                  <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
+                  <Image
+                    src={profileImage}
+                    alt="Profile"
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
                 ) : (
                   <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-400 text-2xl font-bold">
                     AM
