@@ -6,7 +6,6 @@ import { MessageSquare, MonitorPlay, Settings, Pencil, LogOut, Mail, Phone } fro
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'react-hot-toast';
-import { useRouter } from 'next/navigation';
 
 type SidebarTab = 'chat' | 'monitor' | 'settings';
 
@@ -35,7 +34,6 @@ const Sidebar = () => {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  const router = useRouter();
 
   const handleTabClick = (tab: SidebarTab) => {
     setActiveTab(tab);
