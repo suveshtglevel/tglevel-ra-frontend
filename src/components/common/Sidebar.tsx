@@ -8,25 +8,20 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'react-hot-toast';
 
-type SidebarTab = 'chat' | 'webinar' | 'settings';
+type SidebarTab = 'chat' | 'webinar' | 'tradeJournal' | 'settings';
 
 const Sidebar = () => {
   const router = useRouter();
   const pathname = usePathname();
-  const [showProfile, setShowProfile] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
 
-  const profileRef = useRef<HTMLDivElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Close popups on outside click
   React.useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
-        setShowProfile(false);
-      }
       if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
         setShowSettings(false);
       }
@@ -39,6 +34,8 @@ const Sidebar = () => {
     ? 'settings'
     : pathname?.startsWith('/webinar')
     ? 'webinar'
+    : pathname?.startsWith('/trade-journal')
+    ? 'tradeJournal'
     : 'chat';
 
   const handleTabClick = (tab: SidebarTab) => {
@@ -49,6 +46,10 @@ const Sidebar = () => {
     if (tab === 'webinar') {
       setShowSettings(false);
       router.push('/webinar');
+    }
+    if (tab === 'tradeJournal') {
+      setShowSettings(false);
+      router.push('/trade-journal');
     }
     if (tab === 'settings') {
       setShowSettings((prev) => !prev);
@@ -101,39 +102,19 @@ const Sidebar = () => {
         >
           <MonitorPlay className="w-6 h-6" />
         </Button>
-        <div
-          ref={profileRef}
-          onClick={() => setShowProfile(!showProfile)}
+        <button
+          type="button"
+          aria-label="Trade Journal"
+          onClick={() => handleTabClick('tradeJournal')}
           className={cn(
-            "w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs cursor-pointer transition-colors relative overflow-visible",
-            showProfile ? "ring-2 ring-emerald-300" : "hover:ring-2 hover:ring-slate-200"
+            "w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs cursor-pointer transition-colors",
+            activeTab === 'tradeJournal'
+              ? "bg-emerald-50 text-emerald-600 ring-2 ring-emerald-300"
+              : "bg-slate-100 text-slate-500 hover:ring-2 hover:ring-slate-200"
           )}
         >
-          {profileImage ? (
-            <div className="relative w-10 h-10 rounded-full overflow-hidden">
-              <Image
-                src={profileImage}
-                alt="Profile"
-                fill
-                className="object-cover"
-                unoptimized
-              />
-            </div>
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center font-bold text-xs">
-              TJ
-            </div>
-          )}
-          {showProfile && (
-            <div className="absolute left-14 top-0 bg-white border border-slate-200 rounded-xl shadow-lg p-4 w-48 z-50">
-              <p className="font-bold text-slate-800 text-sm">Alex Mercer</p>
-              <p className="text-xs text-slate-400 mt-1">alex.mercer@tg.com</p>
-              <div className="h-[1px] bg-slate-100 my-2" />
-              <p className="text-xs text-slate-500">Role: Research Analyst</p>
-              <p className="text-xs text-slate-500 mt-1">Status: Online</p>
-            </div>
-          )}
-        </div>
+          TJ
+        </button>
       </nav>
 
       {/* Settings button with profile card */}
