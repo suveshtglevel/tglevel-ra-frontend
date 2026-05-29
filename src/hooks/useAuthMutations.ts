@@ -28,7 +28,7 @@ export function useVerifyOtp() {
   return useMutation({
     mutationFn: (payload: VerifyOtpPayload) => verifyOtp(payload),
     onSuccess: (result) => {
-      persistSession(result.accessToken, result.refreshToken);
+      persistSession(result.accessToken);
       dispatch(
         setCredentials({
           token: result.accessToken,
