@@ -39,7 +39,9 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { useHydrated } from '@/hooks/useHydrated';
 import dynamic from 'next/dynamic';
+import type { EmojiClickData } from 'emoji-picker-react';
 const EmojiPicker = dynamic(() => import('emoji-picker-react'), { ssr: false });
 import {
   Popover,
@@ -82,11 +84,7 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
     url: string;
   } | null>(null);
   const [caption, setCaption] = React.useState('');
-  const [mounted, setMounted] = React.useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useHydrated();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -190,11 +188,8 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
     },
   });
 
-  if (!editor) {
-    return null;
-  }
-
   const handleSend = () => {
+    if (!editor) return;
     if (!selectedMessageType) {
       toast.error('Please select a message type before sending');
       return;
@@ -213,7 +208,17 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
     setSelectedMessageType(null);
     setNotifyUsers(false);
   };
-  handleSendRef.current = handleSend;
+  // Keep the editor's static keydown handler pointed at the latest closure
+  // without writing to the ref during render.
+  useEffect(() => {
+    handleSendRef.current = handleSend;
+  });
+
+  // TipTap initialises asynchronously; render nothing until the editor is ready.
+  // Placed after the hooks above so hook order stays stable across renders.
+  if (!editor) {
+    return null;
+  }
 
   const toggleBold = () => editor.chain().focus().toggleBold().run();
   const toggleItalic = () => editor.chain().focus().toggleItalic().run();
@@ -273,7 +278,7 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
     ).run();
   };
 
-  const addEmoji = (emojiData: any) => {
+  const addEmoji = (emojiData: EmojiClickData) => {
     editor.chain().focus().insertContent(emojiData.emoji).run();
   };
 
@@ -453,7 +458,7 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
               avoidCollisions={false}
             >
               <div className="flex flex-col py-0">
-                {messageTypes.map((type, index) => (
+                {messageTypes.map((type) => (
                   <button
                     key={type}
                     onClick={() => setSelectedMessageType(type)}

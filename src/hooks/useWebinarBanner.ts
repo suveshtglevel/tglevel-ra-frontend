@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'react-hot-toast';
+import * as z from 'zod';
 import { PublishOption } from '@/constants/webinarData';
 
 export interface WebinarBannerState {
@@ -19,6 +20,11 @@ export interface WebinarBannerState {
   scheduleDate: string;
   scheduleTime: string;
 }
+
+// Title is always required; the image is required only when publishing/scheduling.
+const titleSchema = z.object({
+  title: z.string().trim().min(1, 'Banner title is required'),
+});
 
 const INITIAL: WebinarBannerState = {
   image: null,
@@ -65,6 +71,17 @@ export const useWebinarBanner = () => {
   };
 
   const save = () => {
+    // Drafts can be saved incomplete; publishing/scheduling requires the essentials.
+    const result = titleSchema.safeParse(state);
+    if (!result.success) {
+      toast.error(result.error.issues[0]?.message ?? 'Please complete the form');
+      return;
+    }
+    if (state.publishOption !== 'draft' && !state.image) {
+      toast.error('Please upload a banner image before publishing');
+      return;
+    }
+
     const label =
       state.publishOption === 'now'
         ? 'Banner published'
