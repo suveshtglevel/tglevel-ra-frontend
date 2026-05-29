@@ -6,11 +6,15 @@ import Providers from "@/providers/Providers";
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
+  display: "swap",
 });
 
 
 export const metadata: Metadata = {
-  title: "Research Analyst Panel",
+  title: {
+    default: "Research Analyst Panel",
+    template: "%s | Research Analyst Panel",
+  },
   description: "Securely manage trade alerts, subscribers, and research operations.",
 };
 

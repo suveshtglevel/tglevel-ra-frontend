@@ -27,10 +27,10 @@ axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Handle unauthorized access (e.g., redirect to login)
+      // Session expired / unauthorized: clear the token and bounce to login.
       Cookies.remove('token');
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth/login')) {
+        window.location.href = '/auth/login';
       }
     }
     return Promise.reject(error);

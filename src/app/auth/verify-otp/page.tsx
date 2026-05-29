@@ -1,33 +1,37 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card } from '@/components/ui/card';
-import { Lock, ChevronRight } from 'lucide-react';
+import { Lock, ChevronRight, Loader2 } from 'lucide-react';
 import AuthLayout from '@/components/layout/AuthLayout';
+import { useVerifyOtp, useResendOtp } from '@/hooks/useAuthMutations';
+
+const RESEND_SECONDS = 30;
 
 const otpSchema = z.object({
-  otp: z.string().length(4, 'OTP must be 4 digits'),
+  otp: z.string().length(4, 'OTP must be 4 digits').regex(/^[0-9]+$/, 'OTP must be numeric'),
 });
 
 type OtpFormValues = z.infer<typeof otpSchema>;
 
-export default function VerifyOtpPage() {
-  const router = useRouter();
-  const [timer, setTimer] = useState(30);
+function VerifyOtpContent() {
+  const searchParams = useSearchParams();
+  const mobileNumber = searchParams.get('mobile') ?? '';
+
+  const verifyOtp = useVerifyOtp();
+  const resendOtp = useResendOtp();
+
+  const [timer, setTimer] = useState(RESEND_SECONDS);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (timer > 0) {
-      interval = setInterval(() => {
-        setTimer((prev) => prev - 1);
-      }, 1000);
-    }
+    if (timer <= 0) return;
+    const interval = setInterval(() => setTimer((prev) => prev - 1), 1000);
     return () => clearInterval(interval);
   }, [timer]);
 
@@ -37,8 +41,14 @@ export default function VerifyOtpPage() {
   });
 
   function onSubmit(values: OtpFormValues) {
-    console.log(values);
-    router.push('/dashboard');
+    verifyOtp.mutate({ mobileNumber, otp: values.otp });
+  }
+
+  function handleResend() {
+    resendOtp.mutate(
+      { mobileNumber },
+      { onSuccess: () => setTimer(RESEND_SECONDS) }
+    );
   }
 
   const formatTime = (seconds: number) => {
@@ -71,6 +81,8 @@ export default function VerifyOtpPage() {
                         <input
                           key={index}
                           type="text"
+                          inputMode="numeric"
+                          aria-label={`Digit ${index + 1}`}
                           maxLength={1}
                           className="w-full h-16 sm:h-20 bg-[#F1F3FF] border-none rounded-[16px] sm:rounded-[20px] text-center text-2xl sm:text-3xl font-bold text-[#0F172A] focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all shadow-sm"
                           value={field.value[index] || ''}
@@ -101,17 +113,38 @@ export default function VerifyOtpPage() {
             />
 
             <div className="text-center">
-              <p className="text-sm font-semibold text-slate-600">
-                Resend Code in <span className="text-slate-900">{formatTime(timer)}</span>
-              </p>
+              {timer > 0 ? (
+                <p className="text-sm font-semibold text-slate-600">
+                  Resend Code in <span className="text-slate-900">{formatTime(timer)}</span>
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  disabled={resendOtp.isPending}
+                  className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {resendOtp.isPending ? 'Resending…' : 'Resend Code'}
+                </button>
+              )}
             </div>
 
-            <Button 
-              type="submit" 
-              className="w-full h-[60px] bg-[#042F23] hover:bg-[#03241b] text-white rounded-xl text-base font-bold transition-all duration-300 group flex items-center justify-center gap-2 shadow-lg shadow-[#042F23]/10"
+            <Button
+              type="submit"
+              disabled={verifyOtp.isPending}
+              className="w-full h-[60px] bg-[#042F23] hover:bg-[#03241b] text-white rounded-xl text-base font-bold transition-all duration-300 group flex items-center justify-center gap-2 shadow-lg shadow-[#042F23]/10 disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              Verify & Login
-              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              {verifyOtp.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Verifying…
+                </>
+              ) : (
+                <>
+                  Verify &amp; Login
+                  <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
             </Button>
           </form>
         </Form>
@@ -125,5 +158,19 @@ export default function VerifyOtpPage() {
         </div>
       </Card>
     </AuthLayout>
+  );
+}
+
+export default function VerifyOtpPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen w-full flex items-center justify-center bg-[#F8FAFC]">
+          <span className="h-9 w-9 rounded-full border-[3px] border-slate-200 border-t-emerald-500 animate-spin" />
+        </div>
+      }
+    >
+      <VerifyOtpContent />
+    </Suspense>
   );
 }
