@@ -3,7 +3,7 @@ import { getAccessToken } from '@/lib/api/tokenStore';
 import { clearSession } from '@/lib/api/session';
 
 const axiosInstance = axios.create({
-  baseURL: 'http://api.ra.test:5000',
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
 
   withCredentials: true,
 

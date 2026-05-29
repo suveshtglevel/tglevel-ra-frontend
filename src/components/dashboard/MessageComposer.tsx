@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
+import Image from 'next/image';
 import { createPortal } from 'react-dom';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -319,10 +320,13 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
         <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-12 overflow-y-auto bg-[#0b141a]/95">
           {filePreview.fileType === 'image' ? (
             <div className="relative max-h-[65vh] max-w-[85vw] flex items-center justify-center">
-              <img
+              <Image
                 src={filePreview.url}
                 alt={filePreview.name}
+                width={800}
+                height={600}
                 className="max-h-[65vh] max-w-[85vw] object-contain rounded-lg shadow-2xl border border-white/5"
+                unoptimized
               />
             </div>
           ) : filePreview.fileType === 'video' ? (
