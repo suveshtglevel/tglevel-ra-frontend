@@ -73,6 +73,7 @@ export default function DashboardPage() {
         {/* Feed Scroll Area */}
         <ChatFeed
           views={selectedCommunity.views}
+          communityTag={selectedCommunity.analysis.tag}
           messages={currentMessages}
           onTogglePin={handleTogglePin}
         />
