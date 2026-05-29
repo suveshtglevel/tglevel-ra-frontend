@@ -4,30 +4,33 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card } from '@/components/ui/card';
-import { Smartphone, Lock, ChevronRight } from 'lucide-react';
+import { Smartphone, Lock, ChevronRight, Loader2 } from 'lucide-react';
 import AuthLayout from '@/components/layout/AuthLayout';
+import { useSendOtp } from '@/hooks/useAuthMutations';
 
 const loginSchema = z.object({
-  mobileNumber: z.string().min(10, 'Mobile number must be at least 10 digits').max(10, 'Mobile number must be 10 digits').regex(/^[0-9]+$/, 'Invalid mobile number'),
+  mobileNumber: z
+    .string()
+    .min(10, 'Mobile number must be at least 10 digits')
+    .max(10, 'Mobile number must be 10 digits')
+    .regex(/^[0-9]+$/, 'Invalid mobile number'),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  const router = useRouter();
+  const sendOtp = useSendOtp();
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { mobileNumber: '' },
   });
 
   function onSubmit(values: LoginFormValues) {
-    console.log(values);
-    router.push('/auth/verify-otp');
+    sendOtp.mutate({ mobileNumber: values.mobileNumber });
   }
 
   return (
@@ -52,10 +55,26 @@ export default function LoginPage() {
                     <FormControl>
                       <div className="relative flex-1">
                         <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400" />
-                        <Input 
-                          placeholder="Enter mobile number" 
+                        <Input
+                          type="tel"
+                          inputMode="numeric"
+                          autoComplete="tel"
+                          maxLength={10}
+                          placeholder="Enter mobile number"
                           className="pl-12 h-[52px] bg-[#F1F3FF] border-none rounded-xl focus-visible:ring-2 focus-visible:ring-indigo-500/10 text-base font-medium placeholder:text-slate-300 transition-all"
-                          {...field} 
+                          {...field}
+                          onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ''))}
+                          onKeyDown={(e) => {
+                            // Block non-numeric character keys (allow control/navigation keys).
+                            if (
+                              e.key.length === 1 &&
+                              !/[0-9]/.test(e.key) &&
+                              !e.ctrlKey &&
+                              !e.metaKey
+                            ) {
+                              e.preventDefault();
+                            }
+                          }}
                         />
                       </div>
                     </FormControl>
@@ -65,12 +84,22 @@ export default function LoginPage() {
               )}
             />
 
-            <Button 
-              type="submit" 
-              className="w-full h-[60px] bg-[#042F23] hover:bg-[#03241b] text-white rounded-xl text-base font-bold transition-all duration-300 group flex items-center justify-center gap-2 shadow-lg shadow-[#042F23]/10"
+            <Button
+              type="submit"
+              disabled={sendOtp.isPending}
+              className="w-full h-[60px] bg-[#042F23] hover:bg-[#03241b] text-white rounded-xl text-base font-bold transition-all duration-300 group flex items-center justify-center gap-2 shadow-lg shadow-[#042F23]/10 disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              Send OTP
-              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              {sendOtp.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Sending OTP…
+                </>
+              ) : (
+                <>
+                  Send OTP
+                  <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
             </Button>
           </form>
         </Form>

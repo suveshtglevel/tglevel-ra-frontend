@@ -8,10 +8,12 @@ import TradeCard from './TradeCard';
 import ViewedByPanel from './ViewedByPanel';
 import FileViewer from './FileViewer';
 import { cn } from '@/lib/utils';
+import { isResearchAnalysis } from '@/lib/researchAnalysis';
 import type { ChatMessage, FileAttachment } from '@/redux/slices/messageSlice';
 
 interface ChatFeedProps {
   views?: string;
+  communityTag?: string; // shown on trade cards instead of the message type
   messages?: ChatMessage[];
   onTogglePin?: (messageId: string) => void;
 }
@@ -112,7 +114,7 @@ const FileAttachmentView = ({ attachment, isSent, onOpen }: { attachment: NonNul
 
 // Every message renders as a left-aligned post (like the seed messages),
 // regardless of who sent it or its type.
-const MessageBubble = ({ message, onOpenFile }: { message: ChatMessage; onOpenFile: (attachment: FileAttachment) => void }) => {
+const MessageBubble = ({ message, communityTag, onOpenFile }: { message: ChatMessage; communityTag?: string; onOpenFile: (attachment: FileAttachment) => void }) => {
   return (
     <div className="max-w-[380px] rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm bg-white border border-slate-200 text-slate-800">
       <div className="flex items-center justify-between gap-2 mb-1">
@@ -137,8 +139,8 @@ const MessageBubble = ({ message, onOpenFile }: { message: ChatMessage; onOpenFi
         {message.group && (
           <span className="text-[9px] font-medium mr-1 bg-slate-100 px-1.5 py-0.5 rounded">{message.group}</span>
         )}
-        {message.messageType && (
-          <span className="text-[9px] font-medium mr-1 bg-slate-100 px-1.5 py-0.5 rounded">{message.messageType}</span>
+        {communityTag && (
+          <span className="text-[9px] font-medium mr-1 bg-slate-100 px-1.5 py-0.5 rounded">{communityTag}</span>
         )}
         <span className="text-[10px] font-medium">{message.timestamp}</span>
       </div>
@@ -146,7 +148,7 @@ const MessageBubble = ({ message, onOpenFile }: { message: ChatMessage; onOpenFi
   );
 };
 
-const ChatFeed = ({ views = '42', messages = [], onTogglePin }: ChatFeedProps) => {
+const ChatFeed = ({ views = '42', communityTag, messages = [], onTogglePin }: ChatFeedProps) => {
   const [showViewedBy, setShowViewedBy] = React.useState(false);
   const [viewingFile, setViewingFile] = React.useState<FileAttachment | null>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -177,18 +179,18 @@ const ChatFeed = ({ views = '42', messages = [], onTogglePin }: ChatFeedProps) =
           <div className="flex flex-col gap-3 w-full">
             {messages.map((msg) => (
               <div key={msg.id} id={`feed-msg-${msg.id}`} className="group relative w-fit max-w-full scroll-mt-4">
-                {msg.messageType === 'Trade' ? (
+                {msg.messageType === 'Trade' || (!msg.attachment && isResearchAnalysis(msg.content)) ? (
                   <TradeCard
                     content={msg.content}
                     timestamp={msg.timestamp}
                     status={msg.status}
-                    tag={msg.tradeTag}
+                    tag={communityTag ?? msg.tradeTag}
                     refId={msg.tradeRefId}
                     pinned={msg.pinned}
                     onTickClick={() => setShowViewedBy((prev) => !prev)}
                   />
                 ) : (
-                  <MessageBubble message={msg} onOpenFile={(att) => setViewingFile(att)} />
+                  <MessageBubble message={msg} communityTag={communityTag} onOpenFile={(att) => setViewingFile(att)} />
                 )}
                 <MessageMenu pinned={!!msg.pinned} onTogglePin={() => onTogglePin?.(msg.id)} />
               </div>

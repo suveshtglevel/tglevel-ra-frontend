@@ -37,6 +37,7 @@ const analysisToHtml = (a: CommunityAnalysis) =>
   `<p>SL = ${a.sl}</p>` +
   `<p>Target 1 = ${a.target1}</p>` +
   `<p>Target 2 = ${a.target2}</p>` +
+  `<p>${a.disclaimer}</p>` +
   `<p>Our Customer Care:- ${a.customerCare}</p>` +
   `<p>Rationale = <a href="${a.rationale}" target="_blank" rel="noopener noreferrer">${a.rationale}</a></p>` +
   `<p>Confidence Level Trade: ${a.confidence}</p>`;
