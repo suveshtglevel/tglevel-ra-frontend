@@ -1,35 +1,34 @@
 import axios from 'axios';
-import Cookies from 'js-cookie';
+import { getAccessToken } from '@/lib/api/tokenStore';
+import { clearSession } from '@/lib/api/session';
 
 const axiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
+  // Host only; endpoint paths (e.g. /api/v1/researchAnalyst/...) live in the API layer.
+  baseURL: 'http://13.201.61.128:5000',
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor for adding auth token
+// Attach the in-memory access token (refresh token stays in its cookie).
 axiosInstance.interceptors.request.use(
   (config) => {
-    const token = Cookies.get('token');
+    const token = getAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor for handling errors
+// On unauthorized, drop the session and bounce to login (unless already there).
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Session expired / unauthorized: clear the token and bounce to login.
-      Cookies.remove('token');
-      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth/login')) {
+      clearSession();
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth')) {
         window.location.href = '/auth/login';
       }
     }

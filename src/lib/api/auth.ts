@@ -1,17 +1,14 @@
-// Auth API layer. The functions are typed against the backend contract; the
-// bodies currently mock a successful response so the UI flow works without a
-// backend. To go live, replace each mock with the commented axios call.
-//
-//   import axiosInstance from '@/lib/axios';
-//   import type { ApiResponse } from '@/types/api';
+import axiosInstance from '@/lib/axios';
+
+const BASE = '/api/v1/ra';
 
 export interface SendOtpPayload {
   mobileNumber: string;
 }
 
-export interface SendOtpResult {
-  otpSentTo: string;
-  expiresInSeconds: number;
+export interface SendOtpResponse {
+  success: boolean;
+  message: string;
 }
 
 export interface VerifyOtpPayload {
@@ -19,23 +16,42 @@ export interface VerifyOtpPayload {
   otp: string;
 }
 
-export interface VerifyOtpResult {
-  token: string;
+export interface ResearchAnalyst {
+  _id: string;
+  display_name: string;
+  phone_number: string;
+  status: string;
+  assigned_communities: string[];
+  ra_id: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-const mockNetwork = (ms = 800) => new Promise((resolve) => setTimeout(resolve, ms));
-
-export async function sendOtp(payload: SendOtpPayload): Promise<SendOtpResult> {
-  // TODO(api): const { data } = await axiosInstance.post<ApiResponse<SendOtpResult>>('/auth/send-otp', payload); return data.data;
-  await mockNetwork();
-  return { otpSentTo: payload.mobileNumber, expiresInSeconds: 30 };
+export interface LoginResponse {
+  success: boolean;
+  message: string;
+  accessToken: string;
+  refreshToken: string;
+  data: ResearchAnalyst;
 }
 
-export async function verifyOtp(payload: VerifyOtpPayload): Promise<VerifyOtpResult> {
-  // TODO(api): const { data } = await axiosInstance.post<ApiResponse<VerifyOtpResult>>('/auth/verify-otp', payload); return data.data;
-  await mockNetwork();
-  if (payload.otp.length !== 4) {
-    throw new Error('Invalid OTP. Please try again.');
+export async function sendOtp(payload: SendOtpPayload): Promise<SendOtpResponse> {
+  const { data } = await axiosInstance.post<SendOtpResponse>(`${BASE}/send-otp`, {
+    phone_number: payload.mobileNumber,
+  });
+  if (!data.success) {
+    throw new Error(data.message || 'Failed to send OTP');
   }
-  return { token: 'mock-jwt-token' };
+  return data;
+}
+
+export async function verifyOtp(payload: VerifyOtpPayload): Promise<LoginResponse> {
+  const { data } = await axiosInstance.post<LoginResponse>(`${BASE}/login`, {
+    phone_number: payload.mobileNumber,
+    otp: payload.otp,
+  });
+  if (!data.success) {
+    throw new Error(data.message || 'Login failed');
+  }
+  return data;
 }
