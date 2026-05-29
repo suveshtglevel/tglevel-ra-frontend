@@ -63,6 +63,18 @@ export default function LoginPage() {
                           placeholder="Enter mobile number"
                           className="pl-12 h-[52px] bg-[#F1F3FF] border-none rounded-xl focus-visible:ring-2 focus-visible:ring-indigo-500/10 text-base font-medium placeholder:text-slate-300 transition-all"
                           {...field}
+                          onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ''))}
+                          onKeyDown={(e) => {
+                            // Block non-numeric character keys (allow control/navigation keys).
+                            if (
+                              e.key.length === 1 &&
+                              !/[0-9]/.test(e.key) &&
+                              !e.ctrlKey &&
+                              !e.metaKey
+                            ) {
+                              e.preventDefault();
+                            }
+                          }}
                         />
                       </div>
                     </FormControl>
