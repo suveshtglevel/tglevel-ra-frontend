@@ -75,9 +75,9 @@ function VerifyOtpContent() {
                   <FormLabel className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-400 mb-4 block">
                     VERIFICATION CODE
                   </FormLabel>
-                  <FormControl>
-                    <div className="flex justify-between gap-3">
-                      {[0, 1, 2, 3].map((index) => (
+                  <div role="group" aria-label="Verification code" className="flex justify-between gap-3">
+                    {[0, 1, 2, 3].map((index) => {
+                      const digit = (
                         <input
                           key={index}
                           type="text"
@@ -104,9 +104,11 @@ function VerifyOtpContent() {
                             }
                           }}
                         />
-                      ))}
-                    </div>
-                  </FormControl>
+                      );
+                      // Bind the form control (id/aria) to the first box so FormLabel's htmlFor targets a real input.
+                      return index === 0 ? <FormControl key={index}>{digit}</FormControl> : digit;
+                    })}
+                  </div>
                   <FormMessage className="text-xs text-red-500 font-medium ml-2" />
                 </FormItem>
               )}

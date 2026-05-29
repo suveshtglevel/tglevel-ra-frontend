@@ -3,8 +3,10 @@ import { getAccessToken } from '@/lib/api/tokenStore';
 import { clearSession } from '@/lib/api/session';
 
 const axiosInstance = axios.create({
-  // Host only; endpoint paths (e.g. /api/v1/researchAnalyst/...) live in the API layer.
-  baseURL: 'http://13.201.61.128:5000',
+  baseURL: 'http://api.ra.test:5000',
+
+  withCredentials: true,
+
   headers: {
     'Content-Type': 'application/json',
   },
