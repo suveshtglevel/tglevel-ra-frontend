@@ -279,7 +279,9 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
   };
 
   const addEmoji = (emojiData: EmojiClickData) => {
-    editor.chain().focus().insertContent(emojiData.emoji).run();
+    // Insert without focusing the editor: stealing focus would move it out of
+    // the popover and make Radix auto-close the picker after each selection.
+    editor.chain().insertContent(emojiData.emoji).run();
   };
 
   const renderPreviewModal = () => {
@@ -594,8 +596,14 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
                 <Smile className="h-4 w-4" />
               </ToolbarButton>
             </PopoverTrigger>
-            <PopoverContent className="p-0 border-none shadow-none w-auto" side="bottom" align="start" avoidCollisions={false}>
-              <EmojiPicker onEmojiClick={addEmoji} />
+            <PopoverContent className="p-0 border-none shadow-none w-auto" side="top" align="start" sideOffset={8}>
+              <EmojiPicker
+                onEmojiClick={addEmoji}
+                height={420}
+                width={340}
+                lazyLoadEmojis
+                searchPlaceHolder="Search emoji"
+              />
             </PopoverContent>
           </Popover>
           <div className="h-5 w-[1px] bg-slate-200 mx-2" />
