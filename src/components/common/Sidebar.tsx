@@ -7,6 +7,7 @@ import { MessageSquare, MonitorPlay, Settings, Pencil, LogOut, Mail, Phone } fro
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'react-hot-toast';
+import { clearSession } from '@/lib/api/session';
 
 type SidebarTab = 'chat' | 'webinar' | 'tradeJournal' | 'settings';
 
@@ -70,8 +71,8 @@ const Sidebar = () => {
   };
 
   const handleLogout = () => {
+    clearSession();
     toast.success('Logged out successfully!');
-    // When API is ready: call logout API, clear tokens, redirect
     setTimeout(() => {
       window.location.href = '/auth/login';
     }, 1000);
