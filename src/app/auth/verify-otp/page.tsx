@@ -24,8 +24,8 @@ function VerifyOtpContent() {
   const searchParams = useSearchParams();
   const mobileNumber = searchParams.get('mobile') ?? '';
 
-  const verifyOtp = useVerifyOtp();
-  const resendOtp = useResendOtp();
+  const callVerifyOtp = useVerifyOtp();
+  const callResendOtp = useResendOtp();
 
   const [timer, setTimer] = useState(RESEND_SECONDS);
 
@@ -41,11 +41,11 @@ function VerifyOtpContent() {
   });
 
   function onSubmit(values: OtpFormValues) {
-    verifyOtp.mutate({ mobileNumber, otp: values.otp });
+    callVerifyOtp.mutate({ mobileNumber, otp: values.otp });
   }
 
   function handleResend() {
-    resendOtp.mutate(
+    callResendOtp.mutate(
       { mobileNumber },
       { onSuccess: () => setTimer(RESEND_SECONDS) }
     );
@@ -123,20 +123,20 @@ function VerifyOtpContent() {
                 <button
                   type="button"
                   onClick={handleResend}
-                  disabled={resendOtp.isPending}
+                  disabled={callResendOtp.isPending}
                   className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
                 >
-                  {resendOtp.isPending ? 'Resending…' : 'Resend Code'}
+                  {callResendOtp.isPending ? 'Resending…' : 'Resend Code'}
                 </button>
               )}
             </div>
 
             <Button
               type="submit"
-              disabled={verifyOtp.isPending}
+              disabled={callVerifyOtp.isPending}
               className="w-full h-[60px] bg-[#042F23] hover:bg-[#03241b] text-white rounded-xl text-base font-bold transition-all duration-300 group flex items-center justify-center gap-2 shadow-lg shadow-[#042F23]/10 disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              {verifyOtp.isPending ? (
+              {callVerifyOtp.isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Verifying…
