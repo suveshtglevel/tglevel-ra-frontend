@@ -6,7 +6,7 @@ const BASE_URL = 'https://shun-reborn-landlady.ngrok-free.dev';
 const REFRESH_URL = '/api/v1/auth/refresh';
 
 const axiosInstance = axios.create({
-  baseURL: BASE_URL,
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
 
   withCredentials: true,
 

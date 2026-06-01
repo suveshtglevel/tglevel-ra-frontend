@@ -46,11 +46,11 @@ const Sidebar = () => {
     }
     if (tab === 'webinar') {
       setShowSettings(false);
-      router.push('/webinar');
+      // router.push('/webinar');
     }
     if (tab === 'tradeJournal') {
       setShowSettings(false);
-      router.push('/trade-journal');
+      // router.push('/trade-journal');
     }
     if (tab === 'settings') {
       setShowSettings((prev) => !prev);

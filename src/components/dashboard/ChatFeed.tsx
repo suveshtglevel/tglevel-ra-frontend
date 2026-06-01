@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { FileText, FileSpreadsheet, File, Play, MoreVertical, Pin } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -47,10 +48,13 @@ const FileAttachmentView = ({ attachment, isSent, onOpen }: { attachment: NonNul
   if (attachment.fileType === 'image') {
     return (
       <div className="rounded-lg overflow-hidden mb-1 cursor-pointer" onClick={onOpen}>
-        <img
+        <Image
           src={attachment.url}
           alt={attachment.name}
+          width={260}
+          height={200}
           className="max-w-[260px] max-h-[200px] object-cover rounded-lg hover:opacity-90 transition-opacity"
+          unoptimized
         />
         <p className={cn("text-[11px] mt-1 font-medium", isSent ? "text-white/70" : "text-slate-400")}>
           {attachment.name} &bull; {attachment.size}
