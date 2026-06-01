@@ -45,7 +45,7 @@ export async function sendOtp(payload: SendOtpPayload): Promise<SendOtpResponse>
 }
 
 export async function verifyOtp(payload: VerifyOtpPayload): Promise<LoginResponse> {
-  const { data } = await axiosInstance.post<LoginResponse>(`${BASE}/login`, {
+  const { data } = await axiosInstance.post<LoginResponse>(`${BASE}/verify-otp`, {
     phone_number: payload.mobileNumber,
     otp: payload.otp,
   });
