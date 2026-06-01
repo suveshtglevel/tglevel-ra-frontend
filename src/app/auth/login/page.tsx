@@ -23,14 +23,14 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  const sendOtp = useSendOtp();
+  const callSendOtp = useSendOtp();
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { mobileNumber: '' },
   });
 
   function onSubmit(values: LoginFormValues) {
-    sendOtp.mutate({ mobileNumber: values.mobileNumber });
+    callSendOtp.mutate({ mobileNumber: values.mobileNumber });
   }
 
   return (
@@ -86,10 +86,10 @@ export default function LoginPage() {
 
             <Button
               type="submit"
-              disabled={sendOtp.isPending}
+              disabled={callSendOtp.isPending}
               className="w-full h-[60px] bg-[#042F23] hover:bg-[#03241b] text-white rounded-xl text-base font-bold transition-all duration-300 group flex items-center justify-center gap-2 shadow-lg shadow-[#042F23]/10 disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              {sendOtp.isPending ? (
+              {callSendOtp.isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Sending OTP…
