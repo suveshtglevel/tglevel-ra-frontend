@@ -1,21 +1,21 @@
 'use client';
 
 import React from 'react';
-import { Users, ChevronDown } from 'lucide-react';
+import { Users, ChevronDown, Lock } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import type { Community, SubCommunity } from '@/constants/mockData';
+import type { CommunityVM, SubCommunityVM } from '@/types/dashboard';
 
 interface CommunityCardProps {
-  community: Community;
+  community: CommunityVM;
   active: boolean;
-  selectedSubCommunityId: number | null;
-  targetSubIds: number[];
+  selectedSubCommunityId: string | null;
+  targetSubIds: string[];
   initialExpanded?: boolean;
-  onSelectCommunity: (id: number) => void;
-  onSelectSubCommunity: (id: number) => void;
-  onToggleSubTarget: (communityId: number, subId: number) => void;
-  onToggleCommunityTargets: (communityId: number, allSubIds: number[]) => void;
+  onSelectCommunity: (id: string) => void;
+  onSelectSubCommunity: (id: string) => void;
+  onToggleSubTarget: (communityId: string, subId: string) => void;
+  onToggleCommunityTargets: (communityId: string, allSubIds: string[]) => void;
 }
 
 const CheckCircle = ({ checked, onClick }: { checked: boolean; onClick?: (e: React.MouseEvent) => void }) => (
@@ -40,14 +40,15 @@ const CheckCircle = ({ checked, onClick }: { checked: boolean; onClick?: (e: Rea
 );
 
 interface SubCommunityRowProps {
-  sub: SubCommunity;
+  sub: SubCommunityVM;
   checked: boolean;
   isSelected: boolean;
+  sendable: boolean;
   onToggle: () => void;
   onSelect: () => void;
 }
 
-const SubCommunityRow = ({ sub, checked, isSelected, onToggle, onSelect }: SubCommunityRowProps) => {
+const SubCommunityRow = ({ sub, checked, isSelected, sendable, onToggle, onSelect }: SubCommunityRowProps) => {
   return (
     <div
       role="button"
@@ -80,13 +81,17 @@ const SubCommunityRow = ({ sub, checked, isSelected, onToggle, onSelect }: SubCo
       <span className={cn("text-[12px] font-medium mr-3", isSelected ? "text-emerald-600" : "text-[#64748B]")}>
         {sub.type}
       </span>
-      <CheckCircle
-        checked={checked}
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggle();
-        }}
-      />
+      {sendable ? (
+        <CheckCircle
+          checked={checked}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle();
+          }}
+        />
+      ) : (
+        <Lock className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+      )}
     </div>
   );
 };
@@ -165,15 +170,19 @@ const CommunityCard = ({ community, active, selectedSubCommunityId, targetSubIds
         <div className="absolute top-3 right-3 flex flex-col items-center gap-[15px]">
           {subCommunities.length > 0 ? (
             <>
-              {/* Master checkbox: selects/clears all sub-communities. The
-                  selected count is shown under the timestamp. */}
-              <CheckCircle
-                checked={allSelected}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleCommunityTargets(community.id, subCommunities.map((s) => s.id));
-                }}
-              />
+              {/* Master checkbox: selects/clears all sub-communities. The RA can
+                  only target communities it is assigned to (others are locked). */}
+              {community.sendable ? (
+                <CheckCircle
+                  checked={allSelected}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleCommunityTargets(community.id, subCommunities.map((s) => s.id));
+                  }}
+                />
+              ) : (
+                <Lock className="w-3.5 h-3.5 text-slate-300" />
+              )}
               <button
                 type="button"
                 aria-label="Toggle dropdown"
@@ -191,7 +200,7 @@ const CommunityCard = ({ community, active, selectedSubCommunityId, targetSubIds
                 />
               </button>
             </>
-          ) : (
+          ) : community.sendable ? (
             <CheckCircle
               checked={selfSelected}
               onClick={(e) => {
@@ -199,6 +208,8 @@ const CommunityCard = ({ community, active, selectedSubCommunityId, targetSubIds
                 onToggleCommunityTargets(community.id, [community.id]);
               }}
             />
+          ) : (
+            <Lock className="w-3.5 h-3.5 text-slate-300" />
           )}
         </div>
       </div>
@@ -212,6 +223,7 @@ const CommunityCard = ({ community, active, selectedSubCommunityId, targetSubIds
               sub={sub}
               checked={targetSubIds.includes(sub.id)}
               isSelected={selectedSubCommunityId === sub.id}
+              sendable={community.sendable}
               onToggle={() => onToggleSubTarget(community.id, sub.id)}
               onSelect={() => onSelectSubCommunity(sub.id)}
             />

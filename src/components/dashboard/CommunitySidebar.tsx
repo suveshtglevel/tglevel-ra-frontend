@@ -7,22 +7,22 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import CommunityCard from './CommunityCard';
 import CommunityFilters from './CommunityFilters';
 import type { FilterType } from './CommunityFilters';
-import type { Community } from '@/constants/mockData';
+import type { CommunityVM } from '@/types/dashboard';
 import { cn } from '@/lib/utils';
 import { useDebounce } from '@/hooks/useDebounce';
 
 interface CommunitySidebarProps {
-  communities: Community[];
-  selectedCommunityId: number;
-  selectedSubCommunityId: number | null;
-  targetCommunityId: number | null;
-  targetSubIds: number[];
+  communities: CommunityVM[];
+  selectedCommunityId: string | null;
+  selectedSubCommunityId: string | null;
+  targetCommunityId: string | null;
+  targetSubIds: string[];
   open: boolean;
   onClose: () => void;
-  onSelectCommunity: (id: number) => void;
-  onSelectSubCommunity: (id: number) => void;
-  onToggleSubTarget: (communityId: number, subId: number) => void;
-  onToggleCommunityTargets: (communityId: number, allSubIds: number[]) => void;
+  onSelectCommunity: (id: string) => void;
+  onSelectSubCommunity: (id: string) => void;
+  onToggleSubTarget: (communityId: string, subId: string) => void;
+  onToggleCommunityTargets: (communityId: string, allSubIds: string[]) => void;
 }
 
 const CommunitySidebar = ({

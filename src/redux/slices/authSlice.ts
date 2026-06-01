@@ -7,6 +7,9 @@ export interface AuthUser {
   email?: string;
   role?: string;
   avatarUrl?: string;
+  // Backend community ids this RA may post to. The RA can view every community
+  // but may only send messages where the community id is in this list.
+  assignedCommunities?: string[];
 }
 
 interface AuthState {

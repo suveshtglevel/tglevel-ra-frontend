@@ -1,5 +1,4 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { COMMUNITIES, CommunityAnalysis } from '@/constants/mockData';
 
 export interface FileAttachment {
   name: string;
@@ -10,7 +9,9 @@ export interface FileAttachment {
 
 export interface ChatMessage {
   id: string;
-  communityId: number;
+  // The chat this message belongs to: a sub-community id, or a community id for
+  // communities without sub-communities. Backend Mongo string id.
+  communityId: string;
   content: string;
   type: 'sent' | 'received';
   messageType?: string;
@@ -27,51 +28,12 @@ export interface ChatMessage {
 }
 
 interface MessageState {
-  messages: Record<number, ChatMessage[]>;
+  // Keyed by chat id (sub-community id, or community id when it has no subs).
+  messages: Record<string, ChatMessage[]>;
 }
 
-// Build the HTML body of a Trade card from structured analysis data.
-const analysisToHtml = (a: CommunityAnalysis) =>
-  `<p><b>${a.title}</b></p>` +
-  `<p>Entry Above = ${a.entry}</p>` +
-  `<p>SL = ${a.sl}</p>` +
-  `<p>Target 1 = ${a.target1}</p>` +
-  `<p>Target 2 = ${a.target2}</p>` +
-  `<p>${a.disclaimer}</p>` +
-  `<p>Our Customer Care:- ${a.customerCare}</p>` +
-  `<p>Rationale = <a href="${a.rationale}" target="_blank" rel="noopener noreferrer">${a.rationale}</a></p>` +
-  `<p>Confidence Level Trade: ${a.confidence}</p>`;
-
-// One seed Trade card per chat (derived from the parent community's analysis).
-const seedTrade = (chatId: number, a: CommunityAnalysis): ChatMessage => ({
-  id: `seed-${chatId}`,
-  communityId: chatId,
-  content: analysisToHtml(a),
-  type: 'received',
-  messageType: 'Trade',
-  timestamp: a.time,
-  status: 'read',
-  sender: 'RA Admin',
-  tradeTag: a.tag,
-  tradeRefId: a.id,
-});
-
-// Each chat starts with exactly one seed Trade card (no random messages).
-// Communities WITH sub-communities are chatted through those subs; a community
-// WITHOUT sub-communities (e.g. Free/Paid Alumini) is chattable directly.
-const INITIAL_MESSAGES: Record<number, ChatMessage[]> = {};
-COMMUNITIES.forEach((c) => {
-  if (c.subCommunities && c.subCommunities.length > 0) {
-    c.subCommunities.forEach((s) => {
-      INITIAL_MESSAGES[s.id] = [seedTrade(s.id, c.analysis)];
-    });
-  } else {
-    INITIAL_MESSAGES[c.id] = [seedTrade(c.id, c.analysis)];
-  }
-});
-
 const initialState: MessageState = {
-  messages: INITIAL_MESSAGES,
+  messages: {},
 };
 
 const formatNow = () => {
@@ -87,8 +49,15 @@ const messageSlice = createSlice({
   name: 'messages',
   initialState,
   reducers: {
+    // Replace a chat's messages with the list fetched from the backend.
+    setMessages: (
+      state,
+      action: PayloadAction<{ chatId: string; messages: ChatMessage[] }>
+    ) => {
+      state.messages[action.payload.chatId] = action.payload.messages;
+    },
     sendMessage: (state, action: PayloadAction<{
-      communityId: number;
+      communityId: string;
       content: string;
       messageType?: string;
       group?: string;
@@ -118,7 +87,7 @@ const messageSlice = createSlice({
       state.messages[communityId].push(newMsg);
     },
     sendFileMessage: (state, action: PayloadAction<{
-      communityId: number;
+      communityId: string;
       attachment: FileAttachment;
       caption?: string;
     }>) => {
@@ -140,14 +109,14 @@ const messageSlice = createSlice({
       }
       state.messages[communityId].push(newMsg);
     },
-    togglePin: (state, action: PayloadAction<{ communityId: number; messageId: string }>) => {
+    togglePin: (state, action: PayloadAction<{ communityId: string; messageId: string }>) => {
       const { communityId, messageId } = action.payload;
       const msg = state.messages[communityId]?.find((m) => m.id === messageId);
       if (msg) {
         msg.pinned = !msg.pinned;
       }
     },
-    updateMessageStatus: (state, action: PayloadAction<{ messageId: string; communityId: number; status: 'sent' | 'delivered' | 'read' }>) => {
+    updateMessageStatus: (state, action: PayloadAction<{ messageId: string; communityId: string; status: 'sent' | 'delivered' | 'read' }>) => {
       const { messageId, communityId, status } = action.payload;
       const msgs = state.messages[communityId];
       if (msgs) {
@@ -160,5 +129,5 @@ const messageSlice = createSlice({
   },
 });
 
-export const { sendMessage, sendFileMessage, togglePin, updateMessageStatus } = messageSlice.actions;
+export const { setMessages, sendMessage, sendFileMessage, togglePin, updateMessageStatus } = messageSlice.actions;
 export default messageSlice.reducer;

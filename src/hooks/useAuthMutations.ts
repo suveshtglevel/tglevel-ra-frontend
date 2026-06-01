@@ -36,6 +36,7 @@ export function useVerifyOtp() {
             id: result.data.ra_id,
             name: result.data.display_name,
             phone: result.data.phone_number,
+            assignedCommunities: result.data.assigned_communities,
           },
         })
       );

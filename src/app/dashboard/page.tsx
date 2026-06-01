@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { Loader2 } from 'lucide-react';
 import CommunitySidebar from '@/components/dashboard/CommunitySidebar';
 import ChatHeader from '@/components/dashboard/ChatHeader';
 import PinnedAlert from '@/components/dashboard/PinnedAlert';
@@ -11,6 +12,9 @@ import { useDashboard } from '@/hooks/useDashboard';
 export default function DashboardPage() {
   const {
     communities,
+    communitiesLoading,
+    communitiesError,
+    messageTypes,
     selectedCommunityId,
     selectedSubCommunityId,
     selectedCommunity,
@@ -30,18 +34,25 @@ export default function DashboardPage() {
   // Community list is an off-canvas drawer below `lg`; static side-by-side at lg+.
   const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false);
 
-  const headerTitle = selectedSubCommunity ? selectedSubCommunity.name : selectedCommunity.name;
-  const headerMembers = selectedSubCommunity ? `${selectedSubCommunity.members} members` : `${selectedCommunity.members} members`;
+  const headerTitle = selectedSubCommunity?.name ?? selectedCommunity?.name ?? '';
+  const headerMembers = selectedSubCommunity
+    ? `${selectedSubCommunity.members} members`
+    : selectedCommunity
+      ? `${selectedCommunity.members} members`
+      : '';
 
   // On mobile, picking a chat should also close the drawer.
-  const selectSubCommunity = (id: number) => {
+  const selectSubCommunity = (id: string) => {
     handleSelectSubCommunity(id);
     setMobileSidebarOpen(false);
   };
-  const selectCommunity = (id: number) => {
+  const selectCommunity = (id: string) => {
     handleSelectCommunity(id);
     setMobileSidebarOpen(false);
   };
+
+  // Whether the RA may post to the currently open chat.
+  const canSend = Boolean(selectedCommunity?.sendable && selectedSubCommunityId);
 
   return (
     <>
@@ -70,18 +81,42 @@ export default function DashboardPage() {
 
         <PinnedAlert pinnedMessages={pinnedItems} />
 
-        {/* Feed Scroll Area */}
-        <ChatFeed
-          views={selectedCommunity.views}
-          communityTag={selectedCommunity.analysis.tag}
-          messages={currentMessages}
-          onTogglePin={handleTogglePin}
-        />
+        {communitiesLoading ? (
+          <div className="flex-1 flex items-center justify-center text-slate-400">
+            <Loader2 className="w-6 h-6 animate-spin mr-2" /> Loading communities…
+          </div>
+        ) : communitiesError ? (
+          <div className="flex-1 flex items-center justify-center text-red-400 text-sm font-medium">
+            Failed to load communities. Please try again.
+          </div>
+        ) : communities.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center text-slate-400 text-sm font-medium">
+            No communities available.
+          </div>
+        ) : (
+          <ChatFeed
+            views={selectedCommunity?.views}
+            messages={currentMessages}
+            onTogglePin={handleTogglePin}
+          />
+        )}
 
         {/* Message Input Section */}
         <div className="p-3 sm:p-4 lg:p-6 bg-[#F8FAFC] shrink-0">
           <div className="max-w-[991px] mx-auto w-full">
-            <MessageComposer communities={communities} onSend={handleSendMessage} onSendFile={handleSendFile} />
+            {communities.length > 0 && !canSend && (
+              <p className="text-center text-[12px] font-medium text-slate-400 mb-2">
+                {selectedSubCommunityId
+                  ? 'You are not assigned to this community — viewing only.'
+                  : 'Select a sub-community to send a message.'}
+              </p>
+            )}
+            <MessageComposer
+              communities={communities}
+              messageTypes={messageTypes}
+              onSend={handleSendMessage}
+              onSendFile={handleSendFile}
+            />
           </div>
         </div>
       </main>
