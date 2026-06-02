@@ -107,22 +107,25 @@ export default function DashboardPage() {
         {/* Message Input Section */}
         <div className="p-3 sm:p-4 lg:p-6 bg-[#F8FAFC] shrink-0">
           <div className="max-w-[991px] mx-auto w-full">
-            {communities.length > 0 && !canSend && (
-              <p className="text-center text-[12px] font-medium text-slate-400 mb-2">
-                {selectedSubCommunityId
-                  ? 'You are not assigned to this community — viewing only.'
-                  : 'Select a sub-community to send a message.'}
+            {canSend ? (
+              <MessageComposer
+                communities={communities}
+                messageTypes={messageTypes}
+                bundles={bundles}
+                creatingBundle={creatingBundle}
+                onCreateBundle={handleCreateBundle}
+                onSend={handleSendMessage}
+                onSendFile={handleSendFile}
+              />
+            ) : selectedSubCommunityId ? (
+              <p className="text-center text-[13px] font-semibold text-slate-400 py-3 bg-slate-100/50 rounded-xl border border-slate-200">
+                You are not assigned to this community — viewing only.
+              </p>
+            ) : (
+              <p className="text-center text-[13px] font-semibold text-slate-400 py-3 bg-slate-100/50 rounded-xl border border-slate-200">
+                Select a sub-community to send a message.
               </p>
             )}
-            <MessageComposer
-              communities={communities}
-              messageTypes={messageTypes}
-              bundles={bundles}
-              creatingBundle={creatingBundle}
-              onCreateBundle={handleCreateBundle}
-              onSend={handleSendMessage}
-              onSendFile={handleSendFile}
-            />
           </div>
         </div>
       </main>

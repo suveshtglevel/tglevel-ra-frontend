@@ -64,9 +64,10 @@ interface MessageComposerProps {
   onCreateBundle?: (payload: { name: string; communityId: string; subIds: string[] }) => void;
   onSend?: (content: string, options?: SendOptions) => void;
   onSendFile?: (attachment: { name: string; size: string; fileType: 'image' | 'video' | 'pdf' | 'doc' | 'excel' | 'file'; url: string }, caption?: string) => void;
+  disabled?: boolean;
 }
 
-const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, onCreateBundle, onSend, onSendFile }: MessageComposerProps) => {
+const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, onCreateBundle, onSend, onSendFile, disabled = false }: MessageComposerProps) => {
   const [isEditorEmpty, setIsEditorEmpty] = React.useState(true);
   const [selectedBundleId, setSelectedBundleId] = React.useState<string | null>(null);
   const [selectedType, setSelectedType] = React.useState<MessageTypeOption | null>(null);
@@ -202,6 +203,13 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
   useEffect(() => {
     handleSendRef.current = handleSend;
   });
+
+  // Dynamically toggle tip-tap editor editability based on the disabled prop
+  useEffect(() => {
+    if (editor) {
+      editor.setEditable(!disabled);
+    }
+  }, [editor, disabled]);
 
   // TipTap initialises asynchronously; render nothing until the editor is ready.
   // Placed after the hooks above so hook order stays stable across renders.
@@ -380,7 +388,8 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
     <Card
       className={cn(
         "w-full max-w-[1100px] bg-white border-slate-200 shadow-sm rounded-[14px] overflow-hidden flex flex-col transition-all duration-300 focus-within:border-emerald-300/50 focus-within:ring-4 focus-within:ring-emerald-500/5 opacity-100 rotate-0 border-[1px]",
-        isEditorEmpty ? "min-h-[150px] h-auto" : "min-h-[200px] h-auto max-h-[330px]"
+        isEditorEmpty ? "min-h-[150px] h-auto" : "min-h-[200px] h-auto max-h-[330px]",
+        disabled && "opacity-50 pointer-events-none bg-slate-50/50"
       )}
     >
       {/* Top Control Bar */}
