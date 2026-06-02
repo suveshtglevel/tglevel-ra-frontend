@@ -67,8 +67,7 @@ export const useDashboard = () => {
   const communityVMs = useMemo<CommunityVM[]>(
     () =>
       (rawCommunities ?? [])
-        .map((c) => toCommunityVM(c, assignedCommunities))
-        .filter((c) => c.sendable),
+        .map((c) => toCommunityVM(c, assignedCommunities)),
     [rawCommunities, assignedCommunities]
   );
 
@@ -109,7 +108,7 @@ export const useDashboard = () => {
         id: b._id,
         name: b.name,
         communityId: b.community_id,
-        subIds: b.subCommunities_Ids,
+        subIds: b.subCommunities_Ids ?? b.sub_communities ?? [],
       })),
     [rawBundles]
   );

@@ -4,18 +4,20 @@ import axiosInstance from '@/lib/axios';
 // community. Sending to a bundle broadcasts to every sub-community in it.
 const BASE = '/api/v1/ra/bundle';
 
+// A bundle as returned by get-bundles: keyed by the UUID `bundle_id`, with its
+// member sub-communities listed under `sub_communities` (sub_community_id[]).
 export interface Bundle {
   _id: string;
-  bundle_id: string;
+  bundle_id?: string;
   name: string;
   status: string;
   community_id: string;
   subCommunities_Ids: string[];
-  author_id: string;
-  createdAt: string;
-  updatedAt: string;
+  sub_communities?: string[];
 }
 
+// create-bundle request body. The backend still names the ids field
+// `subCommunities_Ids` on the way in (responses use `sub_communities`).
 export interface CreateBundlePayload {
   name: string;
   status: string;

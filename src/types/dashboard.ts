@@ -13,7 +13,8 @@ export interface SubCommunityVM {
 }
 
 export interface CommunityVM {
-  id: string;
+  id: string;       // community_id (UUID) — used in send-message / get-messages
+  _id: string;      // Mongo ObjectId — matches assigned_communities from login
   name: string;
   members: string;
   time: string;

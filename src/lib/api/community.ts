@@ -11,25 +11,25 @@ export interface CommunityAuthor {
 }
 
 // A sub-community as returned nested inside its parent community.
+// Keyed by `sub_community_id` — used when sending.
 export interface SubCommunity {
-  _id: string;
+  sub_community_id: string;
   name: string;
   status: string;
   users: number;
   author?: CommunityAuthor;
 }
 
-// A community as returned by the RA backend. The RA gates sending against `_id`
-// (must be in the RA's assigned_communities) and sends to `sub_communities[]._id`
-// as the sub_community_id.
+// A community as returned by the RA backend.
+// `community_id` is the UUID-style id (e.g. "com_51fc75e5-...") used in
+// send-message / get-messages payloads.
 export interface Community {
-  _id: string;
+  community_id: string;
   name: string;
   description: string;
   icon_url: string;
   status: string;
   total_users: number;
-  community_id: string;
   sub_communities: SubCommunity[];
   author?: CommunityAuthor;
 }
@@ -56,19 +56,19 @@ function formatCount(n: number): string {
   return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k`;
 }
 
-// Adapt a backend community to the dashboard view-model. `assigned` is the RA's
-// assigned_communities list; a community is sendable only when its `_id` is in it.
+// Adapt a backend community to the dashboard view-model.
 export function toCommunityVM(c: Community, assigned: string[]): CommunityVM {
   return {
-    id: c._id,
+    id: c.community_id,
+    _id: c.community_id,
     name: c.name,
     members: formatCount(c.total_users),
     time: '',
     views: String(c.total_users ?? ''),
     pinned: '',
-    sendable: assigned.includes(c._id),
+    sendable: assigned.includes(c.community_id),
     subCommunities: c.sub_communities?.map((s) => ({
-      id: s._id,
+      id: s.sub_community_id,
       name: s.name,
       members: formatCount(s.users),
       type: s.status,
