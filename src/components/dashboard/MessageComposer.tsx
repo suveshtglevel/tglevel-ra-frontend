@@ -50,34 +50,32 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Check } from 'lucide-react';
-import type { Community } from '@/constants/mockData';
-
-// A bundle is a combination of sub-communities that all belong to the SAME
-// parent community (no cross-community mixing). Sending to a bundle broadcasts
-// the message to every sub-community in it.
-interface Bundle {
-  id: string;
-  name: string;
-  communityId: number;
-  subIds: number[];
-}
+import type { CommunityVM, BundleVM } from '@/types/dashboard';
+import type { MessageTypeOption } from '@/lib/api/messages';
+import type { SendOptions } from '@/hooks/useDashboard';
 
 interface MessageComposerProps {
-  communities: Community[];
-  onSend?: (content: string, options?: { messageType?: string; group?: string; notifyUsers?: boolean; targetCommunityIds?: number[] }) => void;
+  communities: CommunityVM[];
+  messageTypes: MessageTypeOption[];
+  // Server-owned bundles (a bundle groups sub-communities of one parent
+  // community). Created via onCreateBundle; the list refreshes after creation.
+  bundles: BundleVM[];
+  creatingBundle?: boolean;
+  onCreateBundle?: (payload: { name: string; communityId: string; subIds: string[] }) => void;
+  onSend?: (content: string, options?: SendOptions) => void;
   onSendFile?: (attachment: { name: string; size: string; fileType: 'image' | 'video' | 'pdf' | 'doc' | 'excel' | 'file'; url: string }, caption?: string) => void;
 }
 
-const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerProps) => {
+const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, onCreateBundle, onSend, onSendFile }: MessageComposerProps) => {
   const [isEditorEmpty, setIsEditorEmpty] = React.useState(true);
   const [selectedBundleId, setSelectedBundleId] = React.useState<string | null>(null);
-  const [selectedMessageType, setSelectedMessageType] = React.useState<string | null>(null);
+  const [selectedType, setSelectedType] = React.useState<MessageTypeOption | null>(null);
   const [notifyUsers, setNotifyUsers] = React.useState(false);
-  // RA-created bundles + the in-progress draft for the bundle builder.
-  const [bundles, setBundles] = React.useState<Bundle[]>([]);
+  // In-progress draft for the bundle builder (the saved list comes from props).
   const [bundleOpen, setBundleOpen] = React.useState(false);
-  const [draftCommunityId, setDraftCommunityId] = React.useState<number | null>(null);
-  const [draftSubIds, setDraftSubIds] = React.useState<number[]>([]);
+  const [draftName, setDraftName] = React.useState('');
+  const [draftCommunityId, setDraftCommunityId] = React.useState<string | null>(null);
+  const [draftSubIds, setDraftSubIds] = React.useState<string[]>([]);
   const [filePreview, setFilePreview] = React.useState<{
     name: string;
     size: string;
@@ -100,13 +98,16 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
     };
   }, [filePreview]);
 
-  // Only communities that actually have sub-communities can be bundled.
-  const bundleableCommunities = communities.filter((c) => (c.subCommunities?.length ?? 0) > 0);
+  // Only sendable communities that actually have sub-communities can be bundled
+  // (the RA may not broadcast to communities it is not assigned to).
+  const bundleableCommunities = communities.filter(
+    (c) => c.sendable && (c.subCommunities?.length ?? 0) > 0
+  );
   const selectedBundle = bundles.find((b) => b.id === selectedBundleId) ?? null;
 
   // Toggle a sub-community in the draft. A draft is locked to one parent
   // community — picking a sub from a different community is disallowed.
-  const toggleDraftSub = (communityId: number, subId: number) => {
+  const toggleDraftSub = (communityId: string, subId: string) => {
     if (draftCommunityId !== null && draftCommunityId !== communityId) return;
     setDraftCommunityId(communityId);
     setDraftSubIds((prev) =>
@@ -117,6 +118,7 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
   const resetDraft = () => {
     setDraftCommunityId(null);
     setDraftSubIds([]);
+    setDraftName('');
   };
 
   const saveBundle = () => {
@@ -124,29 +126,14 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
       toast.error('Pick at least one sub-community');
       return;
     }
+    // Fall back to the joined sub-community names if no name was typed.
     const community = communities.find((c) => c.id === draftCommunityId);
     const subs = community?.subCommunities?.filter((s) => draftSubIds.includes(s.id)) ?? [];
-    const name = subs.map((s) => s.name).join(', ');
-    const bundle: Bundle = {
-      id: `bundle-${Date.now()}`,
-      name,
-      communityId: draftCommunityId,
-      subIds: [...draftSubIds],
-    };
-    setBundles((prev) => [...prev, bundle]);
-    setSelectedBundleId(bundle.id);
+    const name = draftName.trim() || subs.map((s) => s.name).join(', ');
+    onCreateBundle?.({ name, communityId: draftCommunityId, subIds: [...draftSubIds] });
     resetDraft();
     setBundleOpen(false);
-    toast.success(`Bundle "${name}" created`);
   };
-
-  const messageTypes = [
-    "Trade",
-    "Promotional",
-    "Follow up",
-    "Feedback",
-    "Flaunt",
-  ];
 
   const imageInputRef = React.useRef<HTMLInputElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -191,14 +178,15 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
 
   const handleSend = () => {
     if (!editor) return;
-    if (!selectedMessageType) {
+    if (!selectedType) {
       toast.error('Please select a message type before sending');
       return;
     }
     const content = editor.getHTML();
     if (content === '<p></p>') return;
     onSend?.(content, {
-      messageType: selectedMessageType ?? undefined,
+      messageType: selectedType.name,
+      messageTypeId: selectedType.id,
       group: selectedBundle?.name,
       notifyUsers,
       targetCommunityIds: selectedBundle?.subIds,
@@ -206,7 +194,7 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
     editor.commands.clearContent();
     setIsEditorEmpty(true);
     setSelectedBundleId(null);
-    setSelectedMessageType(null);
+    setSelectedType(null);
     setNotifyUsers(false);
   };
   // Keep the editor's static keydown handler pointed at the latest closure
@@ -450,10 +438,10 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
                 size="sm"
                 className={cn(
                   "h-9 rounded-xl border-slate-200 bg-white text-slate-600 gap-2 font-bold px-4 hover:bg-slate-50 transition-colors shadow-none cursor-pointer",
-                  selectedMessageType && "bg-[#0F172A] text-white border-[#0F172A] hover:bg-[#1E293B] hover:text-white"
+                  selectedType && "bg-[#0F172A] text-white border-[#0F172A] hover:bg-[#1E293B] hover:text-white"
                 )}
               >
-                {selectedMessageType || "Select Message Type"} <ChevronDown className={cn("w-4 h-4 text-slate-400", selectedMessageType && "text-white/70")} />
+                {selectedType?.name || "Select Message Type"} <ChevronDown className={cn("w-4 h-4 text-slate-400", selectedType && "text-white/70")} />
               </Button>
             </PopoverTrigger>
             <PopoverContent
@@ -464,19 +452,25 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
               avoidCollisions={false}
             >
               <div className="flex flex-col py-0">
-                {messageTypes.map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => setSelectedMessageType(type)}
-                    className={cn(
-                      "w-full text-left px-[12px] py-[5.38px] text-[11.75px] font-normal transition-colors border-b border-[#E2E8F0] last:border-none hover:bg-slate-50 flex items-center whitespace-nowrap cursor-pointer",
-                      selectedMessageType === type ? "bg-[#CFDCE8] text-[#0F172A]" : "text-[#0F172A]"
-                    )}
-                    style={{ height: '23.77px' }}
-                  >
-                    {type}
-                  </button>
-                ))}
+                {messageTypes.length === 0 ? (
+                  <div className="px-3 py-3 text-[11.5px] text-slate-400 font-medium text-center">
+                    No message types available
+                  </div>
+                ) : (
+                  messageTypes.map((type) => (
+                    <button
+                      key={type.id}
+                      onClick={() => setSelectedType(type)}
+                      className={cn(
+                        "w-full text-left px-[12px] py-[5.38px] text-[11.75px] font-normal transition-colors border-b border-[#E2E8F0] last:border-none hover:bg-slate-50 flex items-center whitespace-nowrap cursor-pointer",
+                        selectedType?.id === type.id ? "bg-[#CFDCE8] text-[#0F172A]" : "text-[#0F172A]"
+                      )}
+                      style={{ height: '23.77px' }}
+                    >
+                      {type.name}
+                    </button>
+                  ))
+                )}
               </div>
             </PopoverContent>
           </Popover>
@@ -507,6 +501,13 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
               <div className="px-3 py-2.5 border-b border-slate-100 bg-slate-50">
                 <p className="text-[12px] font-bold text-slate-700">Create a bundle</p>
                 <p className="text-[10.5px] text-slate-400 font-medium">Pick sub-communities from one community.</p>
+                <input
+                  type="text"
+                  value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                  placeholder="Bundle name (optional)"
+                  className="mt-2 w-full h-8 px-2.5 rounded-lg border border-slate-200 bg-white text-[12px] text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/10"
+                />
               </div>
               <div className="max-h-[280px] overflow-y-auto py-1">
                 {bundleableCommunities.map((c) => {
@@ -562,22 +563,22 @@ const MessageComposer = ({ communities, onSend, onSendFile }: MessageComposerPro
                 <Button
                   size="sm"
                   onClick={saveBundle}
-                  disabled={draftSubIds.length === 0}
+                  disabled={draftSubIds.length === 0 || creatingBundle}
                   className={cn(
                     "h-8 rounded-lg px-4 font-bold text-[12px] bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer",
-                    draftSubIds.length === 0 && "opacity-50 cursor-not-allowed hover:bg-emerald-500"
+                    (draftSubIds.length === 0 || creatingBundle) && "opacity-50 cursor-not-allowed hover:bg-emerald-500"
                   )}
                 >
-                  Save bundle ({draftSubIds.length})
+                  {creatingBundle ? 'Saving…' : `Save bundle (${draftSubIds.length})`}
                 </Button>
               </div>
             </PopoverContent>
           </Popover>
           <Button
-            title={!selectedMessageType ? 'Select a message type first' : undefined}
+            title={!selectedType ? 'Select a message type first' : undefined}
             className={cn(
               "bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl px-4 sm:px-6 font-bold h-10 gap-2 shadow-lg shadow-emerald-500/20 transition-all active:scale-95 cursor-pointer",
-              !selectedMessageType && "opacity-50"
+              !selectedType && "opacity-50"
             )}
             onClick={handleSend}
           >

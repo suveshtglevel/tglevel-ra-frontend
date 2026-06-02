@@ -2,8 +2,8 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { getAccessToken, setAccessToken } from '@/lib/api/tokenStore';
 import { clearSession } from '@/lib/api/session';
 
-const BASE_URL = 'https://shun-reborn-landlady.ngrok-free.dev';
-const REFRESH_URL = '/api/v1/auth/refresh';
+const BASE_URL = 'https://ra-tglevels.duckdns.org';
+const REFRESH_URL = '/api/v1/ra/refresh-token';
 
 const axiosInstance = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
@@ -33,9 +33,11 @@ type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 // Only one refresh runs at a time; concurrent 401s wait on this promise.
 let refreshPromise: Promise<string> | null = null;
 
-// Exchange the HttpOnly refresh-token cookie for a fresh access token.
-// Uses a bare axios call (no interceptors) so a 401 here can't recurse.
-async function requestRefresh(): Promise<string> {
+// Exchange the HttpOnly ra_refreshToken cookie for a fresh access token via
+// POST /api/v1/ra/refresh-token. Uses a bare axios call (no interceptors) so a
+// 401 here can't recurse. Exported so app bootstrap can restore a session after
+// a reload (the in-memory access token is gone, but the cookie may still be valid).
+export async function refreshAccessToken(): Promise<string> {
   const { data } = await axios.post(
     `${BASE_URL}${REFRESH_URL}`,
     null,
@@ -75,7 +77,7 @@ axiosInstance.interceptors.response.use(
     original._retry = true;
 
     try {
-      refreshPromise = refreshPromise ?? requestRefresh();
+      refreshPromise = refreshPromise ?? refreshAccessToken();
       const token = await refreshPromise;
       original.headers.Authorization = `Bearer ${token}`;
       return axiosInstance(original);
