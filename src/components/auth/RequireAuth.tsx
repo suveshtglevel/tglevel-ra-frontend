@@ -1,8 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppSelector } from '@/redux/hooks';
+
+const emptySubscribe = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
 
 // Full-screen spinner shown while the session bootstrap is still running.
 function AuthLoading() {
@@ -18,6 +22,9 @@ function AuthLoading() {
 export default function RequireAuth({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const status = useAppSelector((state) => state.auth.status);
+  // Prevent hydration mismatch: returns false on the server and true on the
+  // client, so the first client render matches the server HTML (spinner).
+  const mounted = useSyncExternalStore(emptySubscribe, getClientSnapshot, getServerSnapshot);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -25,7 +32,7 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
     }
   }, [status, router]);
 
-  if (status !== 'authenticated') {
+  if (!mounted || status !== 'authenticated') {
     return <AuthLoading />;
   }
   return <>{children}</>;
