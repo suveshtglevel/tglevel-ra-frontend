@@ -63,11 +63,14 @@ interface MessageComposerProps {
   creatingBundle?: boolean;
   onCreateBundle?: (payload: { name: string; communityId: string; subIds: string[] }) => void;
   onSend?: (content: string, options?: SendOptions) => void;
-  onSendFile?: (attachment: { name: string; size: string; fileType: 'image' | 'video' | 'pdf' | 'doc' | 'excel' | 'file'; url: string }, caption?: string) => void;
   disabled?: boolean;
 }
 
-const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, onCreateBundle, onSend, onSendFile, disabled = false }: MessageComposerProps) => {
+type FilePreview = NonNullable<SendOptions['attachment']> & {
+  file: File;
+};
+
+const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, onCreateBundle, onSend, disabled = false }: MessageComposerProps) => {
   const [isEditorEmpty, setIsEditorEmpty] = React.useState(true);
   const [selectedBundleId, setSelectedBundleId] = React.useState<string | null>(null);
   const [selectedType, setSelectedType] = React.useState<MessageTypeOption | null>(null);
@@ -77,27 +80,25 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
   const [draftName, setDraftName] = React.useState('');
   const [draftCommunityId, setDraftCommunityId] = React.useState<string | null>(null);
   const [draftSubIds, setDraftSubIds] = React.useState<string[]>([]);
-  const [filePreview, setFilePreview] = React.useState<{
-    name: string;
-    size: string;
-    fileType: 'image' | 'video' | 'pdf' | 'doc' | 'excel' | 'file';
-    url: string;
-  } | null>(null);
-  const [caption, setCaption] = React.useState('');
+  const [filePreview, setFilePreview] = React.useState<FilePreview | null>(null);
+  const [showFullPreview, setShowFullPreview] = React.useState(false);
   const mounted = useHydrated();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && filePreview) {
-        setFilePreview(null);
-        setCaption('');
+      if (e.key === 'Escape') {
+        if (showFullPreview) {
+          setShowFullPreview(false);
+        } else if (filePreview) {
+          setFilePreview(null);
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [filePreview]);
+  }, [filePreview, showFullPreview]);
 
   // Only sendable communities that actually have sub-communities can be bundled
   // (the RA may not broadcast to communities it is not assigned to).
@@ -105,6 +106,7 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
     (c) => c.sendable && (c.subCommunities?.length ?? 0) > 0
   );
   const selectedBundle = bundles.find((b) => b.id === selectedBundleId) ?? null;
+  const messageTypeRequiredText = 'Select message type before sending';
 
   // Toggle a sub-community in the draft. A draft is locked to one parent
   // community — picking a sub from a different community is disallowed.
@@ -180,23 +182,40 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
   const handleSend = () => {
     if (!editor) return;
     if (!selectedType) {
-      toast.error('Please select a message type before sending');
+      toast.error(messageTypeRequiredText);
       return;
     }
     const content = editor.getHTML();
-    if (content === '<p></p>') return;
-    onSend?.(content, {
+    const hasContent = !editor.isEmpty && content !== '<p></p>';
+    if (!hasContent && !filePreview) return;
+
+    const sendOptions: SendOptions = {
       messageType: selectedType.name,
       messageTypeId: selectedType.id,
       group: selectedBundle?.name,
       notifyUsers,
       targetCommunityIds: selectedBundle?.subIds,
-    });
+    };
+
+    if (filePreview) {
+      sendOptions.file = filePreview.file;
+      sendOptions.fileType = filePreview.fileType;
+      sendOptions.attachment = {
+        name: filePreview.name,
+        size: filePreview.size,
+        fileType: filePreview.fileType,
+        url: filePreview.url,
+      };
+    }
+
+    onSend?.(hasContent ? content : '', sendOptions);
     editor.commands.clearContent();
     setIsEditorEmpty(true);
     setSelectedBundleId(null);
     setSelectedType(null);
     setNotifyUsers(false);
+    setFilePreview(null);
+    setShowFullPreview(false);
   };
   // Keep the editor's static keydown handler pointed at the latest closure
   // without writing to the ref during render.
@@ -249,18 +268,10 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
       const sizeKB = file.size / 1024;
       const size = sizeKB > 1024 ? `${(sizeKB / 1024).toFixed(1)} MB` : `${sizeKB.toFixed(1)} KB`;
 
-      setFilePreview({ name: file.name, size, fileType, url });
-      setCaption('');
+      setFilePreview({ name: file.name, size, fileType, url, file });
+      setShowFullPreview(false);
     };
     reader.readAsDataURL(file);
-  };
-
-  const handleFileConfirmSend = () => {
-    if (filePreview) {
-      onSendFile?.(filePreview, caption || undefined);
-      setFilePreview(null);
-      setCaption('');
-    }
   };
 
   const insertChart = () => {
@@ -282,7 +293,7 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
   };
 
   const renderPreviewModal = () => {
-    if (!filePreview || !mounted) return null;
+    if (!filePreview || !mounted || !showFullPreview) return null;
 
     const modalContent = (
       <div className="fixed inset-0 z-[9999] bg-[#0b141a] text-white flex flex-col select-none animate-in fade-in duration-200">
@@ -292,11 +303,10 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
             <button
               type="button"
               onClick={() => {
-                setFilePreview(null);
-                setCaption('');
+                setShowFullPreview(false);
               }}
               className="p-2 rounded-full hover:bg-white/10 text-[#aebac1] hover:text-white transition-colors cursor-pointer border-none bg-transparent flex items-center justify-center"
-              title="Cancel and close"
+              title="Close"
             >
               <X className="w-6 h-6" />
             </button>
@@ -351,33 +361,6 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
             </div>
           )}
         </div>
-
-        {/* Footer caption & send area */}
-        <div className="bg-[#111b21] border-t border-white/5 py-5 px-6 shrink-0 flex items-center justify-center">
-          <div className="w-full max-w-[800px] flex items-center gap-4">
-            <div className="flex-1 bg-[#2a3942] rounded-xl flex items-center px-4 py-1.5 border border-white/5 focus-within:border-emerald-500/30 transition-all">
-              <input
-                type="text"
-                placeholder="Add a caption..."
-                value={caption}
-                onChange={(e) => setCaption(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleFileConfirmSend();
-                }}
-                autoFocus
-                className="flex-1 bg-transparent border-none text-[#e9edef] placeholder-[#8696a0] focus:outline-none focus:ring-0 text-[15px] py-1.5"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={handleFileConfirmSend}
-              className="bg-[#00a884] hover:bg-[#008f72] active:scale-95 text-white rounded-full p-4 flex items-center justify-center shadow-lg transition-all cursor-pointer shrink-0 border-none"
-              title="Send"
-            >
-              <Send className="w-6 h-6 fill-current translate-x-[2px] text-white" />
-            </button>
-          </div>
-        </div>
       </div>
     );
 
@@ -388,7 +371,7 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
     <Card
       className={cn(
         "w-full max-w-[1100px] bg-white border-slate-200 shadow-sm rounded-[14px] overflow-hidden flex flex-col transition-all duration-300 focus-within:border-emerald-300/50 focus-within:ring-4 focus-within:ring-emerald-500/5 opacity-100 rotate-0 border-[1px]",
-        isEditorEmpty ? "min-h-[150px] h-auto" : "min-h-[200px] h-auto max-h-[330px]",
+        filePreview ? "min-h-[360px] h-auto" : isEditorEmpty ? "min-h-[150px] h-auto" : "min-h-[200px] h-auto max-h-[330px]",
         disabled && "opacity-50 pointer-events-none bg-slate-50/50"
       )}
     >
@@ -583,16 +566,24 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
               </div>
             </PopoverContent>
           </Popover>
-          <Button
-            title={!selectedType ? 'Select a message type first' : undefined}
-            className={cn(
-              "bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl px-4 sm:px-6 font-bold h-10 gap-2 shadow-lg shadow-emerald-500/20 transition-all active:scale-95 cursor-pointer",
-              !selectedType && "opacity-50"
-            )}
-            onClick={handleSend}
+          <div
+            className="inline-flex"
+            onClick={() => {
+              if (!selectedType) toast.error(messageTypeRequiredText);
+            }}
+            title={!selectedType ? messageTypeRequiredText : undefined}
           >
-            Send <Send className="w-4 h-4 fill-current" />
-          </Button>
+            <Button
+              className={cn(
+                "bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl px-4 sm:px-6 font-bold h-10 gap-2 shadow-lg shadow-emerald-500/20 transition-all active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+                !selectedType && "opacity-50"
+              )}
+              onClick={handleSend}
+              disabled={!selectedType}
+            >
+              Send <Send className="w-4 h-4 fill-current" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -646,12 +637,69 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
       <div
         className={cn(
           "px-3 sm:px-5 pt-3 pb-6 overflow-y-auto cursor-pointer",
-          isEditorEmpty ? "flex-1" : "min-h-[80px]"
+          filePreview ? "min-h-[190px]" : isEditorEmpty ? "flex-1" : "min-h-[80px]"
         )}
         onClick={() => editor.commands.focus()}
         onDoubleClick={() => editor.commands.focus()}
       >
         <EditorContent editor={editor} />
+
+        {/* Small File Preview */}
+        {filePreview && !showFullPreview && (
+          <div className="mt-5 mb-4 max-w-[420px] rounded-xl border border-slate-200 bg-slate-50/80 p-3 shadow-sm">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                setFilePreview(null);
+              }}
+              className="float-right ml-3 p-1.5 rounded-full bg-white text-slate-400 border border-slate-200 hover:text-red-500 hover:border-red-100 hover:bg-red-50 transition-colors cursor-pointer"
+              title="Remove selected file"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div
+              onClick={(event) => {
+                event.stopPropagation();
+                setShowFullPreview(true);
+              }}
+              className="flex items-center gap-3 cursor-pointer"
+            >
+              {filePreview.fileType === 'image' ? (
+                <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-slate-200 bg-white shrink-0">
+                  <Image
+                    src={filePreview.url}
+                    alt={filePreview.name}
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
+                </div>
+              ) : filePreview.fileType === 'video' ? (
+                <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-slate-200 bg-slate-900 flex items-center justify-center shrink-0">
+                  <Video className="w-9 h-9 text-white/60" />
+                </div>
+              ) : (
+                <div className="w-24 h-24 rounded-lg border border-slate-200 bg-white flex items-center justify-center shrink-0">
+                  {filePreview.fileType === 'pdf' && <FileText className="w-9 h-9 text-red-500" />}
+                  {filePreview.fileType === 'doc' && <FileIcon className="w-9 h-9 text-blue-500" />}
+                  {filePreview.fileType === 'excel' && <FileSpreadsheet className="w-9 h-9 text-green-500" />}
+                  {filePreview.fileType === 'file' && <FileIcon className="w-9 h-9 text-slate-400" />}
+                </div>
+              )}
+              <div className="min-w-0 pr-2">
+                <p
+                  className="text-sm font-bold text-slate-800 truncate"
+                  title={filePreview.name}
+                >
+                  {filePreview.name}
+                </p>
+                <p className="text-xs font-medium text-slate-500 mt-1">{filePreview.size}</p>
+                <p className="text-[11px] font-semibold text-emerald-600 mt-3">Click to preview</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <style jsx global>{`
