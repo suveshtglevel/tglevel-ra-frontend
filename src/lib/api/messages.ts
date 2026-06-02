@@ -5,24 +5,28 @@ const BASE = '/api/v1/messages';
 // Message kind, sent as a numeric code the backend understands.
 export type MessageType = number;
 
-export interface SendMessagePayload {
+// send-message is multipart/form-data: text fields plus optional file fields
+// (`images` for an image/video, `docs` for a document).
+export interface SendMessageInput {
   community_id: string;
-  sub_community_id?: string;
+  sub_community_id: string;
   type: MessageType;
-  content: string;
+  content?: string;
   // Set when this message is a reply to an existing one.
   parent_message_id?: string;
   // Whether the backend should fan out a push notification for this message.
   notification_sent?: boolean;
+  imageFile?: File;
+  docFile?: File;
 }
 
 export interface SentMessage {
   _id: string;
+  message_id?: string;
   community_id: string;
   sub_community_id?: string;
   type: MessageType;
   content: string;
-  parent_message_id?: string;
   notification_sent: boolean;
   createdAt: string;
   updatedAt: string;
@@ -34,12 +38,25 @@ interface SendMessageResponse {
   data: SentMessage;
 }
 
-export async function sendMessage(
-  payload: SendMessagePayload
-): Promise<SentMessage> {
+export async function sendMessage(input: SendMessageInput): Promise<SentMessage> {
+  const form = new FormData();
+  form.append('community_id', input.community_id);
+  form.append('sub_community_id', input.sub_community_id);
+  form.append('type', String(input.type));
+  form.append('content', input.content ?? '');
+  form.append('notification_sent', String(input.notification_sent ?? false));
+  if (input.parent_message_id) {
+    form.append('parent_message_id', input.parent_message_id);
+  }
+  if (input.imageFile) form.append('images', input.imageFile);
+  if (input.docFile) form.append('docs', input.docFile);
+
   const { data } = await axiosInstance.post<SendMessageResponse>(
     `${BASE}/send-message`,
-    payload
+    form,
+    // Clear the default JSON Content-Type so the browser sets the multipart
+    // boundary itself.
+    { headers: { 'Content-Type': null } }
   );
   if (!data.success) {
     throw new Error(data.message || 'Failed to send message');
@@ -51,15 +68,25 @@ export async function sendMessage(
 
 // A message as returned by get-messages. The backend schema is open-ended, so
 // fields beyond the ones we rely on are kept optional.
+export interface BackendAttachment {
+  file_url: string;
+  file_type: string;
+  file_name: string;
+}
+
 export interface BackendMessage {
-  _id: string;
+  // UUID-style message id (e.g. "msg_..."); used as message_id when pinning.
+  message_id?: string;
+  _id?: string;
   community_id: string;
   sub_community_id?: string;
   type?: MessageType;
   content: string;
   parent_message_id?: string;
   notification_sent?: boolean;
-  sender_name?: string;
+  author_id?: string;
+  author_name?: string;
+  attachments?: BackendAttachment[];
   createdAt?: string;
   updatedAt?: string;
 }

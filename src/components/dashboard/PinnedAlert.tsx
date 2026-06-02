@@ -14,70 +14,80 @@ interface PinnedAlertProps {
 }
 
 const scrollToMessage = (id: string) => {
-  document.getElementById(`feed-msg-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const el = document.getElementById(`feed-msg-${id}`);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  // Briefly highlight the target so the RA can spot which message is pinned.
+  el.classList.remove('pinned-flash');
+  // Force reflow so the animation restarts even on repeated clicks.
+  void el.offsetWidth;
+  el.classList.add('pinned-flash');
+  window.setTimeout(() => el.classList.remove('pinned-flash'), 1800);
 };
 
 const PinnedAlert = ({ pinnedMessages }: PinnedAlertProps) => {
-  const [collapsed, setCollapsed] = React.useState(false);
+  // Collapsed by default: show only the latest pinned message until expanded.
+  const [expanded, setExpanded] = React.useState(false);
 
   // Nothing pinned -> the bar is hidden entirely.
   if (pinnedMessages.length === 0) return null;
 
   const count = pinnedMessages.length;
+  // pinnedMessages[0] is the most recently pinned. Collapsed shows just it.
+  const visible = expanded ? pinnedMessages : pinnedMessages.slice(0, 1);
 
   return (
-    <div className="bg-white border-b border-slate-100 px-4 sm:px-6 py-2.5 text-sm shrink-0">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-3 text-slate-700 font-bold overflow-hidden min-w-0">
-          <Pin className="w-4 h-4 text-emerald-500 rotate-45 shrink-0" />
-          {count > 1 && (
-            <span className="text-[10px] font-bold text-white bg-emerald-500 rounded-full px-1.5 py-0.5 shrink-0">
-              {count}
-            </span>
-          )}
-          {collapsed ? (
-            <span className="text-slate-400 text-xs">
-              {count} pinned message{count > 1 ? 's' : ''}
-            </span>
-          ) : (
-            <button
-              type="button"
-              onClick={() => scrollToMessage(pinnedMessages[0].id)}
-              className="truncate text-left bg-transparent border-none p-0 cursor-pointer hover:text-emerald-600 transition-colors"
-            >
-              {pinnedMessages[0].preview}
-            </button>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={() => setCollapsed((prev) => !prev)}
-          className="bg-transparent border-none cursor-pointer p-1 rounded hover:bg-slate-100 transition-colors shrink-0"
-        >
-          <ChevronDown
-            className={cn(
-              "w-4 h-4 text-slate-400 transition-transform duration-200",
-              collapsed && "rotate-180"
-            )}
-          />
-        </button>
-      </div>
-
-      {/* Remaining pinned messages */}
-      {!collapsed && count > 1 && (
-        <div className="mt-1.5 ml-7 flex flex-col gap-1 items-start">
-          {pinnedMessages.slice(1).map((m) => (
-            <button
+    <div className="bg-white border-b border-slate-100 px-4 sm:px-6 py-2 text-sm shrink-0">
+      <div className="flex flex-col gap-1.5">
+        {visible.map((m, idx) => {
+          // The first row doubles as the expand/collapse control (clicking the
+          // row/box or the arrow toggles the list) when there is more than one
+          // pinned message. Clicking the text itself jumps to the message.
+          const toggleable = idx === 0 && count > 1;
+          return (
+            <div
               key={m.id}
-              type="button"
-              onClick={() => scrollToMessage(m.id)}
-              className="max-w-full truncate text-left bg-transparent border-none p-0 text-slate-500 font-medium text-xs cursor-pointer hover:text-emerald-600 transition-colors"
+              role={toggleable ? 'button' : undefined}
+              tabIndex={toggleable ? 0 : undefined}
+              onClick={toggleable ? () => setExpanded((prev) => !prev) : undefined}
+              onKeyDown={
+                toggleable
+                  ? (e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setExpanded((prev) => !prev);
+                      }
+                    }
+                  : undefined
+              }
+              className={cn(
+                'flex items-center gap-3 rounded-lg',
+                toggleable && 'cursor-pointer hover:bg-slate-50 -mx-2 px-2 py-0.5'
+              )}
             >
-              {m.preview}
-            </button>
-          ))}
-        </div>
-      )}
+              <Pin className="w-4 h-4 text-emerald-500 rotate-45 shrink-0" />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  scrollToMessage(m.id);
+                }}
+                className="flex-1 min-w-0 truncate text-left bg-transparent border-none p-0 text-slate-700 font-medium cursor-pointer hover:text-emerald-600 transition-colors"
+              >
+                {m.preview}
+              </button>
+              {toggleable && (
+                <ChevronDown
+                  className={cn(
+                    'w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0',
+                    expanded && 'rotate-180'
+                  )}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };

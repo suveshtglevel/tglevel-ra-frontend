@@ -7,17 +7,15 @@ const BASE = '/api/v1/ra/bundle';
 // A bundle as returned by get-bundles: keyed by the UUID `bundle_id`, with its
 // member sub-communities listed under `sub_communities` (sub_community_id[]).
 export interface Bundle {
-  _id: string;
-  bundle_id?: string;
+  bundle_id: string;
   name: string;
   status: string;
   community_id: string;
-  subCommunities_Ids: string[];
-  sub_communities?: string[];
+  sub_communities: string[];
 }
 
-// create-bundle request body. The backend still names the ids field
-// `subCommunities_Ids` on the way in (responses use `sub_communities`).
+// create-bundle request body. The backend names the ids field
+// `subCommunities_Ids` on the way in (get-bundles uses `sub_communities`).
 export interface CreateBundlePayload {
   name: string;
   status: string;
@@ -25,10 +23,9 @@ export interface CreateBundlePayload {
   community_id: string;
 }
 
-interface CreateBundleResponse {
+interface MutationResponse {
   success: boolean;
   message: string;
-  bundle: Bundle;
 }
 
 interface GetBundlesResponse {
@@ -37,15 +34,15 @@ interface GetBundlesResponse {
   bundles: Bundle[];
 }
 
-export async function createBundle(payload: CreateBundlePayload): Promise<Bundle> {
-  const { data } = await axiosInstance.post<CreateBundleResponse>(
+// create-bundle returns only { success, message } (no bundle object).
+export async function createBundle(payload: CreateBundlePayload): Promise<void> {
+  const { data } = await axiosInstance.post<MutationResponse>(
     `${BASE}/create-bundle`,
     payload
   );
   if (!data.success) {
     throw new Error(data.message || 'Failed to create bundle');
   }
-  return data.bundle;
 }
 
 export async function getBundles(): Promise<Bundle[]> {

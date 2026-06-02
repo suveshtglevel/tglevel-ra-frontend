@@ -20,29 +20,36 @@ interface ChatFeedProps {
 }
 
 // Three-dots menu overlaid at the top-right of every message; offers pin/unpin.
-const MessageMenu = ({ pinned, onTogglePin }: { pinned: boolean; onTogglePin: () => void }) => (
-  <Popover>
-    <PopoverTrigger asChild>
-      <button
-        type="button"
-        aria-label="Message options"
-        className="absolute top-2 right-2 z-10 p-1 rounded-full bg-white/90 text-slate-500 border border-slate-200 shadow-sm hover:bg-white hover:text-slate-700 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity cursor-pointer"
-      >
-        <MoreVertical className="w-4 h-4" />
-      </button>
-    </PopoverTrigger>
-    <PopoverContent className="w-40 p-1 rounded-xl border border-slate-200 shadow-lg" align="end" side="bottom" sideOffset={4}>
-      <button
-        type="button"
-        onClick={onTogglePin}
-        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors"
-      >
-        <Pin className={cn("w-4 h-4", pinned ? "text-emerald-500 rotate-45" : "text-slate-400")} />
-        {pinned ? 'Unpin message' : 'Pin message'}
-      </button>
-    </PopoverContent>
-  </Popover>
-);
+// Controlled so it closes itself right after the action (no extra click needed).
+const MessageMenu = ({ pinned, onTogglePin }: { pinned: boolean; onTogglePin: () => void }) => {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label="Message options"
+          className="absolute top-2 right-2 z-10 p-1 rounded-full bg-white/90 text-slate-500 border border-slate-200 shadow-sm hover:bg-white hover:text-slate-700 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity cursor-pointer"
+        >
+          <MoreVertical className="w-4 h-4" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-40 p-1 rounded-xl border-white bg-white shadow-lg" align="end" side="right" sideOffset={4}>
+        <button
+          type="button"
+          onClick={() => {
+            onTogglePin();
+            setOpen(false);
+          }}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
+        >
+          <Pin className={cn("w-4 h-4", pinned ? "text-emerald-500 rotate-45" : "text-slate-400")} />
+          {pinned ? 'Unpin message' : 'Pin message'}
+        </button>
+      </PopoverContent>
+    </Popover>
+  );
+};
 
 const FileAttachmentView = ({ attachment, isSent, onOpen }: { attachment: NonNullable<ChatMessage['attachment']>; isSent: boolean; onOpen: () => void }) => {
   if (attachment.fileType === 'image') {
@@ -170,8 +177,8 @@ const ChatFeed = ({ views = '42', communityTag, messages = [], onTogglePin }: Ch
   return (
     <div className="flex-1 flex min-h-0 relative">
       <ScrollArea className="flex-1" ref={scrollRef}>
-        <div className="w-full max-w-4xl py-4 sm:py-8 px-3 sm:px-6 flex flex-col items-start">
-          <div className="mb-6 sm:mb-8 flex items-center gap-4 w-full">
+        <div className="w-full py-4 sm:py-8 flex flex-col items-stretch">
+          <div className="mb-6 sm:mb-8 flex items-center gap-4 w-full px-3 sm:px-6">
             <div className="flex-1 h-[1px] bg-slate-200" />
             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Today</span>
             <div className="flex-1 h-[1px] bg-slate-200" />
@@ -182,21 +189,25 @@ const ChatFeed = ({ views = '42', communityTag, messages = [], onTogglePin }: Ch
               a three-dots menu for pinning. */}
           <div className="flex flex-col gap-3 w-full">
             {messages.map((msg) => (
-              <div key={msg.id} id={`feed-msg-${msg.id}`} className="group relative w-fit max-w-full scroll-mt-4">
-                {msg.messageType === 'Trade' || (!msg.attachment && isResearchAnalysis(msg.content)) ? (
-                  <TradeCard
-                    content={msg.content}
-                    timestamp={msg.timestamp}
-                    status={msg.status}
-                    tag={communityTag ?? msg.tradeTag}
-                    refId={msg.tradeRefId}
-                    pinned={msg.pinned}
-                    onTickClick={() => setShowViewedBy((prev) => !prev)}
-                  />
-                ) : (
-                  <MessageBubble message={msg} communityTag={communityTag} onOpenFile={(att) => setViewingFile(att)} />
-                )}
-                <MessageMenu pinned={!!msg.pinned} onTogglePin={() => onTogglePin?.(msg.id)} />
+              // Full-width row carries the scroll/highlight target so the pinned
+              // flash spans the whole width; the bubble stays inset & content-width.
+              <div key={msg.id} id={`feed-msg-${msg.id}`} className="w-full scroll-mt-4 px-3 sm:px-6 py-1">
+                <div className="group relative w-fit max-w-full">
+                  {msg.messageType === 'Trade' || (!msg.attachment && isResearchAnalysis(msg.content)) ? (
+                    <TradeCard
+                      content={msg.content}
+                      timestamp={msg.timestamp}
+                      status={msg.status}
+                      tag={communityTag ?? msg.tradeTag}
+                      refId={msg.tradeRefId}
+                      pinned={msg.pinned}
+                      onTickClick={() => setShowViewedBy((prev) => !prev)}
+                    />
+                  ) : (
+                    <MessageBubble message={msg} communityTag={communityTag} onOpenFile={(att) => setViewingFile(att)} />
+                  )}
+                  <MessageMenu pinned={!!msg.pinned} onTogglePin={() => onTogglePin?.(msg.id)} />
+                </div>
               </div>
             ))}
           </div>

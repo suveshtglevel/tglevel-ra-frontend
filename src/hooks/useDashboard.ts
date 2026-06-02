@@ -11,7 +11,7 @@ import {
   setMessages,
   sendMessage,
   sendFileMessage,
-  togglePin,
+  setPinned,
 } from '@/redux/slices/messageSlice';
 import type { FileAttachment } from '@/redux/slices/messageSlice';
 import { useCommunities } from '@/hooks/useCommunities';
@@ -19,13 +19,13 @@ import { useMessages } from '@/hooks/useMessages';
 import { useMessageTypes } from '@/hooks/useMessageTypes';
 import { useBundles } from '@/hooks/useBundles';
 import { useCreateBundle } from '@/hooks/useCreateBundle';
+import { usePinnedMessages } from '@/hooks/usePinnedMessages';
 import { toCommunityVM } from '@/lib/api/community';
 import { sendMessage as sendMessageApi } from '@/lib/api/messages';
+import { togglePinnedMessage } from '@/lib/api/pinnedMessages';
 import { getApiErrorMessage } from '@/lib/api/errors';
 import { mapBackendMessage } from '@/lib/mappers/message';
 import type { CommunityVM, BundleVM } from '@/types/dashboard';
-
-const MAX_PINNED = 3;
 
 // Plain-text preview from a message's HTML content / attachment.
 const messagePreview = (content: string, attachmentName?: string) => {
@@ -46,6 +46,11 @@ export interface SendOptions {
   group?: string;
   notifyUsers?: boolean;
   targetCommunityIds?: string[];
+  // Attachment to upload with the message (send-message is multipart). `file`
+  // is the raw upload; `attachment` is the local preview for optimistic render.
+  file?: File;
+  fileType?: FileAttachment['fileType'];
+  attachment?: FileAttachment;
 }
 
 export const useDashboard = () => {
@@ -105,10 +110,10 @@ export const useDashboard = () => {
   const bundles = useMemo<BundleVM[]>(
     () =>
       (rawBundles ?? []).map((b) => ({
-        id: b._id,
+        id: b.bundle_id,
         name: b.name,
         communityId: b.community_id,
-        subIds: b.subCommunities_Ids ?? b.sub_communities ?? [],
+        subIds: b.sub_communities ?? [],
       })),
     [rawBundles]
   );
@@ -134,10 +139,18 @@ export const useDashboard = () => {
     return map;
   }, [messageTypes]);
 
-  // ----- Server state: messages for the open chat ----------------------------
+  // ----- Server state: messages + pinned messages for the open chat ----------
   const { data: fetchedMessages } = useMessages(
     selectedCommunityId ?? undefined,
     selectedSubCommunityId ?? undefined
+  );
+  const { data: pinnedData } = usePinnedMessages(
+    selectedCommunityId ?? undefined,
+    selectedSubCommunityId ?? undefined
+  );
+  const pinnedIdSet = useMemo(
+    () => new Set((pinnedData ?? []).map((p) => p.message_id)),
+    [pinnedData]
   );
 
   useEffect(() => {
@@ -145,29 +158,44 @@ export const useDashboard = () => {
       dispatch(
         setMessages({
           chatId: selectedSubCommunityId,
-          messages: fetchedMessages.map((m) =>
-            mapBackendMessage(m, m.type != null ? typeNameById.get(m.type) : undefined)
-          ),
+          messages: fetchedMessages.map((m) => {
+            const cm = mapBackendMessage(m, m.type != null ? typeNameById.get(m.type) : undefined);
+            cm.pinned = pinnedIdSet.has(cm.id);
+            return cm;
+          }),
         })
       );
     }
-  }, [fetchedMessages, selectedSubCommunityId, typeNameById, dispatch]);
+  }, [fetchedMessages, selectedSubCommunityId, typeNameById, pinnedIdSet, dispatch]);
 
-  const pinnedMessages = currentMessages.filter((m) => m.pinned);
-  const pinnedItems = pinnedMessages.map((m) => ({
-    id: m.id,
-    preview: messagePreview(m.content, m.attachment?.name),
+  // The pinned bar is driven by the server's pinned list (so it persists across
+  // reloads), with previews taken from each pin's message content.
+  const pinnedItems = (pinnedData ?? []).map((p) => ({
+    id: p.message_id,
+    preview: messagePreview(p.message ?? ''),
   }));
 
-  // Pin/unpin a message in the current chat. Pinning while already at
-  // MAX_PINNED drops the oldest pinned message to make room.
+  // Pin/unpin a message via the pinned-messages API (a single toggle endpoint).
+  // Optimistically flip the feed, reconcile with the server's reported status,
+  // then refresh the pinned list so the pinned bar stays in sync. Pins are
+  // removed manually by the RA (no automatic eviction).
   const handleTogglePin = (messageId: string) => {
     const msg = currentMessages.find((m) => m.id === messageId);
     if (!msg) return;
-    if (!msg.pinned && pinnedMessages.length >= MAX_PINNED) {
-      dispatch(togglePin({ communityId: activeChatId, messageId: pinnedMessages[0].id }));
-    }
-    dispatch(togglePin({ communityId: activeChatId, messageId }));
+    const willPin = !msg.pinned;
+
+    dispatch(setPinned({ communityId: activeChatId, messageId, pinned: willPin }));
+    togglePinnedMessage(messageId)
+      .then((status) => {
+        dispatch(setPinned({ communityId: activeChatId, messageId, pinned: status === 'pinned' }));
+        queryClient.invalidateQueries({
+          queryKey: ['pinned-messages', selectedCommunityId, selectedSubCommunityId],
+        });
+      })
+      .catch((error) => {
+        dispatch(setPinned({ communityId: activeChatId, messageId, pinned: !willPin }));
+        toast.error(getApiErrorMessage(error));
+      });
   };
 
   const [checkboxTargets, setCheckboxTargets] = useState<CheckboxTargets>({
@@ -216,7 +244,8 @@ export const useDashboard = () => {
     communities.find((c) => c.subCommunities?.some((s) => s.id === subId));
 
   const handleSendMessage = (content: string, options?: SendOptions) => {
-    if (!content || content === '<p></p>') {
+    const hasContent = Boolean(content && content !== '<p></p>');
+    if (!hasContent && !options?.file) {
       toast.error('Please enter a message');
       return;
     }
@@ -253,26 +282,42 @@ export const useDashboard = () => {
       return;
     }
 
+    // Images go in the `images` field; PDFs/Excel/docs go in `docs`.
+    // (Video handling is undecided, so it currently falls through to `docs`.)
+    const isImage = options?.fileType === 'image';
+
     // Fire one send per target sub-community, then refresh those chats.
     Promise.allSettled(
       sendable.map((subId) => {
         const parent = parentCommunityOf(subId)!;
         // Optimistic local append so the feed updates immediately.
-        dispatch(
-          sendMessage({
-            communityId: subId,
-            content,
-            messageType: options?.messageType,
-            group: options?.group,
-            notifyUsers: options?.notifyUsers,
-          })
-        );
+        if (options?.attachment) {
+          dispatch(
+            sendFileMessage({
+              communityId: subId,
+              attachment: options.attachment,
+              caption: hasContent ? content : undefined,
+            })
+          );
+        } else {
+          dispatch(
+            sendMessage({
+              communityId: subId,
+              content,
+              messageType: options?.messageType,
+              group: options?.group,
+              notifyUsers: options?.notifyUsers,
+            })
+          );
+        }
         return sendMessageApi({
           community_id: parent.id,
           sub_community_id: subId,
           type: options!.messageTypeId!,
-          content,
+          content: hasContent ? content : '',
           notification_sent: options?.notifyUsers ?? false,
+          imageFile: isImage ? options?.file : undefined,
+          docFile: !isImage ? options?.file : undefined,
         }).then(() =>
           queryClient.invalidateQueries({ queryKey: ['messages', parent.id, subId] })
         );
@@ -291,12 +336,6 @@ export const useDashboard = () => {
         );
       }
     });
-  };
-
-  const handleSendFile = (attachment: FileAttachment, caption?: string) => {
-    // No file-upload endpoint in the RA API yet; keep this local-only.
-    dispatch(sendFileMessage({ communityId: activeChatId, attachment, caption }));
-    toast.success(`${attachment.name} sent!`);
   };
 
   return {
@@ -319,7 +358,6 @@ export const useDashboard = () => {
     handleSelectSubCommunity,
     handleSelectCommunity,
     handleSendMessage,
-    handleSendFile,
     handleTogglePin,
   };
 };

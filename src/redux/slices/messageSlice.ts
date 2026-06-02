@@ -116,6 +116,15 @@ const messageSlice = createSlice({
         msg.pinned = !msg.pinned;
       }
     },
+    // Set a message's pinned flag explicitly (used to reconcile with the
+    // server's reported pin/unpin status).
+    setPinned: (state, action: PayloadAction<{ communityId: string; messageId: string; pinned: boolean }>) => {
+      const { communityId, messageId, pinned } = action.payload;
+      const msg = state.messages[communityId]?.find((m) => m.id === messageId);
+      if (msg) {
+        msg.pinned = pinned;
+      }
+    },
     updateMessageStatus: (state, action: PayloadAction<{ messageId: string; communityId: string; status: 'sent' | 'delivered' | 'read' }>) => {
       const { messageId, communityId, status } = action.payload;
       const msgs = state.messages[communityId];
@@ -129,5 +138,5 @@ const messageSlice = createSlice({
   },
 });
 
-export const { setMessages, sendMessage, sendFileMessage, togglePin, updateMessageStatus } = messageSlice.actions;
+export const { setMessages, sendMessage, sendFileMessage, togglePin, setPinned, updateMessageStatus } = messageSlice.actions;
 export default messageSlice.reducer;

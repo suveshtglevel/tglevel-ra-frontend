@@ -10,9 +10,9 @@ export function useCreateBundle() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: createBundle,
-    onSuccess: (bundle) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bundles'] });
-      toast.success(`Bundle "${bundle.name}" created`);
+      toast.success('Bundle created');
     },
     onError: (error) => toast.error(getApiErrorMessage(error)),
   });

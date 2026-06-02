@@ -30,7 +30,6 @@ export default function DashboardPage() {
     handleSelectSubCommunity,
     handleSelectCommunity,
     handleSendMessage,
-    handleSendFile,
     handleTogglePin,
   } = useDashboard();
 
@@ -115,7 +114,6 @@ export default function DashboardPage() {
                 creatingBundle={creatingBundle}
                 onCreateBundle={handleCreateBundle}
                 onSend={handleSendMessage}
-                onSendFile={handleSendFile}
               />
             ) : selectedSubCommunityId ? (
               <p className="text-center text-[13px] font-semibold text-slate-400 py-3 bg-slate-100/50 rounded-xl border border-slate-200">
