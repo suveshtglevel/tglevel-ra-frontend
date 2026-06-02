@@ -45,7 +45,7 @@ export async function sendOtp(payload: SendOtpPayload): Promise<SendOtpResponse>
 }
 
 export async function verifyOtp(payload: VerifyOtpPayload): Promise<LoginResponse> {
-  const { data } = await axiosInstance.post<LoginResponse>(`${BASE}/login`, {
+  const { data } = await axiosInstance.post<LoginResponse>(`${BASE}/verify-otp`, {
     phone_number: payload.mobileNumber,
     otp: payload.otp,
   });
@@ -53,4 +53,10 @@ export async function verifyOtp(payload: VerifyOtpPayload): Promise<LoginRespons
     throw new Error(data.message || 'Login failed');
   }
   return data;
+}
+
+// Invalidate the session server-side: clears the HttpOnly ra_refreshToken
+// cookie. Sent with credentials + bearer token (both via the axios instance).
+export async function logout(): Promise<void> {
+  await axiosInstance.post(`${BASE}/logout`);
 }

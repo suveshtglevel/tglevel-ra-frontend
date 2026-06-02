@@ -17,11 +17,13 @@ import type { FileAttachment } from '@/redux/slices/messageSlice';
 import { useCommunities } from '@/hooks/useCommunities';
 import { useMessages } from '@/hooks/useMessages';
 import { useMessageTypes } from '@/hooks/useMessageTypes';
+import { useBundles } from '@/hooks/useBundles';
+import { useCreateBundle } from '@/hooks/useCreateBundle';
 import { toCommunityVM } from '@/lib/api/community';
 import { sendMessage as sendMessageApi } from '@/lib/api/messages';
 import { getApiErrorMessage } from '@/lib/api/errors';
 import { mapBackendMessage } from '@/lib/mappers/message';
-import type { CommunityVM } from '@/types/dashboard';
+import type { CommunityVM, BundleVM } from '@/types/dashboard';
 
 const MAX_PINNED = 3;
 
@@ -60,8 +62,13 @@ export const useDashboard = () => {
     isError: communitiesError,
   } = useCommunities();
 
+  // Only the RA's assigned communities are shown (the backend returns every
+  // community, but the RA should see just the ones it owns/can use).
   const communityVMs = useMemo<CommunityVM[]>(
-    () => (rawCommunities ?? []).map((c) => toCommunityVM(c, assignedCommunities)),
+    () =>
+      (rawCommunities ?? [])
+        .map((c) => toCommunityVM(c, assignedCommunities))
+        .filter((c) => c.sendable),
     [rawCommunities, assignedCommunities]
   );
 
@@ -92,6 +99,33 @@ export const useDashboard = () => {
   // keying when a community has no sub-communities.
   const activeChatId = selectedSubCommunityId ?? selectedCommunityId ?? '';
   const currentMessages = allMessages[activeChatId] ?? [];
+
+  // ----- Bundles (RA-owned sub-community groupings) --------------------------
+  const { data: rawBundles } = useBundles();
+  const createBundleMutation = useCreateBundle();
+  const bundles = useMemo<BundleVM[]>(
+    () =>
+      (rawBundles ?? []).map((b) => ({
+        id: b._id,
+        name: b.name,
+        communityId: b.community_id,
+        subIds: b.subCommunities_Ids,
+      })),
+    [rawBundles]
+  );
+
+  const handleCreateBundle = (payload: {
+    name: string;
+    communityId: string;
+    subIds: string[];
+  }) => {
+    createBundleMutation.mutate({
+      name: payload.name,
+      status: 'active',
+      subCommunities_Ids: payload.subIds,
+      community_id: payload.communityId,
+    });
+  };
 
   // ----- Message types (for label <-> numeric id mapping) --------------------
   const { data: messageTypes } = useMessageTypes();
@@ -271,6 +305,9 @@ export const useDashboard = () => {
     communitiesLoading,
     communitiesError,
     messageTypes: messageTypes ?? [],
+    bundles,
+    handleCreateBundle,
+    creatingBundle: createBundleMutation.isPending,
     selectedCommunityId,
     selectedSubCommunityId,
     selectedCommunity,

@@ -15,6 +15,9 @@ export default function DashboardPage() {
     communitiesLoading,
     communitiesError,
     messageTypes,
+    bundles,
+    handleCreateBundle,
+    creatingBundle,
     selectedCommunityId,
     selectedSubCommunityId,
     selectedCommunity,
@@ -114,6 +117,9 @@ export default function DashboardPage() {
             <MessageComposer
               communities={communities}
               messageTypes={messageTypes}
+              bundles={bundles}
+              creatingBundle={creatingBundle}
+              onCreateBundle={handleCreateBundle}
               onSend={handleSendMessage}
               onSendFile={handleSendFile}
             />

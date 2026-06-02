@@ -50,35 +50,30 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Check } from 'lucide-react';
-import type { CommunityVM } from '@/types/dashboard';
+import type { CommunityVM, BundleVM } from '@/types/dashboard';
 import type { MessageTypeOption } from '@/lib/api/messages';
 import type { SendOptions } from '@/hooks/useDashboard';
-
-// A bundle is a combination of sub-communities that all belong to the SAME
-// parent community (no cross-community mixing). Sending to a bundle broadcasts
-// the message to every sub-community in it.
-interface Bundle {
-  id: string;
-  name: string;
-  communityId: string;
-  subIds: string[];
-}
 
 interface MessageComposerProps {
   communities: CommunityVM[];
   messageTypes: MessageTypeOption[];
+  // Server-owned bundles (a bundle groups sub-communities of one parent
+  // community). Created via onCreateBundle; the list refreshes after creation.
+  bundles: BundleVM[];
+  creatingBundle?: boolean;
+  onCreateBundle?: (payload: { name: string; communityId: string; subIds: string[] }) => void;
   onSend?: (content: string, options?: SendOptions) => void;
   onSendFile?: (attachment: { name: string; size: string; fileType: 'image' | 'video' | 'pdf' | 'doc' | 'excel' | 'file'; url: string }, caption?: string) => void;
 }
 
-const MessageComposer = ({ communities, messageTypes, onSend, onSendFile }: MessageComposerProps) => {
+const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, onCreateBundle, onSend, onSendFile }: MessageComposerProps) => {
   const [isEditorEmpty, setIsEditorEmpty] = React.useState(true);
   const [selectedBundleId, setSelectedBundleId] = React.useState<string | null>(null);
   const [selectedType, setSelectedType] = React.useState<MessageTypeOption | null>(null);
   const [notifyUsers, setNotifyUsers] = React.useState(false);
-  // RA-created bundles + the in-progress draft for the bundle builder.
-  const [bundles, setBundles] = React.useState<Bundle[]>([]);
+  // In-progress draft for the bundle builder (the saved list comes from props).
   const [bundleOpen, setBundleOpen] = React.useState(false);
+  const [draftName, setDraftName] = React.useState('');
   const [draftCommunityId, setDraftCommunityId] = React.useState<string | null>(null);
   const [draftSubIds, setDraftSubIds] = React.useState<string[]>([]);
   const [filePreview, setFilePreview] = React.useState<{
@@ -123,6 +118,7 @@ const MessageComposer = ({ communities, messageTypes, onSend, onSendFile }: Mess
   const resetDraft = () => {
     setDraftCommunityId(null);
     setDraftSubIds([]);
+    setDraftName('');
   };
 
   const saveBundle = () => {
@@ -130,20 +126,13 @@ const MessageComposer = ({ communities, messageTypes, onSend, onSendFile }: Mess
       toast.error('Pick at least one sub-community');
       return;
     }
+    // Fall back to the joined sub-community names if no name was typed.
     const community = communities.find((c) => c.id === draftCommunityId);
     const subs = community?.subCommunities?.filter((s) => draftSubIds.includes(s.id)) ?? [];
-    const name = subs.map((s) => s.name).join(', ');
-    const bundle: Bundle = {
-      id: `bundle-${Date.now()}`,
-      name,
-      communityId: draftCommunityId,
-      subIds: [...draftSubIds],
-    };
-    setBundles((prev) => [...prev, bundle]);
-    setSelectedBundleId(bundle.id);
+    const name = draftName.trim() || subs.map((s) => s.name).join(', ');
+    onCreateBundle?.({ name, communityId: draftCommunityId, subIds: [...draftSubIds] });
     resetDraft();
     setBundleOpen(false);
-    toast.success(`Bundle "${name}" created`);
   };
 
   const imageInputRef = React.useRef<HTMLInputElement>(null);
@@ -512,6 +501,13 @@ const MessageComposer = ({ communities, messageTypes, onSend, onSendFile }: Mess
               <div className="px-3 py-2.5 border-b border-slate-100 bg-slate-50">
                 <p className="text-[12px] font-bold text-slate-700">Create a bundle</p>
                 <p className="text-[10.5px] text-slate-400 font-medium">Pick sub-communities from one community.</p>
+                <input
+                  type="text"
+                  value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                  placeholder="Bundle name (optional)"
+                  className="mt-2 w-full h-8 px-2.5 rounded-lg border border-slate-200 bg-white text-[12px] text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/10"
+                />
               </div>
               <div className="max-h-[280px] overflow-y-auto py-1">
                 {bundleableCommunities.map((c) => {
@@ -567,13 +563,13 @@ const MessageComposer = ({ communities, messageTypes, onSend, onSendFile }: Mess
                 <Button
                   size="sm"
                   onClick={saveBundle}
-                  disabled={draftSubIds.length === 0}
+                  disabled={draftSubIds.length === 0 || creatingBundle}
                   className={cn(
                     "h-8 rounded-lg px-4 font-bold text-[12px] bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer",
-                    draftSubIds.length === 0 && "opacity-50 cursor-not-allowed hover:bg-emerald-500"
+                    (draftSubIds.length === 0 || creatingBundle) && "opacity-50 cursor-not-allowed hover:bg-emerald-500"
                   )}
                 >
-                  Save bundle ({draftSubIds.length})
+                  {creatingBundle ? 'Saving…' : `Save bundle (${draftSubIds.length})`}
                 </Button>
               </div>
             </PopoverContent>

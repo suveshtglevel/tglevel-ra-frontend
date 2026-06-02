@@ -8,14 +8,19 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'react-hot-toast';
 import { clearSession } from '@/lib/api/session';
+import { logout as logoutApi } from '@/lib/api/auth';
+import { useAppDispatch } from '@/redux/hooks';
+import { logout as logoutAction } from '@/redux/slices/authSlice';
 
 type SidebarTab = 'chat' | 'webinar' | 'tradeJournal' | 'settings';
 
 const Sidebar = () => {
   const router = useRouter();
   const pathname = usePathname();
+  const dispatch = useAppDispatch();
   const [showSettings, setShowSettings] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const settingsRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -70,12 +75,20 @@ const Sidebar = () => {
     e.target.value = '';
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      // Clear the refresh cookie server-side; ignore failures so the client
+      // session is dropped regardless.
+      await logoutApi();
+    } catch {
+      // no-op
+    }
     clearSession();
+    dispatch(logoutAction());
     toast.success('Logged out successfully!');
-    setTimeout(() => {
-      window.location.href = '/auth/login';
-    }, 1000);
+    router.replace('/auth/login');
   };
 
   return (
@@ -185,10 +198,11 @@ const Sidebar = () => {
               <button
                 type="button"
                 onClick={handleLogout}
-                className="mt-4 w-full py-2.5 rounded-full bg-red-50 text-red-500 font-medium text-[13px] flex items-center justify-center gap-2 cursor-pointer border-none hover:bg-red-100 transition-colors"
+                disabled={loggingOut}
+                className="mt-4 w-full py-2.5 rounded-full bg-red-50 text-red-500 font-medium text-[13px] flex items-center justify-center gap-2 cursor-pointer border-none hover:bg-red-100 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <LogOut className="w-4 h-4" />
-                Logout
+                {loggingOut ? 'Logging out…' : 'Logout'}
               </button>
             </div>
 

@@ -6,6 +6,7 @@ import { Provider } from 'react-redux';
 import { store } from '@/redux/store/store';
 import { Toaster } from 'react-hot-toast';
 import { useState } from 'react';
+import AuthBootstrap from '@/components/auth/AuthBootstrap';
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({
@@ -20,7 +21,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <Provider store={store}>
       <QueryClientProvider client={queryClient}>
-        {children}
+        <AuthBootstrap>{children}</AuthBootstrap>
         <Toaster position="top-right" />
         <ReactQueryDevtools initialIsOpen={false} />
       </QueryClientProvider>

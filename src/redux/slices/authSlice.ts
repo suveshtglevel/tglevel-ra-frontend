@@ -12,10 +12,15 @@ export interface AuthUser {
   assignedCommunities?: string[];
 }
 
+// 'pending' until the app has tried to restore a session (silent refresh) on
+// load; guards wait for this before deciding to redirect.
+export type AuthStatus = 'pending' | 'authenticated' | 'unauthenticated';
+
 interface AuthState {
   user: AuthUser | null;
   token: string | null;
   isAuthenticated: boolean;
+  status: AuthStatus;
   loading: boolean;
 }
 
@@ -23,6 +28,7 @@ const initialState: AuthState = {
   user: null,
   token: null,
   isAuthenticated: false,
+  status: 'pending',
   loading: false,
 };
 
@@ -37,11 +43,20 @@ const authSlice = createSlice({
       state.user = action.payload.user;
       state.token = action.payload.token;
       state.isAuthenticated = true;
+      state.status = 'authenticated';
+    },
+    // Session bootstrap finished with no valid session (or the user logged out).
+    setUnauthenticated: (state) => {
+      state.user = null;
+      state.token = null;
+      state.isAuthenticated = false;
+      state.status = 'unauthenticated';
     },
     logout: (state) => {
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;
+      state.status = 'unauthenticated';
     },
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.loading = action.payload;
@@ -49,5 +64,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { setCredentials, logout, setLoading } = authSlice.actions;
+export const { setCredentials, setUnauthenticated, logout, setLoading } = authSlice.actions;
 export default authSlice.reducer;

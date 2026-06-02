@@ -1,47 +1,53 @@
 import axiosInstance from '@/lib/axios';
 import type { CommunityVM } from '@/types/dashboard';
 
-// Communities are created and owned by the admin module; the RA only reads them.
-const BASE = '/api/v1/admin/community';
+// RA-readable community list. Requires the bearer access token (attached by the
+// axios interceptor from the verify-otp response).
+const BASE = '/api/v1/ra/community';
+
+export interface CommunityAuthor {
+  _id: string;
+  display_name: string;
+}
 
 // A sub-community as returned nested inside its parent community.
 export interface SubCommunity {
   _id: string;
-  community_id: string;
   name: string;
   status: string;
+  users: number;
+  author?: CommunityAuthor;
 }
 
-// A community as returned by the admin backend (Mongo _id + string ids). The
-// RA gates sending against `_id` (must be in the RA's assigned_communities),
-// and sends to `sub_communities[]._id` as the sub_community_id.
+// A community as returned by the RA backend. The RA gates sending against `_id`
+// (must be in the RA's assigned_communities) and sends to `sub_communities[]._id`
+// as the sub_community_id.
 export interface Community {
   _id: string;
-  id: string;
   name: string;
   description: string;
   icon_url: string;
   status: string;
   total_users: number;
+  community_id: string;
   sub_communities: SubCommunity[];
+  author?: CommunityAuthor;
 }
 
-// get-communities uses its own envelope (`status`/`communities`) rather than the
-// shared ApiResponse shape, so it is typed locally here.
 interface GetCommunitiesResponse {
-  status: boolean;
+  success: boolean;
   message: string;
-  communities: Community[];
+  data: Community[];
 }
 
 export async function getCommunities(): Promise<Community[]> {
   const { data } = await axiosInstance.get<GetCommunitiesResponse>(
     `${BASE}/get-communities`
   );
-  if (!data.status) {
+  if (!data.success) {
     throw new Error(data.message || 'Failed to load communities');
   }
-  return data.communities;
+  return data.data ?? [];
 }
 
 // Compact member-count label (1234 -> "1.2k").
@@ -64,7 +70,7 @@ export function toCommunityVM(c: Community, assigned: string[]): CommunityVM {
     subCommunities: c.sub_communities?.map((s) => ({
       id: s._id,
       name: s.name,
-      members: '',
+      members: formatCount(s.users),
       type: s.status,
     })),
   };

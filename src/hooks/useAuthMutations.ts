@@ -6,9 +6,10 @@ import { toast } from 'react-hot-toast';
 import { sendOtp, verifyOtp } from '@/lib/api/auth';
 import type { SendOtpPayload, VerifyOtpPayload } from '@/lib/api/auth';
 import { getApiErrorMessage } from '@/lib/api/errors';
-import { persistSession } from '@/lib/api/session';
+import { persistSession, persistUser } from '@/lib/api/session';
 import { useAppDispatch } from '@/redux/hooks';
 import { setCredentials } from '@/redux/slices/authSlice';
+import type { AuthUser } from '@/redux/slices/authSlice';
 
 export function useSendOtp() {
   const router = useRouter();
@@ -29,17 +30,14 @@ export function useVerifyOtp() {
     mutationFn: (payload: VerifyOtpPayload) => verifyOtp(payload),
     onSuccess: (result) => {
       persistSession(result.accessToken);
-      dispatch(
-        setCredentials({
-          token: result.accessToken,
-          user: {
-            id: result.data.ra_id,
-            name: result.data.display_name,
-            phone: result.data.phone_number,
-            assignedCommunities: result.data.assigned_communities,
-          },
-        })
-      );
+      const user: AuthUser = {
+        id: result.data.ra_id,
+        name: result.data.display_name,
+        phone: result.data.phone_number,
+        assignedCommunities: result.data.assigned_communities,
+      };
+      persistUser(user);
+      dispatch(setCredentials({ token: result.accessToken, user }));
       toast.success(result.message || 'Logged in successfully');
       router.push('/dashboard');
     },

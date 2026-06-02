@@ -23,3 +23,12 @@ export interface CommunityVM {
   sendable: boolean;
   subCommunities?: SubCommunityVM[];
 }
+
+// A saved bundle as the composer consumes it: a named set of sub-community ids
+// (`subIds`) within one parent community (`communityId` = backend community _id).
+export interface BundleVM {
+  id: string;
+  name: string;
+  communityId: string;
+  subIds: string[];
+}

@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
+import RedirectIfAuth from '@/components/auth/RedirectIfAuth';
 
 export const metadata: Metadata = {
   title: 'Sign In',
@@ -7,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function AuthRouteLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+  return <RedirectIfAuth>{children}</RedirectIfAuth>;
 }

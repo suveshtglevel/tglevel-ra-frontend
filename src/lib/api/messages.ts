@@ -86,15 +86,22 @@ export async function getMessages(
 // ----- Message types --------------------------------------------------------
 
 // A message type as configured on the backend. `id` is the numeric code sent as
-// `type` on send-message (swagger: "Message type ID, e.g. 3 = follow-up").
+// `type` on send-message; the backend returns it as a string `message_type_id`
+// (e.g. "3" = follow-up), so it is coerced to a number here.
 export interface MessageTypeOption {
   id: number;
   name: string;
 }
 
+interface BackendMessageType {
+  _id: string;
+  message_type_id: string;
+  name: string;
+}
+
 interface GetMessageTypesResponse {
   success: boolean;
-  data: Array<{ id?: number; type?: number; name: string }>;
+  data: BackendMessageType[];
 }
 
 export async function getMessageTypes(): Promise<MessageTypeOption[]> {
@@ -105,7 +112,7 @@ export async function getMessageTypes(): Promise<MessageTypeOption[]> {
     throw new Error('Failed to load message types');
   }
   return (data.data ?? []).map((t) => ({
-    id: (t.id ?? t.type) as number,
+    id: Number(t.message_type_id),
     name: t.name,
   }));
 }
