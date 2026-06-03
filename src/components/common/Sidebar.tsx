@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'react-hot-toast';
 import { clearSession } from '@/lib/api/session';
 import { logout as logoutApi } from '@/lib/api/auth';
-import { useAppDispatch } from '@/redux/hooks';
+import { useAppDispatch, useAppSelector } from '@/redux/hooks';
 import { logout as logoutAction } from '@/redux/slices/authSlice';
 
 type SidebarTab = 'chat' | 'webinar' | 'tradeJournal' | 'settings';
@@ -18,6 +18,15 @@ const Sidebar = () => {
   const router = useRouter();
   const pathname = usePathname();
   const dispatch = useAppDispatch();
+  const user = useAppSelector((state) => state.auth.user);
+  // Initials for the avatar fallback, from the RA's display name.
+  const initials =
+    user?.name
+      ?.split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase())
+      .join('') || 'RA';
   const [showSettings, setShowSettings] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -78,16 +87,18 @@ const Sidebar = () => {
   const handleLogout = async () => {
     if (loggingOut) return;
     setLoggingOut(true);
+    let message = 'Logged out successfully!';
     try {
       // Clear the refresh cookie server-side; ignore failures so the client
       // session is dropped regardless.
-      await logoutApi();
+      const result = await logoutApi();
+      if (result?.message) message = result.message;
     } catch {
       // no-op
     }
     clearSession();
     dispatch(logoutAction());
-    toast.success('Logged out successfully!');
+    toast.success(message);
     router.replace('/auth/login');
   };
 
@@ -161,25 +172,31 @@ const Sidebar = () => {
                   />
                 ) : (
                   <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-400 text-2xl font-bold">
-                    AM
+                    {initials}
                   </div>
                 )}
               </div>
 
-              {/* Name */}
-              <h3 className="text-[16px] font-bold text-slate-800">Alex Mercer</h3>
+              {/* Display name */}
+              <h3 className="text-[16px] font-bold text-slate-800 text-center break-words">
+                {user?.name || 'RA'}
+              </h3>
 
-              {/* Email */}
-              <div className="flex items-center gap-2 mt-2">
-                <Mail className="w-4 h-4 text-slate-400" />
-                <span className="text-[13px] text-slate-500">alex.mercer@tg.com</span>
-              </div>
+              {/* Email (only when available) */}
+              {user?.email && (
+                <div className="flex items-center gap-2 mt-2">
+                  <Mail className="w-4 h-4 text-slate-400" />
+                  <span className="text-[13px] text-slate-500">{user.email}</span>
+                </div>
+              )}
 
-              {/* Phone */}
-              <div className="flex items-center gap-2 mt-1.5">
-                <Phone className="w-4 h-4 text-slate-400" />
-                <span className="text-[13px] text-slate-500">+91 98765 43210</span>
-              </div>
+              {/* Phone number */}
+              {user?.phone && (
+                <div className="flex items-center gap-2 mt-1.5">
+                  <Phone className="w-4 h-4 text-slate-400" />
+                  <span className="text-[13px] text-slate-500">{user.phone}</span>
+                </div>
+              )}
 
               {/* Divider */}
               <div className="w-full h-[1px] bg-slate-100 my-5" />

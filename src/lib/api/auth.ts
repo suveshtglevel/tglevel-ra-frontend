@@ -55,8 +55,14 @@ export async function verifyOtp(payload: VerifyOtpPayload): Promise<LoginRespons
   return data;
 }
 
+export interface LogoutResponse {
+  success: boolean;
+  message: string;
+}
+
 // Invalidate the session server-side: clears the HttpOnly ra_refreshToken
 // cookie. Sent with credentials + bearer token (both via the axios instance).
-export async function logout(): Promise<void> {
-  await axiosInstance.post(`${BASE}/logout`);
+export async function logout(): Promise<LogoutResponse> {
+  const { data } = await axiosInstance.post<LogoutResponse>(`${BASE}/logout`);
+  return data;
 }
