@@ -29,7 +29,7 @@ const MessageMenu = ({ pinned, onTogglePin }: { pinned: boolean; onTogglePin: ()
         <button
           type="button"
           aria-label="Message options"
-          className="absolute top-2 right-2 z-10 p-1 rounded-full bg-white/90 text-slate-500 border border-slate-200 shadow-sm hover:bg-white hover:text-slate-700 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity cursor-pointer"
+          className="absolute top-2 right-2 z-10 p-1 text-slate-500 hover:text-slate-700 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity cursor-pointer"
         >
           <MoreVertical className="w-4 h-4" />
         </button>
