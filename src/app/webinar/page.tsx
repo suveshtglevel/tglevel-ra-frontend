@@ -30,7 +30,7 @@ export default function WebinarPage() {
             <button type="button" onClick={w.save} className={headerBtn}>Save Draft</button>
             <button type="button" onClick={w.save} className={headerBtn}>Schedule</button>
             <button type="button" className={headerBtn}>Previous Posted banner</button>
-            <button type="button" className={headerBtn}>Preview Banner</button>
+            {/* <button type="button" className={headerBtn}>Preview Banner</button> */}
           </div>
         </div>
       </div>
@@ -43,7 +43,9 @@ export default function WebinarPage() {
             <BannerDetailsForm w={w} />
             <BannerThemeColors w={w} />
             <PublishingOptions w={w} />
-            {hasImage ? <PreviousPostsList /> : <PreviousBannersTable />}
+            {hasImage ? 
+            <PreviousPostsList /> : 
+            <PreviousBannersTable />}
           </div>
 
           {/* Right: live preview (only after an image is uploaded) */}

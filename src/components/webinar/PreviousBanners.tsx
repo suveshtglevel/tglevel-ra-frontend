@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, Filter, Eye, Pencil, Trash2, ChevronDown, MoreVertical, ImageIcon } from 'lucide-react';
+import { Search, Eye, Pencil, Trash2, ChevronDown, MoreVertical, ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   PREVIOUS_BANNERS,
@@ -54,13 +54,13 @@ export const PreviousBannersTable = () => {
               className="h-10 w-44 rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 transition"
             />
           </div>
-          <button
+          {/* <button
             type="button"
             className="h-10 px-4 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 flex items-center gap-2 hover:bg-slate-50 transition-colors cursor-pointer"
           >
             <Filter className="w-4 h-4" />
             Filter
-          </button>
+          </button> */}
         </div>
       </div>
 
