@@ -53,6 +53,11 @@ const CommunitySidebar = ({
     if (debouncedSearch && !comm.name.toLowerCase().includes(debouncedSearch.toLowerCase())) {
       return false;
     }
+    // The Premium filter hides the Free/Paid Alumni communities (the spelling
+    // varies — "Alumni"/"Alumini" — so match the common "alum" stem).
+    if (activeFilter === 'Premium' && /alum/i.test(comm.name)) {
+      return false;
+    }
     return true;
   });
 

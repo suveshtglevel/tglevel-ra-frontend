@@ -6,6 +6,15 @@ import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { CommunityVM, SubCommunityVM } from '@/types/dashboard';
 
+// Infer a sub-community's plan from its name (e.g. NF1 = Free, NP1 = Paid): the
+// letter immediately before the trailing number is F (free) or P (paid).
+const subPlanFromName = (name: string): 'Free' | 'Paid' | null => {
+  const letter = name.match(/([a-z])\s*\d+\s*$/i)?.[1]?.toLowerCase();
+  if (letter === 'f') return 'Free';
+  if (letter === 'p') return 'Paid';
+  return null;
+};
+
 interface CommunityCardProps {
   community: CommunityVM;
   active: boolean;
@@ -101,27 +110,32 @@ const SubCommunityRow = ({ sub, checked, isSelected, sendable, onToggle, onSelec
 
 const CommunityCard = ({ community, active, selectedSubCommunityId, targetSubIds, subTypeFilter, initialExpanded = false, onSelectCommunity, onSelectSubCommunity, onToggleSubTarget, onToggleCommunityTargets }: CommunityCardProps) => {
   const [expanded, setExpanded] = React.useState(initialExpanded);
-  // Apply the Free/Paid filter to the sub-communities only; the community card
-  // is always rendered by the sidebar.
+  const allSubCommunities = community.subCommunities ?? [];
+  // The card keeps the same design as the unfiltered list (arrow, master
+  // checkbox, structure) based on the FULL sub-community list; the Free/Paid
+  // filter only narrows which sub-rows are shown when expanded. Matching is
+  // case-insensitive so it works with whatever casing the API returns.
+  const hasSubCommunities = allSubCommunities.length > 0;
   const subCommunities = subTypeFilter
-    ? (community.subCommunities ?? []).filter((s) => s.type === subTypeFilter)
-    : community.subCommunities ?? [];
+    ? allSubCommunities.filter((s) => subPlanFromName(s.name) === subTypeFilter)
+    : allSubCommunities;
   const toggleExpanded = () => setExpanded((prev) => !prev);
 
   // Clicking the community header: if it has sub-communities, toggle the list
-  // AND open the first one's chat. If it has none (e.g. Free/Paid Alumini),
-  // open the community's own chat directly.
+  // AND open the first visible one's chat. If it has none (e.g. Free/Paid
+  // Alumini), open the community's own chat directly.
   const handleHeaderClick = () => {
-    if (subCommunities.length > 0) {
+    if (hasSubCommunities) {
       toggleExpanded();
-      onSelectSubCommunity(subCommunities[0].id);
+      onSelectSubCommunity((subCommunities[0] ?? allSubCommunities[0]).id);
     } else {
       onSelectCommunity(community.id);
     }
   };
 
   // Checked state is driven by the parent (one community selectable at a time).
-  const selectedCount = targetSubIds.length;
+  // Counts/“all selected” track the currently-visible (filtered) sub-rows.
+  const selectedCount = subCommunities.filter((s) => targetSubIds.includes(s.id)).length;
   const allSelected = subCommunities.length > 0 && selectedCount === subCommunities.length;
   // Communities without sub-communities are targeted by their own id.
   const selfSelected = targetSubIds.includes(community.id);
@@ -166,7 +180,7 @@ const CommunityCard = ({ community, active, selectedSubCommunityId, targetSubIds
         {/* Right Content */}
         <div className="flex flex-col items-end h-10 pr-10">
           <span className="text-[10px] font-medium text-[#64748B]">{community.time}</span>
-          {subCommunities.length > 0 && selectedCount > 0 && (
+          {hasSubCommunities && selectedCount > 0 && (
             <div className="mt-1 w-[18px] h-[18px] rounded-full bg-emerald-500 flex items-center justify-center">
               <span className="text-[9px] font-bold text-white">{selectedCount}</span>
             </div>
@@ -175,7 +189,7 @@ const CommunityCard = ({ community, active, selectedSubCommunityId, targetSubIds
 
         {/* Top Right Controls */}
         <div className="absolute top-3 right-3 flex flex-col items-center gap-[15px]">
-          {subCommunities.length > 0 ? (
+          {hasSubCommunities ? (
             <>
               {/* Master checkbox: selects/clears all sub-communities. The RA can
                   only target communities it is assigned to (others are locked). */}
