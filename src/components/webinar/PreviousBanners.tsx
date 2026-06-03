@@ -1,14 +1,24 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, Eye, Pencil, Trash2, ChevronDown, MoreVertical, ImageIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import Image from 'next/image';
 import {
-  PREVIOUS_BANNERS,
-  PREVIOUS_POSTS,
-  TOTAL_BANNERS,
-  BannerStatus,
-} from '@/constants/webinarData';
+  Search,
+  Eye,
+  Pencil,
+  Trash2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  MoreVertical,
+  ImageIcon,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { PREVIOUS_POSTS, BANNER_CATEGORIES, BannerStatus } from '@/constants/webinarData';
+import { useDebounce } from '@/hooks/useDebounce';
+import { useBanners } from '@/hooks/useBanners';
+import { useDeleteBanner } from '@/hooks/useBannerMutations';
+import type { Banner, BannerStatusApi } from '@/lib/api/banners';
 
 const statusBadge: Record<BannerStatus, string> = {
   Published: 'bg-emerald-50 text-emerald-600 border-emerald-100',
@@ -34,11 +44,48 @@ const BannerThumb = ({ size = 'sm' }: { size?: 'sm' | 'xs' }) => (
   </div>
 );
 
-export const PreviousBannersTable = () => {
+const STATUS_FILTERS = ['All', 'Published', 'Scheduled', 'Draft'] as const;
+type StatusFilter = (typeof STATUS_FILTERS)[number];
+
+// Backend lowercase status -> the capitalized label used by the badge maps.
+const API_TO_DISPLAY_STATUS: Record<BannerStatusApi, BannerStatus> = {
+  published: 'Published',
+  scheduled: 'Scheduled',
+  draft: 'Draft',
+};
+
+const PAGE_SIZE = 10;
+
+// A banner's date can come back as ISO ("2026-06-20T00:00:00.000Z") or plain
+// "YYYY-MM-DD"; render either as "08 Jun 2026". Falls back to the raw value.
+const formatBannerDate = (value?: string) => {
+  if (!value) return '—';
+  const d = new Date(value.length === 10 ? `${value}T00:00:00` : value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+export const PreviousBannersTable = ({ onEdit }: { onEdit?: (banner: Banner) => void }) => {
   const [query, setQuery] = useState('');
-  const rows = PREVIOUS_BANNERS.filter((b) =>
-    b.name.toLowerCase().includes(query.trim().toLowerCase())
-  );
+  const [status, setStatus] = useState<StatusFilter>('All');
+  const [category, setCategory] = useState('All');
+  const [page, setPage] = useState(1);
+  const debouncedQuery = useDebounce(query, 300);
+  const deleteBanner = useDeleteBanner();
+
+  const { data, isLoading, isError } = useBanners({
+    search: debouncedQuery.trim() || undefined,
+    status: status === 'All' ? undefined : (status.toLowerCase() as BannerStatusApi),
+    category: category === 'All' ? undefined : category,
+    page,
+    limit: PAGE_SIZE,
+  });
+
+  const banners = data?.banners ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
+  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const rangeEnd = (page - 1) * PAGE_SIZE + banners.length;
 
   return (
     <section className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6">
@@ -46,21 +93,54 @@ export const PreviousBannersTable = () => {
         <h2 className="text-[18px] font-bold text-slate-800">Previously Posted Banners</h2>
         <div className="flex items-center gap-3">
           <div className="relative">
+            <select
+              value={status}
+              onChange={(e) => {
+                setStatus(e.target.value as StatusFilter);
+                setPage(1);
+              }}
+              className="h-10 appearance-none rounded-lg border border-slate-200 bg-white pl-3 pr-8 text-sm text-slate-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 transition"
+              aria-label="Filter by status"
+            >
+              {STATUS_FILTERS.map((s) => (
+                <option key={s} value={s}>
+                  {s === 'All' ? 'All Status' : s}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+          </div>
+          <div className="relative">
+            <select
+              value={category}
+              onChange={(e) => {
+                setCategory(e.target.value);
+                setPage(1);
+              }}
+              className="h-10 appearance-none rounded-lg border border-slate-200 bg-white pl-3 pr-8 text-sm text-slate-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 transition"
+              aria-label="Filter by category"
+            >
+              <option value="All">All Categories</option>
+              {BANNER_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+          </div>
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setPage(1);
+              }}
               placeholder="Search..."
               className="h-10 w-44 rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 transition"
             />
           </div>
-          {/* <button
-            type="button"
-            className="h-10 px-4 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 flex items-center gap-2 hover:bg-slate-50 transition-colors cursor-pointer"
-          >
-            <Filter className="w-4 h-4" />
-            Filter
-          </button> */}
         </div>
       </div>
 
@@ -70,57 +150,125 @@ export const PreviousBannersTable = () => {
             <tr className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 border-b border-slate-100">
               <th className="text-left font-semibold px-3 py-3">Preview</th>
               <th className="text-left font-semibold px-3 py-3">Name</th>
-              <th className="text-left font-semibold px-3 py-3">Group Sent</th>
+              <th className="text-left font-semibold px-3 py-3">Category</th>
               <th className="text-left font-semibold px-3 py-3">Date</th>
-              <th className="text-left font-semibold px-3 py-3">
-                <span className="inline-flex items-center gap-1">Status <ChevronDown className="w-3 h-3" /></span>
-              </th>
+              <th className="text-left font-semibold px-3 py-3">Status</th>
               <th className="text-right font-semibold px-3 py-3">Actions</th>
             </tr>
           </thead>
           <tbody className="text-sm">
-            {rows.length === 0 ? (
+            {isLoading ? (
+              <tr>
+                <td colSpan={6} className="px-3 py-10 text-center text-slate-400">
+                  Loading banners…
+                </td>
+              </tr>
+            ) : isError ? (
+              <tr>
+                <td colSpan={6} className="px-3 py-10 text-center text-red-400">
+                  Couldn&apos;t load banners.
+                </td>
+              </tr>
+            ) : banners.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-3 py-10 text-center text-slate-400">
                   No banners found.
                 </td>
               </tr>
             ) : (
-              rows.map((b) => (
-                <tr key={b.id} className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
-                  <td className="px-3 py-3">
-                    <BannerThumb />
-                  </td>
-                  <td className="px-3 py-3 font-semibold text-slate-800 whitespace-nowrap">{b.name}</td>
-                  <td className="px-3 py-3 text-slate-500 whitespace-nowrap">{b.groupSent}</td>
-                  <td className="px-3 py-3 text-slate-500 whitespace-nowrap">{b.date}</td>
-                  <td className="px-3 py-3">
-                    <span
-                      className={cn(
-                        'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
-                        statusBadge[b.status]
+              banners.map((b) => {
+                const displayStatus = API_TO_DISPLAY_STATUS[b.status] ?? 'Draft';
+                return (
+                  <tr key={b.banner_id} className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
+                    <td className="px-3 py-3">
+                      {b.image_url ? (
+                        <div className="relative w-12 h-9 rounded-lg overflow-hidden bg-slate-100 shrink-0">
+                          <Image src={b.image_url} alt={b.title} fill className="object-cover" unoptimized />
+                        </div>
+                      ) : (
+                        <BannerThumb />
                       )}
-                    >
-                      {b.status}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="flex items-center justify-end gap-3 text-slate-400">
-                      <button type="button" className="hover:text-slate-600 cursor-pointer" aria-label="View"><Eye className="w-4 h-4" /></button>
-                      <button type="button" className="hover:text-emerald-600 cursor-pointer" aria-label="Edit"><Pencil className="w-4 h-4" /></button>
-                      <button type="button" className="hover:text-red-500 cursor-pointer" aria-label="Delete"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                    </td>
+                    <td className="px-3 py-3 font-semibold text-slate-800 max-w-[220px] truncate">{b.title}</td>
+                    <td className="px-3 py-3 text-slate-500 whitespace-nowrap">{b.category || '—'}</td>
+                    <td className="px-3 py-3 text-slate-500 whitespace-nowrap">
+                      {formatBannerDate(b.status === 'scheduled' ? b.scheduled_date : b.webinar_date)}
+                    </td>
+                    <td className="px-3 py-3">
+                      <span
+                        className={cn(
+                          'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
+                          statusBadge[displayStatus]
+                        )}
+                      >
+                        {displayStatus}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center justify-end gap-3 text-slate-400">
+                        <button type="button" className="hover:text-slate-600 cursor-pointer" aria-label="View"><Eye className="w-4 h-4" /></button>
+                        <button
+                          type="button"
+                          onClick={() => onEdit?.(b)}
+                          disabled={b.status === 'published'}
+                          title={b.status === 'published' ? "Published banners can't be edited" : 'Edit'}
+                          className="hover:text-emerald-600 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-slate-400"
+                          aria-label="Edit"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (window.confirm(`Delete "${b.title}"? This can't be undone.`)) {
+                              deleteBanner.mutate(b.banner_id);
+                            }
+                          }}
+                          disabled={deleteBanner.isPending}
+                          className="hover:text-red-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                          aria-label="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
 
-      <p className="text-center text-sm text-slate-400 mt-5">
-        Showing 1-{rows.length} of {TOTAL_BANNERS} banners
-      </p>
+      {/* Footer: range summary + pagination */}
+      <div className="flex items-center justify-between gap-4 flex-wrap mt-5">
+        <p className="text-sm text-slate-400">
+          {total === 0 ? 'No banners' : `Showing ${rangeStart}-${rangeEnd} of ${total} banners`}
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1}
+            className="h-9 w-9 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            aria-label="Previous page"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span className="text-sm text-slate-600 px-1">
+            {page} / {totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+            className="h-9 w-9 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            aria-label="Next page"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
     </section>
   );
 };

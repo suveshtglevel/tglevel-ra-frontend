@@ -1,9 +1,10 @@
 'use client';
 
 import React from 'react';
-import { Calendar, Clock, Link2, ChevronDown } from 'lucide-react';
+import { Link2, ChevronDown } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { BANNER_CATEGORIES } from '@/constants/webinarData';
+import TimeField from '@/components/webinar/TimeField';
 import type { UseWebinarBanner } from '@/hooks/useWebinarBanner';
 
 const labelClass = 'block text-[13px] font-medium text-slate-600 mb-1.5';
@@ -64,27 +65,20 @@ const BannerDetailsForm = ({ w }: { w: UseWebinarBanner }) => {
       <div className="grid sm:grid-cols-2 gap-5">
         <div>
           <label className={labelClass}>Webinar Date</label>
-          <div className="relative">
-            <input
-              className={`${inputClass} pr-9`}
-              value={w.webinarDate}
-              onChange={(e) => w.set('webinarDate', e.target.value)}
-              placeholder="08 June"
-            />
-            <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-          </div>
+          <input
+            type="date"
+            className={inputClass}
+            value={w.webinarDate}
+            onChange={(e) => w.set('webinarDate', e.target.value)}
+          />
         </div>
         <div>
           <label className={labelClass}>Webinar Time</label>
-          <div className="relative">
-            <input
-              className={`${inputClass} pr-9`}
-              value={w.webinarTime}
-              onChange={(e) => w.set('webinarTime', e.target.value)}
-              placeholder="10:00 AM"
-            />
-            <Clock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-          </div>
+          <TimeField
+            aria-label="Webinar time"
+            value={w.webinarTime}
+            onChange={(v) => w.set('webinarTime', v)}
+          />
         </div>
       </div>
 

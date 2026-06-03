@@ -10,10 +10,14 @@ import ViewedByPanel from './ViewedByPanel';
 import FileViewer from './FileViewer';
 import { cn } from '@/lib/utils';
 import { isResearchAnalysis } from '@/lib/researchAnalysis';
+import { useMessageStats } from '@/hooks/useMessageStats';
 import type { ChatMessage, FileAttachment } from '@/redux/slices/messageSlice';
 
+// Backend-issued message ids look like "msg_<uuid>"; optimistic locally-sent
+// ones use "msg-<community>-<ts>". Only the former have seen-by stats.
+const isBackendMessageId = (id: string) => /^msg_/.test(id);
+
 interface ChatFeedProps {
-  views?: string;
   communityTag?: string; // shown on trade cards instead of the message type
   messages?: ChatMessage[];
   onTogglePin?: (messageId: string) => void;
@@ -257,16 +261,16 @@ const FileAttachmentView = ({ attachment, isSent, onOpen }: { attachment: NonNul
 
 // Numeric backend message type -> display label.
 const MESSAGE_TYPE_LABELS: Record<number, string> = {
-  1: 'Promotion',
-  2: 'Followup',
-  3: 'Feedback',
-  4: 'Flaunt',
-  5: 'Trade',
+  1: 'Trade',
+  2: 'Promotion',
+  3: 'Followup',
+  4: 'Feedback',
+  5: 'Flaunt',
 };
 
 // Every message renders as a left-aligned post (like the seed messages),
 // regardless of who sent it or its type.
-const MessageBubble = ({ message, communityTag, onOpenFile }: { message: ChatMessage; communityTag?: string; onOpenFile: (attachment: FileAttachment) => void }) => {
+const MessageBubble = ({ message, status, communityTag, onOpenFile, onTickClick }: { message: ChatMessage; status: ChatMessage['status']; communityTag?: string; onOpenFile: (attachment: FileAttachment) => void; onTickClick: () => void }) => {
   const typeLabel = message.messageTypeId != null ? MESSAGE_TYPE_LABELS[message.messageTypeId] : undefined;
   const shortId = message.id ? message.id.slice(-3) : '';
   return (
@@ -307,23 +311,93 @@ const MessageBubble = ({ message, communityTag, onOpenFile }: { message: ChatMes
             <span className="text-[9px] font-medium mr-1 bg-slate-100 px-1.5 py-0.5 rounded">{communityTag}</span>
           )}
           <span className="text-[10px] font-medium">{message.timestamp}</span>
-          {message.status === 'read' ? (
-            <CheckCheck className="w-3 h-3 text-sky-500" />
-          ) : message.status === 'delivered' ? (
-            <CheckCheck className="w-3 h-3 text-slate-400" />
-          ) : (
-            <Check className="w-3 h-3 text-slate-400" />
-          )}
+          <button
+            type="button"
+            onClick={onTickClick}
+            aria-label="View who saw this message"
+            className="bg-transparent border-none p-0 cursor-pointer"
+          >
+            {status === 'read' ? (
+              <CheckCheck className="w-3 h-3 text-sky-500" />
+            ) : status === 'delivered' ? (
+              <CheckCheck className="w-3 h-3 text-slate-400" />
+            ) : (
+              <Check className="w-3 h-3 text-slate-400" />
+            )}
+          </button>
         </div>
       </div>
     </div>
   );
 };
 
-const ChatFeed = ({ views = '42', communityTag, messages = [], onTogglePin }: ChatFeedProps) => {
-  const [showViewedBy, setShowViewedBy] = React.useState(false);
+// One message row: fetches the seen-by stats (for backend messages) to drive
+// the delivery tick — single tick when no one has seen it, double tick once any
+// user has — and opens the "Viewed by" panel when the tick is clicked.
+const MessageRow = ({
+  msg,
+  communityTag,
+  onTogglePin,
+  onOpenFile,
+  onShowStats,
+}: {
+  msg: ChatMessage;
+  communityTag?: string;
+  onTogglePin?: (messageId: string) => void;
+  onOpenFile: (attachment: FileAttachment) => void;
+  onShowStats: (messageId: string) => void;
+}) => {
+  const hasStats = isBackendMessageId(msg.id);
+  const { data: stats } = useMessageStats(msg.id, hasStats);
+  // Seen by at least one user -> read (double tick); otherwise fall back to the
+  // message's own status (a freshly sent message shows a single tick).
+  const status: ChatMessage['status'] = stats
+    ? stats.total_seen > 0
+      ? 'read'
+      : 'sent'
+    : msg.status;
+
+  const isTrade = msg.messageType === 'Trade' || (!msg.attachment && isResearchAnalysis(msg.content));
+
+  return (
+    // Full-width row carries the scroll/highlight target so the pinned
+    // flash spans the whole width; the bubble stays inset & content-width.
+    <div id={`feed-msg-${msg.id}`} className="w-full scroll-mt-4 px-3 sm:px-6 py-1">
+      <div className="group relative w-fit max-w-full">
+        {isTrade ? (
+          <TradeCard
+            content={msg.content}
+            timestamp={msg.timestamp}
+            status={status}
+            tag={communityTag ?? msg.tradeTag}
+            refId={msg.tradeRefId}
+            pinned={msg.pinned}
+            onTickClick={() => onShowStats(msg.id)}
+          />
+        ) : (
+          <MessageBubble
+            message={msg}
+            status={status}
+            communityTag={communityTag}
+            onOpenFile={onOpenFile}
+            onTickClick={() => onShowStats(msg.id)}
+          />
+        )}
+        <MessageMenu pinned={!!msg.pinned} onTogglePin={() => onTogglePin?.(msg.id)} />
+      </div>
+    </div>
+  );
+};
+
+const ChatFeed = ({ communityTag, messages = [], onTogglePin }: ChatFeedProps) => {
+  // Message id whose "Viewed by" panel is open (null = closed).
+  const [statsMessageId, setStatsMessageId] = React.useState<string | null>(null);
   const [viewingFile, setViewingFile] = React.useState<FileAttachment | null>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  // Toggle the panel: clicking the same message's tick again closes it.
+  const handleShowStats = (messageId: string) =>
+    setStatsMessageId((current) => (current === messageId ? null : messageId));
 
   // Auto-scroll to bottom when new messages arrive
   React.useEffect(() => {
@@ -350,37 +424,25 @@ const ChatFeed = ({ views = '42', communityTag, messages = [], onTogglePin }: Ch
               a three-dots menu for pinning. */}
           <div className="flex flex-col gap-3 w-full">
             {messages.map((msg) => (
-              // Full-width row carries the scroll/highlight target so the pinned
-              // flash spans the whole width; the bubble stays inset & content-width.
-              <div key={msg.id} id={`feed-msg-${msg.id}`} className="w-full scroll-mt-4 px-3 sm:px-6 py-1">
-                <div className="group relative w-fit max-w-full">
-                  {msg.messageType === 'Trade' || (!msg.attachment && isResearchAnalysis(msg.content)) ? (
-                    <TradeCard
-                      content={msg.content}
-                      timestamp={msg.timestamp}
-                      status={msg.status}
-                      tag={communityTag ?? msg.tradeTag}
-                      refId={msg.tradeRefId}
-                      pinned={msg.pinned}
-                      onTickClick={() => setShowViewedBy((prev) => !prev)}
-                    />
-                  ) : (
-                    <MessageBubble message={msg} communityTag={communityTag} onOpenFile={(att) => setViewingFile(att)} />
-                  )}
-                  <MessageMenu pinned={!!msg.pinned} onTogglePin={() => onTogglePin?.(msg.id)} />
-                </div>
-              </div>
+              <MessageRow
+                key={msg.id}
+                msg={msg}
+                communityTag={communityTag}
+                onTogglePin={onTogglePin}
+                onOpenFile={(att) => setViewingFile(att)}
+                onShowStats={handleShowStats}
+              />
             ))}
           </div>
         </div>
       </ScrollArea>
 
-      {/* Fixed ViewedBy panel */}
-      {showViewedBy && (
+      {/* Fixed ViewedBy panel — shows the seen-by users for the clicked message. */}
+      {statsMessageId && (
         <div className="absolute top-4 right-4 z-50">
           <ViewedByPanel
-            totalViews={views}
-            onClose={() => setShowViewedBy(false)}
+            messageId={statsMessageId}
+            onClose={() => setStatsMessageId(null)}
           />
         </div>
       )}

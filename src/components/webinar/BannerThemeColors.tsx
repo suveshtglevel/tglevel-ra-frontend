@@ -3,7 +3,7 @@
 import React from 'react';
 import { Pipette } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { SUGGESTED_PALETTE } from '@/constants/webinarData';
+import { useSuggestedPalette } from '@/hooks/useSuggestedPalette';
 import type { UseWebinarBanner } from '@/hooks/useWebinarBanner';
 
 const isHex6 = (v: string) => /^#[0-9a-fA-F]{6}$/.test(v);
@@ -57,6 +57,24 @@ const ColorField = ({ label, value, onChange }: ColorFieldProps) => {
 };
 
 const BannerThemeColors = ({ w }: { w: UseWebinarBanner }) => {
+  const { data: palette, isLoading } = useSuggestedPalette();
+
+  // The three suggested colors mapped to the form fields they apply to.
+  const suggestions = palette
+    ? ([
+        { label: 'CTA', color: palette.cta_button_color, key: 'ctaColor' },
+        { label: 'Text', color: palette.text_color, key: 'textColor' },
+        { label: 'Background', color: palette.background_color, key: 'bgColor' },
+      ] as const)
+    : [];
+
+  const applyAll = () => {
+    if (!palette) return;
+    w.set('ctaColor', palette.cta_button_color.toUpperCase());
+    w.set('textColor', palette.text_color.toUpperCase());
+    w.set('bgColor', palette.background_color.toUpperCase());
+  };
+
   return (
     <section className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6">
       <h2 className="text-[16px] font-bold text-slate-800">Banner Theme Colors</h2>
@@ -72,27 +90,50 @@ const BannerThemeColors = ({ w }: { w: UseWebinarBanner }) => {
         <ColorField label="Background Color" value={w.bgColor} onChange={(v) => w.set('bgColor', v)} />
       </div>
 
-      {/* Suggested palette */}
+      {/* Suggested palette — the most-used colors across all banners. */}
       <div className="mt-6">
-        <p className="text-[13px] text-slate-500 mb-2.5">Suggested Palette (Extracted from image)</p>
-        <div className="flex items-center gap-2.5">
-          {SUGGESTED_PALETTE.map((c) => {
-            const selected = c.toUpperCase() === w.ctaColor.toUpperCase();
-            return (
-              <button
-                key={c}
-                type="button"
-                onClick={() => w.set('ctaColor', c.toUpperCase())}
-                style={{ backgroundColor: c }}
-                className={cn(
-                  'w-7 h-7 rounded-full transition-transform cursor-pointer hover:scale-110',
-                  selected ? 'ring-2 ring-offset-2 ring-emerald-500' : 'ring-1 ring-slate-200'
-                )}
-                aria-label={`Use ${c}`}
-              />
-            );
-          })}
+        <div className="flex items-center justify-between mb-2.5">
+          <p className="text-[13px] text-slate-500">Suggested Palette (Most used across banners)</p>
+          {palette && (
+            <button
+              type="button"
+              onClick={applyAll}
+              className="text-[12px] font-semibold text-emerald-600 hover:text-emerald-700 cursor-pointer"
+            >
+              Apply all
+            </button>
+          )}
         </div>
+
+        {isLoading ? (
+          <p className="text-[12px] text-slate-400">Loading palette…</p>
+        ) : suggestions.length === 0 ? (
+          <p className="text-[12px] text-slate-400">No suggested palette available.</p>
+        ) : (
+          <div className="flex items-center gap-5">
+            {suggestions.map(({ label, color, key }) => {
+              const selected = color.toUpperCase() === w[key].toUpperCase();
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => w.set(key, color.toUpperCase())}
+                  className="flex items-center gap-2 cursor-pointer group"
+                  aria-label={`Use ${label} color ${color}`}
+                >
+                  <span
+                    style={{ backgroundColor: color }}
+                    className={cn(
+                      'w-7 h-7 rounded-full transition-transform group-hover:scale-110',
+                      selected ? 'ring-2 ring-offset-2 ring-emerald-500' : 'ring-1 ring-slate-200'
+                    )}
+                  />
+                  <span className="text-[11px] font-medium text-slate-500">{label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     </section>
   );

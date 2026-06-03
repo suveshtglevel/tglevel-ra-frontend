@@ -1,32 +1,18 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { X, Search, Eye, Download } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useMessageStats } from '@/hooks/useMessageStats';
+import type { MessageViewer } from '@/lib/api/messageStats';
 
 interface ViewedByPanelProps {
-  totalViews: string;
+  messageId: string;
   onClose: () => void;
 }
-
-interface ViewerItem {
-  id: number;
-  name: string;
-  avatar: string;
-  viewedAt: string;
-}
-
-const MOCK_VIEWERS: ViewerItem[] = [
-  { id: 1, name: 'Sarah Jenkins', avatar: 'SJ', viewedAt: '02:45 PM' },
-  { id: 2, name: 'Michael Chen', avatar: 'MC', viewedAt: '02:30 PM' },
-  { id: 3, name: 'Priya Patel', avatar: 'PP', viewedAt: '01:15 PM' },
-  { id: 4, name: 'Alex Mercer', avatar: 'AM', viewedAt: '12:40 PM' },
-  { id: 5, name: 'Maria Garcia', avatar: 'MG', viewedAt: '11:20 AM' },
-  { id: 6, name: 'David Kim', avatar: 'DK', viewedAt: '10:05 AM' },
-  { id: 7, name: 'Emma Thompson', avatar: 'ET', viewedAt: '09:30 AM' },
-];
 
 const AVATAR_COLORS = [
   'bg-violet-200 text-violet-700',
@@ -38,12 +24,40 @@ const AVATAR_COLORS = [
   'bg-emerald-200 text-emerald-700',
 ];
 
-const ViewedByPanel = ({ totalViews, onClose }: ViewedByPanelProps) => {
+// First two initials of a viewer's name, for the avatar fallback.
+const initialsOf = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join('') || '?';
+
+// "1 Jun 2025, 12:00 AM" style label for a seen-at timestamp.
+const formatSeenAt = (iso: string) => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+};
+
+const ViewedByPanel = ({ messageId, onClose }: ViewedByPanelProps) => {
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebounce(search, 300);
+  const { data, isLoading, isError } = useMessageStats(messageId);
 
-  const filteredViewers = MOCK_VIEWERS.filter((viewer) =>
-    debouncedSearch ? viewer.name.toLowerCase().includes(debouncedSearch.toLowerCase()) : true
+  const viewers: MessageViewer[] = data?.seen_by ?? [];
+  const totalSeen = data?.total_seen ?? 0;
+
+  const filteredViewers = viewers.filter((viewer) =>
+    debouncedSearch
+      ? viewer.name.toLowerCase().includes(debouncedSearch.toLowerCase())
+      : true
   );
 
   return (
@@ -53,7 +67,7 @@ const ViewedByPanel = ({ totalViews, onClose }: ViewedByPanelProps) => {
         <div className="flex items-center gap-3">
           <h2 className="font-bold text-[16px] text-slate-800">Viewed by Users</h2>
           <span className="text-[12px] font-medium text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
-            {totalViews} views
+            {totalSeen} {totalSeen === 1 ? 'view' : 'views'}
           </span>
         </div>
         <button
@@ -81,9 +95,13 @@ const ViewedByPanel = ({ totalViews, onClose }: ViewedByPanelProps) => {
         </div>
         <button
           type="button"
-          className="w-10 h-10 rounded-full border border-slate-200 bg-white flex items-center justify-center cursor-pointer hover:bg-slate-50 transition-colors shrink-0"
+          disabled={filteredViewers.length === 0}
+          className="w-10 h-10 rounded-full border border-slate-200 bg-white flex items-center justify-center cursor-pointer hover:bg-slate-50 transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={() => {
-            const csv = ['Name,Viewed At', ...filteredViewers.map((v) => `${v.name},${v.viewedAt}`)].join('\n');
+            const csv = [
+              'Name,Email,Seen At',
+              ...filteredViewers.map((v) => `${v.name},${v.email},${formatSeenAt(v.seen_at)}`),
+            ].join('\n');
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -99,32 +117,56 @@ const ViewedByPanel = ({ totalViews, onClose }: ViewedByPanelProps) => {
 
       {/* Viewers List */}
       <ScrollArea className="flex-1 min-h-0">
-        <div className="flex flex-col">
-          {filteredViewers.map((viewer, index) => (
-            <div
-              key={viewer.id}
-              className="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100 last:border-none"
-            >
-              {/* Avatar */}
+        {isLoading ? (
+          <p className="px-5 py-8 text-center text-[13px] text-slate-400">Loading…</p>
+        ) : isError ? (
+          <p className="px-5 py-8 text-center text-[13px] text-red-400">
+            Couldn&apos;t load viewers.
+          </p>
+        ) : filteredViewers.length === 0 ? (
+          <p className="px-5 py-8 text-center text-[13px] text-slate-400">
+            {viewers.length === 0 ? 'No one has seen this message yet.' : 'No matching users.'}
+          </p>
+        ) : (
+          <div className="flex flex-col">
+            {filteredViewers.map((viewer, index) => (
               <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${AVATAR_COLORS[index % AVATAR_COLORS.length]}`}
+                key={viewer.user_id}
+                className="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100 last:border-none"
               >
-                {viewer.avatar}
-              </div>
+                {/* Avatar — profile image when present, initials otherwise. */}
+                {viewer.profile_image ? (
+                  <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 relative bg-slate-100">
+                    <Image
+                      src={viewer.profile_image}
+                      alt={viewer.name}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
+                ) : (
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${AVATAR_COLORS[index % AVATAR_COLORS.length]}`}
+                  >
+                    {initialsOf(viewer.name)}
+                  </div>
+                )}
 
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-bold text-slate-800">{viewer.name}</p>
-                <div className="flex items-center gap-1 mt-0.5">
-                  <Eye className="w-3 h-3 text-slate-400" />
-                  <span className="text-[11px] font-medium text-slate-400">
-                    Viewed at {viewer.viewedAt}
-                  </span>
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-bold text-slate-800 truncate">{viewer.name}</p>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <Eye className="w-3 h-3 text-slate-400 shrink-0" />
+                    <span className="text-[11px] font-medium text-slate-400 truncate">
+                      Viewed {formatSeenAt(viewer.seen_at)}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </ScrollArea>
     </div>
   );

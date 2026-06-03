@@ -97,7 +97,6 @@ export default function DashboardPage() {
           </div>
         ) : (
           <ChatFeed
-            views={selectedCommunity?.views}
             messages={currentMessages}
             onTogglePin={handleTogglePin}
           />

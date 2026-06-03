@@ -45,6 +45,12 @@ const authSlice = createSlice({
       state.isAuthenticated = true;
       state.status = 'authenticated';
     },
+    // Patch fields on the current user (e.g. after a profile-image upload).
+    updateUser: (state, action: PayloadAction<Partial<AuthUser>>) => {
+      if (state.user) {
+        state.user = { ...state.user, ...action.payload };
+      }
+    },
     // Session bootstrap finished with no valid session (or the user logged out).
     setUnauthenticated: (state) => {
       state.user = null;
@@ -64,5 +70,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { setCredentials, setUnauthenticated, logout, setLoading } = authSlice.actions;
+export const { setCredentials, updateUser, setUnauthenticated, logout, setLoading } = authSlice.actions;
 export default authSlice.reducer;

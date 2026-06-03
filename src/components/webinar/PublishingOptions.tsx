@@ -1,10 +1,10 @@
 'use client';
 
 import React from 'react';
-import { Calendar, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { PublishOption } from '@/constants/webinarData';
 import type { UseWebinarBanner } from '@/hooks/useWebinarBanner';
+import TimeField from '@/components/webinar/TimeField';
 
 const Radio = ({ active }: { active: boolean }) => (
   <span
@@ -68,49 +68,26 @@ const PublishingOptions = ({ w }: { w: UseWebinarBanner }) => {
             <div className="grid sm:grid-cols-2 gap-4 px-4 pb-4">
               <div>
                 <label className="block text-[13px] font-medium text-slate-600 mb-1.5">Schedule Date</label>
-                <div className="relative">
-                  <input
-                    className={scheduleInput}
-                    value={w.scheduleDate}
-                    onChange={(e) => w.set('scheduleDate', e.target.value)}
-                  />
-                  <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                </div>
+                <input
+                  type="date"
+                  className={scheduleInput}
+                  value={w.scheduleDate}
+                  onChange={(e) => w.set('scheduleDate', e.target.value)}
+                />
               </div>
               <div>
                 <label className="block text-[13px] font-medium text-slate-600 mb-1.5">Schedule Time</label>
-                <div className="relative">
-                  <input
-                    className={scheduleInput}
-                    value={w.scheduleTime}
-                    onChange={(e) => w.set('scheduleTime', e.target.value)}
-                  />
-                  <Clock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                </div>
+                <TimeField
+                  aria-label="Schedule time"
+                  value={w.scheduleTime}
+                  onChange={(v) => w.set('scheduleTime', v)}
+                />
               </div>
             </div>
           )}
         </div>
 
         {option('draft', 'Save as Draft', 'Save securely to continue editing later')}
-      </div>
-
-      {/* Actions */}
-      <div className="grid grid-cols-2 gap-4 mt-6">
-        <button
-          type="button"
-          onClick={w.reset}
-          className="h-12 rounded-full border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
-        >
-          Reset
-        </button>
-        <button
-          type="button"
-          onClick={w.save}
-          className="h-12 rounded-full bg-emerald-500 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors cursor-pointer"
-        >
-          Save
-        </button>
       </div>
     </section>
   );

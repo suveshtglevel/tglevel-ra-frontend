@@ -22,6 +22,7 @@ export interface ResearchAnalyst {
   phone_number: string;
   status: string;
   assigned_communities: string[];
+  profile_picture?: string;
   ra_id: string;
   createdAt: string;
   updatedAt: string;
@@ -64,5 +65,33 @@ export interface LogoutResponse {
 // cookie. Sent with credentials + bearer token (both via the axios instance).
 export async function logout(): Promise<LogoutResponse> {
   const { data } = await axiosInstance.post<LogoutResponse>(`${BASE}/logout`);
+  return data;
+}
+
+export interface UpdateProfileImageResponse {
+  success: boolean;
+  message: string;
+  data: {
+    ra_id: string;
+    display_name: string;
+    profile_picture: string;
+  };
+}
+
+// Upload a new RA profile picture (multipart). The default instance Content-Type
+// is application/json, which would make axios JSON-stringify the FormData; we
+// override it to multipart/form-data so the browser sends the file with a
+// proper boundary.
+export async function updateProfileImage(file: File): Promise<UpdateProfileImageResponse> {
+  const form = new FormData();
+  form.append('profile_picture', file);
+  const { data } = await axiosInstance.put<UpdateProfileImageResponse>(
+    `${BASE}/update-profile-image`,
+    form,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  );
+  if (!data.success) {
+    throw new Error(data.message || 'Failed to update profile image');
+  }
   return data;
 }

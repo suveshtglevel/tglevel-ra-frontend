@@ -7,10 +7,11 @@ import { MessageSquare, MonitorPlay, Settings, Pencil, LogOut, Mail, Phone } fro
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'react-hot-toast';
-import { clearSession } from '@/lib/api/session';
-import { logout as logoutApi } from '@/lib/api/auth';
+import { clearSession, persistUser } from '@/lib/api/session';
+import { logout as logoutApi, updateProfileImage } from '@/lib/api/auth';
+import { getApiErrorMessage } from '@/lib/api/errors';
 import { useAppDispatch, useAppSelector } from '@/redux/hooks';
-import { logout as logoutAction } from '@/redux/slices/authSlice';
+import { logout as logoutAction, updateUser } from '@/redux/slices/authSlice';
 
 type SidebarTab = 'chat' | 'webinar' | 'tradeJournal' | 'settings';
 
@@ -28,8 +29,13 @@ const Sidebar = () => {
       .map((w) => w[0]?.toUpperCase())
       .join('') || 'RA';
   const [showSettings, setShowSettings] = useState(false);
-  const [profileImage, setProfileImage] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Show the saved avatar from the auth state; an in-flight upload swaps in a
+  // local preview until the server URL comes back.
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const profileImage = previewImage ?? user?.avatarUrl ?? null;
 
   const settingsRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -71,17 +77,31 @@ const Sidebar = () => {
     }
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProfileImage(reader.result as string);
-        toast.success('Profile image updated!');
-      };
-      reader.readAsDataURL(file);
-    }
     e.target.value = '';
+    if (!file || uploadingImage) return;
+
+    // Optimistic local preview while the upload is in flight.
+    const localPreview = URL.createObjectURL(file);
+    setPreviewImage(localPreview);
+    setUploadingImage(true);
+
+    try {
+      const result = await updateProfileImage(file);
+      const avatarUrl = result.data.profile_picture;
+      dispatch(updateUser({ avatarUrl }));
+      if (user) persistUser({ ...user, avatarUrl });
+      // Drop the local preview now that the saved URL is in the auth state.
+      setPreviewImage(null);
+      toast.success(result.message || 'Profile image updated!');
+    } catch (error) {
+      setPreviewImage(null);
+      toast.error(getApiErrorMessage(error));
+    } finally {
+      URL.revokeObjectURL(localPreview);
+      setUploadingImage(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -205,10 +225,11 @@ const Sidebar = () => {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 text-emerald-600 font-medium text-[13px] cursor-pointer bg-transparent border-none hover:text-emerald-700 transition-colors"
+                disabled={uploadingImage}
+                className="flex items-center gap-2 text-emerald-600 font-medium text-[13px] cursor-pointer bg-transparent border-none hover:text-emerald-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <Pencil className="w-4 h-4" />
-                Edit Profile image
+                {uploadingImage ? 'Uploading…' : 'Edit Profile image'}
               </button>
 
               {/* Logout */}
