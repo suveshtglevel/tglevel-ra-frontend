@@ -42,22 +42,16 @@ const CommunitySidebar = ({
   const debouncedSearch = useDebounce(search, 300);
   const [activeFilter, setActiveFilter] = React.useState<FilterType>('ALL');
 
+  // The Free/Premium filter no longer hides whole communities — every community
+  // stays visible (subject to search) and the filter is applied to the
+  // sub-communities shown inside each card instead.
+  const subTypeFilter =
+    activeFilter === 'Free' ? 'Free' : activeFilter === 'Premium' ? 'Paid' : null;
+
   const filteredCommunities = communities.filter((comm) => {
     // Search filter (debounced)
     if (debouncedSearch && !comm.name.toLowerCase().includes(debouncedSearch.toLowerCase())) {
       return false;
-    }
-    // Type filter
-    if (activeFilter === 'Free') {
-      // Communities with sub-communities that have free ones, or "Free Alumini"
-      const hasFree = comm.subCommunities?.some((s) => s.type === 'Free') ?? false;
-      const isFreeByName = comm.name.toLowerCase().includes('free');
-      return hasFree || isFreeByName;
-    }
-    if (activeFilter === 'Premium') {
-      const hasPaid = comm.subCommunities?.some((s) => s.type === 'Paid') ?? false;
-      const isPaidByName = comm.name.toLowerCase().includes('paid');
-      return hasPaid || isPaidByName;
     }
     return true;
   });
@@ -121,6 +115,7 @@ const CommunitySidebar = ({
                     active={comm.id === selectedCommunityId}
                     selectedSubCommunityId={selectedSubCommunityId}
                     targetSubIds={targetCommunityId === comm.id ? targetSubIds : []}
+                    subTypeFilter={subTypeFilter}
                     initialExpanded={index === 0}
                     onSelectCommunity={onSelectCommunity}
                     onSelectSubCommunity={onSelectSubCommunity}

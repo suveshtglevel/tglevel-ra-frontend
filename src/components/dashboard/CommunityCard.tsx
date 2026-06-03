@@ -11,6 +11,9 @@ interface CommunityCardProps {
   active: boolean;
   selectedSubCommunityId: string | null;
   targetSubIds: string[];
+  // When set (Free/Paid), only sub-communities of this type are shown; the
+  // community itself stays visible regardless.
+  subTypeFilter?: string | null;
   initialExpanded?: boolean;
   onSelectCommunity: (id: string) => void;
   onSelectSubCommunity: (id: string) => void;
@@ -96,9 +99,13 @@ const SubCommunityRow = ({ sub, checked, isSelected, sendable, onToggle, onSelec
   );
 };
 
-const CommunityCard = ({ community, active, selectedSubCommunityId, targetSubIds, initialExpanded = false, onSelectCommunity, onSelectSubCommunity, onToggleSubTarget, onToggleCommunityTargets }: CommunityCardProps) => {
+const CommunityCard = ({ community, active, selectedSubCommunityId, targetSubIds, subTypeFilter, initialExpanded = false, onSelectCommunity, onSelectSubCommunity, onToggleSubTarget, onToggleCommunityTargets }: CommunityCardProps) => {
   const [expanded, setExpanded] = React.useState(initialExpanded);
-  const subCommunities = community.subCommunities ?? [];
+  // Apply the Free/Paid filter to the sub-communities only; the community card
+  // is always rendered by the sidebar.
+  const subCommunities = subTypeFilter
+    ? (community.subCommunities ?? []).filter((s) => s.type === subTypeFilter)
+    : community.subCommunities ?? [];
   const toggleExpanded = () => setExpanded((prev) => !prev);
 
   // Clicking the community header: if it has sub-communities, toggle the list

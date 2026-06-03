@@ -9,8 +9,6 @@ import {
 } from '@/redux/slices/communitySlice';
 import {
   setMessages,
-  sendMessage,
-  sendFileMessage,
   setPinned,
 } from '@/redux/slices/messageSlice';
 import type { FileAttachment } from '@/redux/slices/messageSlice';
@@ -47,7 +45,7 @@ export interface SendOptions {
   notifyUsers?: boolean;
   targetCommunityIds?: string[];
   // Attachment to upload with the message (send-message is multipart). `file`
-  // is the raw upload; `attachment` is the local preview for optimistic render.
+  // is the raw upload; `attachment` carries the composer's local preview metadata.
   file?: File;
   fileType?: FileAttachment['fileType'];
   attachment?: FileAttachment;
@@ -286,30 +284,11 @@ export const useDashboard = () => {
     // (Video handling is undecided, so it currently falls through to `docs`.)
     const isImage = options?.fileType === 'image';
 
-    // Fire one send per target sub-community, then refresh those chats.
+    // Fire one send per target sub-community, then refresh those chats. The feed
+    // is updated only from the server response (no temporary local append).
     Promise.allSettled(
       sendable.map((subId) => {
         const parent = parentCommunityOf(subId)!;
-        // Optimistic local append so the feed updates immediately.
-        if (options?.attachment) {
-          dispatch(
-            sendFileMessage({
-              communityId: subId,
-              attachment: options.attachment,
-              caption: hasContent ? content : undefined,
-            })
-          );
-        } else {
-          dispatch(
-            sendMessage({
-              communityId: subId,
-              content,
-              messageType: options?.messageType,
-              group: options?.group,
-              notifyUsers: options?.notifyUsers,
-            })
-          );
-        }
         return sendMessageApi({
           community_id: parent.id,
           sub_community_id: subId,

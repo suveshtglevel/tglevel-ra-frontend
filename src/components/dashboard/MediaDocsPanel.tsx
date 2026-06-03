@@ -6,8 +6,74 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useDebounce } from '@/hooks/useDebounce';
-import FileViewer from './FileViewer';
-import type { ChatMessage, FileAttachment } from '@/redux/slices/messageSlice';
+import type { ChatMessage } from '@/redux/slices/messageSlice';
+
+// Inline-viewable MIME types keyed by extension. Used to re-tag the fetched blob
+// so the browser opens the file in its viewer instead of downloading it when the
+// source type is missing or generic.
+const INLINE_MIME_BY_EXT: Record<string, string> = {
+  pdf: 'application/pdf',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+  mp4: 'video/mp4',
+  webm: 'video/webm',
+  txt: 'text/plain',
+  csv: 'text/csv',
+};
+
+// Office documents open straight in their desktop app via the Office URI scheme
+// (ms-word:/ms-excel:/ms-powerpoint:). The app fetches the document itself, so it
+// needs a reachable http(s) url (a data:/blob: url won't work).
+const OFFICE_SCHEME_BY_EXT: Record<string, string> = {
+  doc: 'ms-word',
+  docx: 'ms-word',
+  xls: 'ms-excel',
+  xlsx: 'ms-excel',
+  ppt: 'ms-powerpoint',
+  pptx: 'ms-powerpoint',
+};
+
+// Open an attachment from the device: Word/Excel/PowerPoint files launch in their
+// desktop app; PDFs/images/video open in a new browser tab (the browser's native
+// viewer) instead of showing a download dialog. The tab is opened synchronously
+// to survive the popup blocker, then pointed at a blob: URL once the file fetches.
+const openAttachment = async (name: string, url: string) => {
+  const ext = name.split('.').pop()?.toLowerCase() ?? '';
+
+  const officeScheme = OFFICE_SCHEME_BY_EXT[ext];
+  if (officeScheme) {
+    const absoluteUrl = /^https?:\/\//i.test(url)
+      ? url
+      : new URL(url, window.location.origin).href;
+    // Only the Office scheme can reach an http(s) document; for a local
+    // data:/blob: url fall through to the in-browser open below.
+    if (/^https?:\/\//i.test(absoluteUrl)) {
+      window.location.href = `${officeScheme}:ofe|u|${absoluteUrl}`;
+      return;
+    }
+  }
+
+  const win = window.open('', '_blank');
+  try {
+    let blob = await (await fetch(url)).blob();
+    const inlineMime = INLINE_MIME_BY_EXT[ext];
+    if (inlineMime && blob.type !== inlineMime) {
+      blob = new Blob([blob], { type: inlineMime });
+    }
+    const objectUrl = URL.createObjectURL(blob);
+    if (win) win.location.href = objectUrl;
+    else window.location.href = objectUrl;
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+  } catch {
+    // Network/CORS failure — fall back to opening the original url directly.
+    if (win) win.location.href = url;
+    else window.location.href = url;
+  }
+};
 
 interface MediaDocsPanelProps {
   title: string;
@@ -72,7 +138,6 @@ const MediaDocsPanel = ({ title, messages, onClose }: MediaDocsPanelProps) => {
   const [activeTab, setActiveTab] = React.useState<Tab>('Media');
   const [docFilter, setDocFilter] = React.useState<DocFilter>('All');
   const [search, setSearch] = React.useState('');
-  const [viewingFile, setViewingFile] = React.useState<FileAttachment | null>(null);
   const debouncedSearch = useDebounce(search, 300);
   const q = debouncedSearch.trim().toLowerCase();
 
@@ -193,7 +258,7 @@ const MediaDocsPanel = ({ title, messages, onClose }: MediaDocsPanelProps) => {
                   key={m.id}
                   type="button"
                   title={m.name}
-                  onClick={() => setViewingFile(m)}
+                  onClick={() => openAttachment(m.name, m.url)}
                   className="relative aspect-square rounded-xl overflow-hidden bg-slate-100 border border-slate-200 hover:opacity-90 transition-opacity cursor-pointer p-0"
                 >
                   {m.fileType === 'image' ? (
@@ -221,7 +286,7 @@ const MediaDocsPanel = ({ title, messages, onClose }: MediaDocsPanelProps) => {
                 <button
                   key={doc.id}
                   type="button"
-                  onClick={() => setViewingFile(doc)}
+                  onClick={() => openAttachment(doc.name, doc.url)}
                   className="flex items-center gap-3 p-4 bg-[#F8FAFC] border border-slate-200 rounded-2xl cursor-pointer hover:border-slate-300 transition-colors text-left w-full"
                 >
                   <DocIcon fileType={doc.fileType} />
@@ -265,10 +330,6 @@ const MediaDocsPanel = ({ title, messages, onClose }: MediaDocsPanelProps) => {
           )
         )}
       </ScrollArea>
-
-      {viewingFile && (
-        <FileViewer attachment={viewingFile} onClose={() => setViewingFile(null)} />
-      )}
     </div>
   );
 };

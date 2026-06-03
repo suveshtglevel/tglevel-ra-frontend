@@ -4,6 +4,8 @@ import React, { useEffect } from 'react';
 import Image from 'next/image';
 import { createPortal } from 'react-dom';
 import { useEditor, EditorContent } from '@tiptap/react';
+import { selectAll } from '@tiptap/pm/commands';
+import { TextSelection } from '@tiptap/pm/state';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -144,6 +146,48 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
   // Holds the latest send handler so the editor's keydown (set up once) always
   // calls the current closure instead of a stale one.
   const handleSendRef = React.useRef<() => void>(() => {});
+  // The capped, scrollable wrapper around the editor — used to keep the caret
+  // visible as the message grows past the max height.
+  const editorScrollRef = React.useRef<HTMLDivElement>(null);
+
+  // Turn a picked/pasted/dropped file into the single attachment preview.
+  // Defined before the editor (and stable) so the editor's paste/drop handlers
+  // can call it. Only uses stable state setters, so an empty dep list is safe.
+  const handleFileSelect = React.useCallback((file: File, type: 'image' | 'file' | 'video') => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const url = reader.result as string;
+      const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+      let fileType: 'image' | 'video' | 'pdf' | 'doc' | 'excel' | 'file' = 'file';
+      if (type === 'image') fileType = 'image';
+      else if (type === 'video') fileType = 'video';
+      else if (ext === 'pdf') fileType = 'pdf';
+      else if (['doc', 'docx'].includes(ext)) fileType = 'doc';
+      else if (['xls', 'xlsx', 'csv'].includes(ext)) fileType = 'excel';
+
+      const sizeKB = file.size / 1024;
+      const size = sizeKB > 1024 ? `${(sizeKB / 1024).toFixed(1)} MB` : `${sizeKB.toFixed(1)} KB`;
+
+      setFilePreview({ name: file.name, size, fileType, url, file });
+      setShowFullPreview(false);
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  // Pull the first file out of a paste/drop and route it to the attachment
+  // preview, picking the input kind from its MIME type. Returns true when a file
+  // was handled (so the editor doesn't also try to insert it).
+  const handleEditorFiles = React.useCallback((files: FileList | null | undefined): boolean => {
+    const file = files?.[0];
+    if (!file) return false;
+    const kind = file.type.startsWith('image/')
+      ? 'image'
+      : file.type.startsWith('video/')
+        ? 'video'
+        : 'file';
+    handleFileSelect(file, kind);
+    return true;
+  }, [handleFileSelect]);
 
   const editor = useEditor({
     extensions: [
@@ -162,16 +206,72 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
     content: '',
     onUpdate: ({ editor }) => {
       setIsEditorEmpty(editor.isEmpty);
+      // Follow the caret as the message grows so the latest line stays visible
+      // (e.g. when adding line breaks with Shift+Enter) instead of being hidden
+      // below the scroll viewport.
+      requestAnimationFrame(() => {
+        const el = editorScrollRef.current;
+        if (!el) return;
+        const coords = editor.view.coordsAtPos(editor.state.selection.head);
+        const box = el.getBoundingClientRect();
+        if (coords.bottom > box.bottom) {
+          el.scrollTop += coords.bottom - box.bottom + 8;
+        } else if (coords.top < box.top) {
+          el.scrollTop -= box.top - coords.top + 8;
+        }
+      });
     },
     editorProps: {
       attributes: {
         class: 'focus:outline-none max-w-full text-slate-700 font-medium text-[15px] leading-relaxed min-h-full',
       },
       // Enter sends the message; Shift+Enter falls through to a line break.
-      handleKeyDown: (_view, event) => {
+      handleKeyDown: (view, event) => {
         if (event.key === 'Enter' && !event.shiftKey) {
           event.preventDefault();
           handleSendRef.current();
+          return true;
+        }
+        // Ctrl/Cmd+A selects the whole message (TipTap doesn't bind this by
+        // default, so the native behaviour is unreliable inside the editor).
+        if ((event.ctrlKey || event.metaKey) && (event.key === 'a' || event.key === 'A')) {
+          event.preventDefault();
+          return selectAll(view.state, view.dispatch);
+        }
+        // Deleting a whole-document selection (e.g. after Ctrl+A) resets to one
+        // empty paragraph so the placeholder shows and no blue gap cursor is left
+        // behind.
+        if (event.key === 'Backspace' || event.key === 'Delete') {
+          const { state } = view;
+          const { selection } = state;
+          const wholeDoc =
+            !selection.empty &&
+            selection.from <= 1 &&
+            selection.to >= state.doc.content.size - 1;
+          if (wholeDoc) {
+            event.preventDefault();
+            const paragraph = state.schema.nodes.paragraph.createAndFill();
+            const tr = state.tr.replaceWith(0, state.doc.content.size, paragraph ?? []);
+            tr.setSelection(TextSelection.create(tr.doc, 1));
+            view.dispatch(tr.scrollIntoView());
+            return true;
+          }
+        }
+        return false;
+      },
+      // Pasting an image/file (e.g. a screenshot) attaches it; text/HTML still
+      // pastes normally because we only intercept when files are present.
+      handlePaste: (_view, event) => {
+        if (handleEditorFiles(event.clipboardData?.files)) {
+          event.preventDefault();
+          return true;
+        }
+        return false;
+      },
+      // Dropping a file onto the editor attaches it instead of opening it.
+      handleDrop: (_view, event) => {
+        if (handleEditorFiles((event as DragEvent).dataTransfer?.files)) {
+          event.preventDefault();
           return true;
         }
         return false;
@@ -187,6 +287,11 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
     }
     const content = editor.getHTML();
     const hasContent = !editor.isEmpty && content !== '<p></p>';
+    // An attachment must be accompanied by a message — block image/doc-only sends.
+    if (filePreview && !hasContent) {
+      toast.error('Please enter a message before sending an image or document');
+      return;
+    }
     if (!hasContent && !filePreview) return;
 
     const sendOptions: SendOptions = {
@@ -252,27 +357,6 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
     editor.chain().focus().setTextAlign(align).run();
   const undo = () => editor.chain().focus().undo().run();
   const redo = () => editor.chain().focus().redo().run();
-
-  const handleFileSelect = (file: File, type: 'image' | 'file' | 'video') => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const url = reader.result as string;
-      const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
-      let fileType: 'image' | 'video' | 'pdf' | 'doc' | 'excel' | 'file' = 'file';
-      if (type === 'image') fileType = 'image';
-      else if (type === 'video') fileType = 'video';
-      else if (ext === 'pdf') fileType = 'pdf';
-      else if (['doc', 'docx'].includes(ext)) fileType = 'doc';
-      else if (['xls', 'xlsx', 'csv'].includes(ext)) fileType = 'excel';
-
-      const sizeKB = file.size / 1024;
-      const size = sizeKB > 1024 ? `${(sizeKB / 1024).toFixed(1)} MB` : `${sizeKB.toFixed(1)} KB`;
-
-      setFilePreview({ name: file.name, size, fileType, url, file });
-      setShowFullPreview(false);
-    };
-    reader.readAsDataURL(file);
-  };
 
   const insertChart = () => {
     editor.chain().focus().insertContent(
@@ -642,7 +726,11 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
         onClick={() => editor.commands.focus()}
         onDoubleClick={() => editor.commands.focus()}
       >
-        <EditorContent editor={editor} />
+        {/* Cap the typing area's height; once the text exceeds it the editor
+            scrolls internally instead of growing the composer further. */}
+        <div ref={editorScrollRef} className="composer-scroll max-h-[180px] overflow-y-auto">
+          <EditorContent editor={editor} />
+        </div>
 
         {/* Small File Preview */}
         {filePreview && !showFullPreview && (
@@ -703,6 +791,33 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
       </div>
 
       <style jsx global>{`
+        .composer-scroll {
+          scrollbar-width: thin;
+          scrollbar-color: #cbd5e1 transparent;
+        }
+        .composer-scroll::-webkit-scrollbar {
+          width: 6px;
+        }
+        .composer-scroll::-webkit-scrollbar-thumb {
+          background-color: #cbd5e1;
+          border-radius: 9999px;
+        }
+        .composer-scroll::-webkit-scrollbar-thumb:hover {
+          background-color: #94a3b8;
+        }
+        .composer-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .tiptap {
+          /* Keep the text caret black instead of the browser's default/accent
+             colour (which can render blue). */
+          caret-color: #0f172a;
+        }
+        /* If a gap cursor ever appears, draw it black (its default line can
+           render in the browser/theme accent colour). */
+        .tiptap .ProseMirror-gapcursor:after {
+          border-top-color: #0f172a;
+        }
         .tiptap p {
           margin: 0;
         }
