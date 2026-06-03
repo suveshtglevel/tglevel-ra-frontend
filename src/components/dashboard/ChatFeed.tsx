@@ -3,7 +3,7 @@
 import React from 'react';
 import Image from 'next/image';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FileText, FileSpreadsheet, File, Play, MoreVertical, Pin, Download, Eye } from 'lucide-react';
+import { FileText, FileSpreadsheet, File, Play, MoreVertical, Pin, Download, Eye, Check, CheckCheck } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import TradeCard from './TradeCard';
 import ViewedByPanel from './ViewedByPanel';
@@ -255,9 +255,20 @@ const FileAttachmentView = ({ attachment, isSent, onOpen }: { attachment: NonNul
   );
 };
 
+// Numeric backend message type -> display label.
+const MESSAGE_TYPE_LABELS: Record<number, string> = {
+  1: 'Promotion',
+  2: 'Followup',
+  3: 'Feedback',
+  4: 'Flaunt',
+  5: 'Trade',
+};
+
 // Every message renders as a left-aligned post (like the seed messages),
 // regardless of who sent it or its type.
 const MessageBubble = ({ message, communityTag, onOpenFile }: { message: ChatMessage; communityTag?: string; onOpenFile: (attachment: FileAttachment) => void }) => {
+  const typeLabel = message.messageTypeId != null ? MESSAGE_TYPE_LABELS[message.messageTypeId] : undefined;
+  const shortId = message.id ? message.id.slice(-3) : '';
   return (
     <div className="max-w-[380px] rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm bg-white border border-slate-200 text-slate-800">
       <div className="flex items-center justify-between gap-2 mb-1">
@@ -278,14 +289,32 @@ const MessageBubble = ({ message, communityTag, onOpenFile }: { message: ChatMes
         />
       )}
 
-      <div className="flex items-center justify-end gap-1 mt-1 text-slate-400">
-        {message.group && (
-          <span className="text-[9px] font-medium mr-1 bg-slate-100 px-1.5 py-0.5 rounded">{message.group}</span>
-        )}
-        {communityTag && (
-          <span className="text-[9px] font-medium mr-1 bg-slate-100 px-1.5 py-0.5 rounded">{communityTag}</span>
-        )}
-        <span className="text-[10px] font-medium">{message.timestamp}</span>
+      <div className="flex items-center justify-between gap-2 mt-1 text-slate-400">
+        {/* Bottom-left: #<last 3 of msg id> and the message-type label. */}
+        <div className="flex items-center gap-1.5 min-w-0">
+          {shortId && <span className="text-[9px] font-bold text-slate-400">#{shortId}</span>}
+          {typeLabel && (
+            <span className="text-[9px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">{typeLabel}</span>
+          )}
+        </div>
+        {/* Bottom-right: group/community tags, then the time just left of the
+            delivery ticks. */}
+        <div className="flex items-center gap-1 shrink-0">
+          {message.group && (
+            <span className="text-[9px] font-medium mr-1 bg-slate-100 px-1.5 py-0.5 rounded">{message.group}</span>
+          )}
+          {communityTag && (
+            <span className="text-[9px] font-medium mr-1 bg-slate-100 px-1.5 py-0.5 rounded">{communityTag}</span>
+          )}
+          <span className="text-[10px] font-medium">{message.timestamp}</span>
+          {message.status === 'read' ? (
+            <CheckCheck className="w-3 h-3 text-sky-500" />
+          ) : message.status === 'delivered' ? (
+            <CheckCheck className="w-3 h-3 text-slate-400" />
+          ) : (
+            <Check className="w-3 h-3 text-slate-400" />
+          )}
+        </div>
       </div>
     </div>
   );

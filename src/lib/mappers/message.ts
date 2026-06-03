@@ -37,6 +37,7 @@ export function mapBackendMessage(m: BackendMessage, typeName?: string): ChatMes
     content: m.content,
     type: 'received',
     messageType: typeName,
+    messageTypeId: m.type ?? undefined,
     timestamp: formatTime(m.createdAt),
     status: 'read',
     sender: m.author_name ?? 'RA',

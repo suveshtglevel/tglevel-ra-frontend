@@ -15,6 +15,9 @@ export interface ChatMessage {
   content: string;
   type: 'sent' | 'received';
   messageType?: string;
+  // Numeric backend message type (1=Promotion, 2=Followup, 3=Feedback,
+  // 4=Flaunt, 5=Trade). Used for the type label shown on the bubble.
+  messageTypeId?: number;
   group?: string;
   notifyUsers?: boolean;
   timestamp: string;

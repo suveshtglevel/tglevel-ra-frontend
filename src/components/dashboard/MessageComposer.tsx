@@ -726,15 +726,10 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
         onClick={() => editor.commands.focus()}
         onDoubleClick={() => editor.commands.focus()}
       >
-        {/* Cap the typing area's height; once the text exceeds it the editor
-            scrolls internally instead of growing the composer further. */}
-        <div ref={editorScrollRef} className="composer-scroll max-h-[180px] overflow-y-auto">
-          <EditorContent editor={editor} />
-        </div>
-
-        {/* Small File Preview */}
+        {/* Small File Preview — shown above the caption input so the image is
+            on top and the message can be typed underneath it. */}
         {filePreview && !showFullPreview && (
-          <div className="mt-5 mb-4 max-w-[420px] rounded-xl border border-slate-200 bg-slate-50/80 p-3 shadow-sm">
+          <div className="mb-3 max-w-[420px] rounded-xl border border-slate-200 bg-slate-50/80 p-3 shadow-sm">
             <button
               type="button"
               onClick={(event) => {
@@ -788,6 +783,12 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
             </div>
           </div>
         )}
+
+        {/* Cap the typing area's height; once the text exceeds it the editor
+            scrolls internally instead of growing the composer further. */}
+        <div ref={editorScrollRef} className="composer-scroll max-h-[180px] overflow-y-auto">
+          <EditorContent editor={editor} />
+        </div>
       </div>
 
       <style jsx global>{`
