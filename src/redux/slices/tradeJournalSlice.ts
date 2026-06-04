@@ -1,41 +1,49 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { TRADE_ROWS, TradeRow } from '@/constants/tradeJournalData';
 
 export type SortKey = 'date' | 'points' | 'profit' | 'lotSize';
 export type SortDir = 'asc' | 'desc';
+// Profit/Loss filter applied to the Profit column header dropdown.
+export type PLFilter = 'all' | 'profit' | 'loss';
+
+// Sentinel meaning "show journals from every sub-community combined".
+export const ALL_SUBS = 'all';
 
 interface TradeJournalState {
-  trades: TradeRow[];
-  community: string;
+  // The selected sub-community id, or ALL_SUBS for the combined view. Journals
+  // from every sub-community are fetched and filtered to this client-side.
+  subCommunityId: string;
   dateFrom: string; // ISO yyyy-mm-dd
   dateTo: string; // ISO yyyy-mm-dd
   sortKey: SortKey;
   sortDir: SortDir;
+  plFilter: PLFilter;
   page: number; // 1-based
   pageSize: number;
 }
 
-const DEFAULT_FILTERS = {
-  community: 'All Communities',
-  dateFrom: '2023-06-01',
-  dateTo: '2023-06-08',
+const DEFAULT_VIEW = {
+  subCommunityId: ALL_SUBS,
+  // Wide default window so no rows are hidden until the user narrows the range.
+  dateFrom: '2025-01-01',
+  dateTo: '2026-12-31',
   sortKey: 'date' as SortKey,
   sortDir: 'desc' as SortDir,
+  plFilter: 'all' as PLFilter,
   page: 1,
   pageSize: 10,
 };
 
 const initialState: TradeJournalState = {
-  trades: TRADE_ROWS,
-  ...DEFAULT_FILTERS,
+  ...DEFAULT_VIEW,
 };
 
 const tradeJournalSlice = createSlice({
   name: 'tradeJournal',
   initialState,
   reducers: {
-    setCommunity: (state, action: PayloadAction<string>) => {
-      state.community = action.payload;
+    // Accepts a sub-community id or ALL_SUBS for the combined view.
+    setSubCommunityId: (state, action: PayloadAction<string>) => {
+      state.subCommunityId = action.payload;
       state.page = 1;
     },
     setDateFrom: (state, action: PayloadAction<string>) => {
@@ -55,6 +63,10 @@ const tradeJournalSlice = createSlice({
       }
       state.page = 1;
     },
+    setPlFilter: (state, action: PayloadAction<PLFilter>) => {
+      state.plFilter = action.payload;
+      state.page = 1;
+    },
     setPage: (state, action: PayloadAction<number>) => {
       state.page = action.payload;
     },
@@ -62,17 +74,20 @@ const tradeJournalSlice = createSlice({
       state.pageSize = action.payload;
       state.page = 1;
     },
+    // Resets the sub-community selection, date range, sort, P/L filter and
+    // pagination back to their defaults.
     resetFilters: (state) => {
-      Object.assign(state, DEFAULT_FILTERS);
+      Object.assign(state, DEFAULT_VIEW);
     },
   },
 });
 
 export const {
-  setCommunity,
+  setSubCommunityId,
   setDateFrom,
   setDateTo,
   toggleSort,
+  setPlFilter,
   setPage,
   setPageSize,
   resetFilters,
