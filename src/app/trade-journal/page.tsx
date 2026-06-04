@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   BarChart3,
   TrendingUp,
@@ -10,13 +10,17 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
+  Pencil,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTradeJournal } from '@/hooks/useTradeJournal';
-import { PAGE_SIZE_OPTIONS } from '@/constants/tradeJournalData';
+import { PAGE_SIZE_OPTIONS, type TradeRow } from '@/constants/tradeJournalData';
 import DateRangePicker from '@/components/trade-journal/DateRangePicker';
 import FilterDropdown from '@/components/trade-journal/FilterDropdown';
 import PLFilter from '@/components/trade-journal/PLFilter';
+import EditTradeJournalModal from '@/components/trade-journal/EditTradeJournalModal';
+import JournalTabs, { type JournalTab } from '@/components/trade-journal/JournalTabs';
+import CustomerTradeJournal from '@/components/trade-journal/CustomerTradeJournal';
 
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DASH = '—';
@@ -37,6 +41,10 @@ const numericClass = (n: number | null) =>
 
 export default function TradeJournalPage() {
   const tj = useTradeJournal();
+  // The row currently open in the edit modal (null = closed).
+  const [editingRow, setEditingRow] = useState<TradeRow | null>(null);
+  // Which journal view is active: the RA journal or the customer journal.
+  const [tab, setTab] = useState<JournalTab>('ra');
 
   const stats = [
     {
@@ -70,23 +78,30 @@ export default function TradeJournalPage() {
     },
   ];
 
+  if (tab === 'customer') {
+    return <CustomerTradeJournal tab={tab} onTab={setTab} />;
+  }
+
   return (
     <main className="flex-1 min-w-0 overflow-hidden bg-[#F8FAFC] flex flex-col">
       <div className="px-6 lg:px-10 py-5 max-w-[1600px] mx-auto w-full flex flex-col gap-4 h-full min-h-0">
         {/* Header */}
         <div className="flex items-start justify-between gap-4 flex-wrap shrink-0">
           <div>
-            <h1 className="text-[26px] font-bold text-slate-900">Trade Journal</h1>
+            <h1 className="text-[26px] font-bold text-slate-900">RA Trade Journal</h1>
             <p className="text-slate-500 text-sm mt-1">Track and analyze all trading activity.</p>
           </div>
-          <button
-            type="button"
-            onClick={tj.downloadReport}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors cursor-pointer"
-          >
-            <Download className="w-4 h-4" />
-            Download Report
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <JournalTabs value={tab} onChange={setTab} />
+            <button
+              type="button"
+              onClick={tj.downloadReport}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors cursor-pointer"
+            >
+              <Download className="w-4 h-4" />
+              Download Report
+            </button>
+          </div>
         </div>
 
         {/* Stat cards */}
@@ -153,30 +168,31 @@ export default function TradeJournalPage() {
                   <th className="text-left font-semibold px-4 py-3.5">Target2</th>
                   <th className="text-left font-semibold px-4 py-3.5">Exit Price</th>
                   <th className="text-left font-semibold px-4 py-3.5">High Of</th>
+                  <th className="text-center font-semibold px-6 py-3.5">Action</th>
                 </tr>
               </thead>
               <tbody className="text-sm">
                 {tj.isLoading ? (
                   <tr>
-                    <td colSpan={12} className="px-6 py-16 text-center text-slate-400">
+                    <td colSpan={13} className="px-6 py-16 text-center text-slate-400">
                       Loading trade journals…
                     </td>
                   </tr>
                 ) : tj.isError ? (
                   <tr>
-                    <td colSpan={12} className="px-6 py-16 text-center text-red-500">
+                    <td colSpan={13} className="px-6 py-16 text-center text-red-500">
                       {tj.errorMessage || 'Failed to load trade journals.'}
                     </td>
                   </tr>
                 ) : !tj.hasScope ? (
                   <tr>
-                    <td colSpan={12} className="px-6 py-16 text-center text-slate-400">
-                      Select a community and sub-community to view trade journals.
+                    <td colSpan={13} className="px-6 py-16 text-center text-slate-400">
+                      No sub-communities available.
                     </td>
                   </tr>
                 ) : tj.pageRows.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="px-6 py-16 text-center text-slate-400">
+                    <td colSpan={13} className="px-6 py-16 text-center text-slate-400">
                       No trade journals found for this sub-community.
                     </td>
                   </tr>
@@ -199,6 +215,16 @@ export default function TradeJournalPage() {
                       <td className="px-4 py-4 text-slate-400 whitespace-nowrap">{numCell(row.target2)}</td>
                       <td className="px-4 py-4 font-medium text-slate-800 whitespace-nowrap">{numCell(row.exitPrice)}</td>
                       <td className="px-4 py-4 text-slate-700 whitespace-nowrap">{numCell(row.highOf)}</td>
+                      <td className="px-6 py-4 text-center whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => setEditingRow(row)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-medium hover:bg-slate-50 hover:text-emerald-600 hover:border-emerald-200 transition-colors cursor-pointer"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          Edit
+                        </button>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -263,6 +289,10 @@ export default function TradeJournalPage() {
           </div>
         </div>
       </div>
+
+      {editingRow && (
+        <EditTradeJournalModal row={editingRow} onClose={() => setEditingRow(null)} />
+      )}
     </main>
   );
 }

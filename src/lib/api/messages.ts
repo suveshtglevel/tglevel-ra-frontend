@@ -1,4 +1,5 @@
 import axiosInstance from '@/lib/axios';
+import { htmlToWhatsApp, whatsappToHtml, looksLikeHtml } from '@/lib/whatsappMarkdown';
 
 const BASE = '/api/v1/messages';
 
@@ -43,7 +44,9 @@ export async function sendMessage(input: SendMessageInput): Promise<SentMessage>
   form.append('community_id', input.community_id);
   form.append('sub_community_id', input.sub_community_id);
   form.append('type', String(input.type));
-  form.append('content', input.content ?? '');
+  // The composer produces HTML; the backend/mobile store WhatsApp markdown, so
+  // convert <strong>…</strong> back to *…* (etc.) before sending.
+  form.append('content', htmlToWhatsApp(input.content ?? ''));
   form.append('notification_sent', String(input.notification_sent ?? false));
   if (input.parent_message_id) {
     form.append('parent_message_id', input.parent_message_id);
@@ -107,7 +110,12 @@ export async function getMessages(
   if (!data.success) {
     throw new Error('Failed to load messages');
   }
-  return data.messages ?? [];
+  // Messages are stored as WhatsApp markdown; the renderer expects HTML. Convert
+  // markdown back to HTML, leaving any legacy HTML content untouched.
+  return (data.messages ?? []).map((m) => ({
+    ...m,
+    content: m.content && !looksLikeHtml(m.content) ? whatsappToHtml(m.content) : m.content,
+  }));
 }
 
 // ----- Message types --------------------------------------------------------

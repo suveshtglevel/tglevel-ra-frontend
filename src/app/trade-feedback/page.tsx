@@ -4,45 +4,71 @@ import React, { useMemo, useState } from 'react';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useTradeFeedbackStats } from '@/hooks/useTradeFeedbackStats';
+import { useTradeFeedback } from '@/hooks/useTradeFeedback';
 import FilterDropdown from '@/components/trade-journal/FilterDropdown';
 import {
-  FEEDBACK_ROWS,
-  FEEDBACK_STATS,
-  COMMUNITY_OPTIONS,
+  mapFeedbackToRow,
   FEEDBACK_OPTIONS,
   TIME_OPTIONS,
   PAGE_SIZE,
 } from '@/constants/tradeFeedbackData';
 
+const DASH = '—';
 const formatSigned = (n: number) =>
   `${n > 0 ? '+' : '-'}₹${Math.abs(n).toLocaleString('en-IN')}`;
 
 export default function TradeFeedbackPage() {
   const [query, setQuery] = useState('');
   const [community, setCommunity] = useState<string>('All Communities');
+  const [subCommunity, setSubCommunity] = useState<string>('All Sub-communities');
   const [feedback, setFeedback] = useState<string>('All Feedback');
   const [time, setTime] = useState<string>('This Month');
   const [page, setPage] = useState(1);
   const debouncedQuery = useDebounce(query, 250);
 
+  const { data: feedbackStats } = useTradeFeedbackStats();
+  const statValue = (n?: number) => (n ?? 0).toLocaleString('en-IN');
   const stats = [
-    { label: 'Total Feedback', value: FEEDBACK_STATS.total.toLocaleString('en-IN'), valueClass: 'text-slate-900' },
-    { label: 'Positive', value: FEEDBACK_STATS.positive.toLocaleString('en-IN'), valueClass: 'text-emerald-600' },
-    { label: 'Neutral', value: FEEDBACK_STATS.neutral.toLocaleString('en-IN'), valueClass: 'text-blue-500' },
-    { label: 'Negative', value: FEEDBACK_STATS.negative.toLocaleString('en-IN'), valueClass: 'text-red-500' },
+    { label: 'Total Feedback', value: statValue(feedbackStats?.total_feedback), valueClass: 'text-slate-900' },
+    { label: 'Positive', value: statValue(feedbackStats?.positive), valueClass: 'text-emerald-600' },
+    { label: 'Neutral', value: statValue(feedbackStats?.neutral), valueClass: 'text-blue-500' },
+    { label: 'Negative', value: statValue(feedbackStats?.negative), valueClass: 'text-red-500' },
   ];
 
-  // Filter by search (name / user id), community and sentiment.
+  const feedbackQuery = useTradeFeedback();
+  const allRows = useMemo(
+    () => (feedbackQuery.data?.feedbacks ?? []).map(mapFeedbackToRow),
+    [feedbackQuery.data]
+  );
+
+  // Community filter options built from the data that actually came back.
+  const communityOptions = useMemo(() => {
+    const names = Array.from(new Set(allRows.map((r) => r.community).filter(Boolean)));
+    return ['All Communities', ...names];
+  }, [allRows]);
+
+  // Sub-community options, scoped to the selected community when one is chosen.
+  const subCommunityOptions = useMemo(() => {
+    const inScope = allRows.filter(
+      (r) => community === 'All Communities' || r.community === community
+    );
+    const names = Array.from(new Set(inScope.map((r) => r.subCommunity).filter(Boolean)));
+    return ['All Sub-communities', ...names];
+  }, [allRows, community]);
+
+  // Filter by search (name / user id), community, sub-community and sentiment.
   const filtered = useMemo(() => {
     const q = debouncedQuery.trim().toLowerCase();
-    return FEEDBACK_ROWS.filter((r) => {
+    return allRows.filter((r) => {
       const matchesQuery =
         !q || r.name.toLowerCase().includes(q) || r.userId.toLowerCase().includes(q);
       const matchesCommunity = community === 'All Communities' || r.community === community;
+      const matchesSub = subCommunity === 'All Sub-communities' || r.subCommunity === subCommunity;
       const matchesFeedback = feedback === 'All Feedback' || r.sentiment === feedback;
-      return matchesQuery && matchesCommunity && matchesFeedback;
+      return matchesQuery && matchesCommunity && matchesSub && matchesFeedback;
     });
-  }, [debouncedQuery, community, feedback]);
+  }, [allRows, debouncedQuery, community, subCommunity, feedback]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -100,7 +126,16 @@ export default function TradeFeedbackPage() {
                 className="w-full h-10 rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 transition"
               />
             </div>
-            <FilterDropdown value={community} options={COMMUNITY_OPTIONS} onChange={resetTo(setCommunity)} />
+            <FilterDropdown
+              value={community}
+              options={communityOptions}
+              onChange={(v) => {
+                setCommunity(v);
+                setSubCommunity('All Sub-communities');
+                setPage(1);
+              }}
+            />
+            <FilterDropdown value={subCommunity} options={subCommunityOptions} onChange={resetTo(setSubCommunity)} />
             <FilterDropdown value={feedback} options={FEEDBACK_OPTIONS} onChange={resetTo(setFeedback)} />
             <FilterDropdown value={time} options={TIME_OPTIONS} onChange={resetTo(setTime)} />
           </div>
@@ -118,7 +153,19 @@ export default function TradeFeedbackPage() {
                 </tr>
               </thead>
               <tbody className="text-sm">
-                {rows.length === 0 ? (
+                {feedbackQuery.isLoading ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-16 text-center text-slate-400">
+                      Loading feedback…
+                    </td>
+                  </tr>
+                ) : feedbackQuery.isError ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-16 text-center text-red-500">
+                      Failed to load feedback.
+                    </td>
+                  </tr>
+                ) : rows.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-16 text-center text-slate-400">
                       No feedback matches the selected filters.
@@ -129,14 +176,23 @@ export default function TradeFeedbackPage() {
                     <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div
-                            className={cn(
-                              'w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
-                              row.avatarColor
-                            )}
-                          >
-                            {row.initials}
-                          </div>
+                          {row.profileImage ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={row.profileImage}
+                              alt={row.name}
+                              className="w-9 h-9 rounded-full object-cover shrink-0"
+                            />
+                          ) : (
+                            <div
+                              className={cn(
+                                'w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
+                                row.avatarColor
+                              )}
+                            >
+                              {row.initials}
+                            </div>
+                          )}
                           <div className="min-w-0">
                             <p className="font-semibold text-slate-800 whitespace-nowrap">{row.name}</p>
                             <p className="text-[11px] text-slate-400 whitespace-nowrap">#{row.userId}</p>
@@ -144,21 +200,37 @@ export default function TradeFeedbackPage() {
                         </div>
                       </td>
                       <td className="px-4 py-4">
-                        <span className="inline-flex items-center rounded-md bg-slate-100 text-slate-600 px-2.5 py-1 text-xs font-medium">
-                          {row.community}
-                        </span>
+                        {row.community ? (
+                          <span className="inline-flex items-center rounded-md bg-slate-100 text-slate-600 px-2.5 py-1 text-xs font-medium">
+                            {row.community}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">{DASH}</span>
+                        )}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
-                        <span className="font-semibold text-slate-800">{row.tradeName}</span>
-                        <span className="text-[11px] text-slate-400 ml-1.5">({row.tradeDate})</span>
+                        {row.tradeName ? (
+                          <>
+                            <span className="font-semibold text-slate-800">{row.tradeName}</span>
+                            {row.tradeDate && (
+                              <span className="text-[11px] text-slate-400 ml-1.5">({row.tradeDate})</span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-slate-400">{DASH}</span>
+                        )}
                       </td>
                       <td
                         className={cn(
                           'px-4 py-4 font-bold whitespace-nowrap',
-                          row.profitLoss >= 0 ? 'text-emerald-600' : 'text-red-500'
+                          row.profitLoss === null
+                            ? 'text-slate-400'
+                            : row.profitLoss >= 0
+                              ? 'text-emerald-600'
+                              : 'text-red-500'
                         )}
                       >
-                        {formatSigned(row.profitLoss)}
+                        {row.profitLoss === null ? DASH : formatSigned(row.profitLoss)}
                       </td>
                       <td className="px-6 py-4">
                         <span className="block text-slate-600 truncate max-w-[280px]" title={row.feedback}>

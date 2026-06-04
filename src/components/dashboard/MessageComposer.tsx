@@ -3,7 +3,7 @@
 import React, { useEffect } from 'react';
 import Image from 'next/image';
 import { createPortal } from 'react-dom';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import { selectAll } from '@tiptap/pm/commands';
 import { TextSelection } from '@tiptap/pm/state';
 import StarterKit from '@tiptap/starter-kit';
@@ -42,6 +42,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { whatsappToHtml } from '@/lib/whatsappMarkdown';
 import { useHydrated } from '@/hooks/useHydrated';
 import dynamic from 'next/dynamic';
 import type { EmojiClickData } from 'emoji-picker-react';
@@ -146,6 +147,9 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
   // Holds the latest send handler so the editor's keydown (set up once) always
   // calls the current closure instead of a stale one.
   const handleSendRef = React.useRef<() => void>(() => {});
+  // The editor instance, exposed via a ref so the paste handler (set up once)
+  // can insert converted content.
+  const editorRef = React.useRef<Editor | null>(null);
   // The capped, scrollable wrapper around the editor — used to keep the caret
   // visible as the message grows past the max height.
   const editorScrollRef = React.useRef<HTMLDivElement>(null);
@@ -203,6 +207,11 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
         placeholder: 'Type your message here...',
       }),
     ],
+    // Disable TipTap's built-in markdown rules: its single-`*` rule maps to
+    // italic, which conflicts with WhatsApp's single-`*` = bold. We handle the
+    // WhatsApp conversion ourselves in handlePaste (and on send) instead.
+    enableInputRules: false,
+    enablePasteRules: false,
     content: '',
     onUpdate: ({ editor }) => {
       setIsEditorEmpty(editor.isEmpty);
@@ -259,12 +268,27 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
         }
         return false;
       },
-      // Pasting an image/file (e.g. a screenshot) attaches it; text/HTML still
-      // pastes normally because we only intercept when files are present.
+      // Pasting an image/file (e.g. a screenshot) attaches it. Pasting plain text
+      // that uses WhatsApp markdown (*bold*, _italic_, ~strike~) is converted so
+      // it shows formatted (asterisks hidden) — matching how it renders after
+      // sending. Rich HTML pastes fall through to TipTap's default handling.
       handlePaste: (_view, event) => {
         if (handleEditorFiles(event.clipboardData?.files)) {
           event.preventDefault();
           return true;
+        }
+        const clipboard = event.clipboardData;
+        const htmlData = clipboard?.getData('text/html') ?? '';
+        const textData = clipboard?.getData('text/plain') ?? '';
+        // Real formatting in the clipboard HTML (bold/italic/…) — paste it as-is.
+        const hasRichFormatting = /<(strong|b|em|i|s|del|u)\b/i.test(htmlData);
+        if (!hasRichFormatting && /[*_~]/.test(textData)) {
+          const ed = editorRef.current;
+          if (ed) {
+            ed.chain().focus().insertContent(textData).run();
+            event.preventDefault();
+            return true;
+          }
         }
         return false;
       },
@@ -327,6 +351,11 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
   useEffect(() => {
     handleSendRef.current = handleSend;
   });
+
+  // Expose the editor to the (statically-defined) paste handler.
+  useEffect(() => {
+    editorRef.current = editor;
+  }, [editor]);
 
   // Dynamically toggle tip-tap editor editability based on the disabled prop
   useEffect(() => {

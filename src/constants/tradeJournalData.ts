@@ -23,9 +23,9 @@ export interface TradeRow {
 
 export const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
 
-// Backend sends numeric values as strings (e.g. "175"); parse to a number, or
-// null when the field is absent/blank so the UI can show a dash.
-const toNum = (v?: string): number | null => {
+// Backend sends numeric values as strings (e.g. "175") or numbers; parse to a
+// number, or null when the field is absent/blank so the UI can show a dash.
+const toNum = (v?: string | number | null): number | null => {
   if (v === undefined || v === null || v === '') return null;
   const n = Number(v);
   return Number.isNaN(n) ? null : n;
@@ -42,10 +42,11 @@ export function mapJournalToRow(j: BackendTradeJournal): TradeRow {
     // Prefer the API's target1/target2; fall back to older field names.
     target1: toNum(j.target1 ?? j.target_1 ?? j.target),
     target2: toNum(j.target2 ?? j.target_2),
-    points: null,
-    lotSize: null,
-    profit: null,
-    exitPrice: null,
-    highOf: null,
+    // RA-filled fields (null until set via update-trade-journal).
+    points: toNum(j.points),
+    lotSize: toNum(j.quantity),
+    profit: toNum(j.profit),
+    exitPrice: toNum(j.exit_price),
+    highOf: toNum(j.high_of),
   };
 }

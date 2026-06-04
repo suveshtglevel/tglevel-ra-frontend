@@ -17,7 +17,15 @@ import {
 import { mapJournalToRow, TradeRow } from '@/constants/tradeJournalData';
 import { useCommunities } from '@/hooks/useCommunities';
 import { useAllTradeJournals } from '@/hooks/useAllTradeJournals';
+import { useAllTradeStats } from '@/hooks/useAllTradeStats';
 import { getApiErrorMessage } from '@/lib/api/errors';
+
+// winRatio comes back as "16.7%"; parse to a number, or null when unavailable.
+const parsePct = (s?: string): number | null => {
+  if (!s) return null;
+  const n = parseFloat(s);
+  return Number.isNaN(n) ? null : n;
+};
 
 type PageItem = number | 'ellipsis';
 
@@ -69,6 +77,10 @@ export const useTradeJournal = () => {
   // dropdown selection then filters this set client-side.
   const journalsQuery = useAllTradeJournals(allSubs);
 
+  // Stats come from the dedicated endpoint (per sub-community), fetched in
+  // parallel so the combined view can aggregate them.
+  const statsQuery = useAllTradeStats(allSubs);
+
   // Map → filter (sub-community, date range, P/L) → sort. All client-side, so
   // the counts and pagination below stay consistent with what's shown. Only the
   // date sort is meaningful today — the numeric fields (incl. profit) aren't
@@ -106,14 +118,30 @@ export const useTradeJournal = () => {
   const rangeStart = totalEntries === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const rangeEnd = Math.min(currentPage * pageSize, totalEntries);
 
-  // Total Trades reflects the current filter set; the rest depend on fields the
-  // backend doesn't return yet, so they're null and shown as a dash.
-  const stats = {
-    totalTrades: totalEntries,
-    totalProfit: null as number | null,
-    winRatio: null as number | null,
-    activeTrades: null as number | null,
-  };
+  // Stats from the get-trade-stats endpoint. For a single sub-community we use
+  // its stats directly; for "All sub-communities" we sum the totals and derive
+  // an overall win ratio from each sub's wins (winRatio × totalTrades).
+  const stats = (() => {
+    if (subCommunityId === ALL_SUBS) {
+      const all = statsQuery.list;
+      if (all.length === 0) {
+        return { totalTrades: 0, totalProfit: null, winRatio: null, activeTrades: null } as const;
+      }
+      const totalTrades = all.reduce((s, x) => s + (x.totalTrades || 0), 0);
+      const totalProfit = all.reduce((s, x) => s + (x.totalProfit || 0), 0);
+      const activeTrades = all.reduce((s, x) => s + (x.activeTrades || 0), 0);
+      const wins = all.reduce((s, x) => s + ((parsePct(x.winRatio) ?? 0) / 100) * (x.totalTrades || 0), 0);
+      const winRatio = totalTrades > 0 ? (wins / totalTrades) * 100 : null;
+      return { totalTrades, totalProfit, winRatio, activeTrades };
+    }
+    const one = statsQuery.byId[subCommunityId];
+    return {
+      totalTrades: one?.totalTrades ?? 0,
+      totalProfit: one ? one.totalProfit : null,
+      winRatio: parsePct(one?.winRatio),
+      activeTrades: one ? one.activeTrades : null,
+    };
+  })();
 
   const downloadReport = () => {
     if (filteredRows.length === 0) {

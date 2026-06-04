@@ -1,18 +1,23 @@
-// Mock data for the User Trade Feedback page. Mirrors the trade-journal data
-// style (plain constants consumed by the page) until a real feedback API exists.
+// Types + mapping for the User Trade Feedback page. Rows are now built from the
+// trade-feedback API (see mapFeedbackToRow); the SEEDS below are kept only as a
+// fallback/reference.
+
+import type { BackendFeedback } from '@/lib/api/tradeFeedback';
 
 export type FeedbackSentiment = 'Positive' | 'Neutral' | 'Negative';
 
 export interface FeedbackRow {
   id: string;
   name: string;
-  userId: string; // e.g. "TG-4821"
+  userId: string;
   initials: string;
   avatarColor: string; // tailwind classes for the avatar circle
+  profileImage: string | null;
   community: string;
-  tradeName: string;
+  subCommunity: string;
+  tradeName: string | null;
   tradeDate: string; // display, e.g. "12 May 2025"
-  profitLoss: number; // signed rupees
+  profitLoss: number | null; // signed rupees, null when not provided
   sentiment: FeedbackSentiment;
   feedback: string;
 }
@@ -86,10 +91,52 @@ export const FEEDBACK_ROWS: FeedbackRow[] = SEEDS.map((s, i) => ({
   userId: `TG-${4821 - i * 13}`,
   initials: initialsOf(s.name),
   avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
+  profileImage: null,
   community: s.community,
+  subCommunity: '',
   tradeName: s.tradeName,
   tradeDate: s.tradeDate,
   profitLoss: s.profitLoss,
   sentiment: s.sentiment,
   feedback: s.feedback,
 }));
+
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// "2026-06-04T09:48:21Z" -> "04 Jun 2026" (empty when missing/invalid).
+const formatFeedbackDate = (iso?: string): string => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${String(d.getDate()).padStart(2, '0')} ${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}`;
+};
+
+// The API has no per-row sentiment, so derive it from the rating (matching how
+// the stats endpoint buckets feedback): 4–5 positive, 3 neutral, 1–2 negative.
+const ratingToSentiment = (rating?: number): FeedbackSentiment => {
+  if (rating === undefined || rating === null) return 'Neutral';
+  if (rating >= 4) return 'Positive';
+  if (rating === 3) return 'Neutral';
+  return 'Negative';
+};
+
+export function mapFeedbackToRow(f: BackendFeedback, index: number): FeedbackRow {
+  const name = f.user_name?.trim() || 'Unknown user';
+  const profit =
+    f.profit === null || f.profit === undefined || f.profit === '' ? null : Number(f.profit);
+  return {
+    id: f.trade_feedback_id || f._id,
+    name,
+    userId: f.user_id,
+    initials: initialsOf(name) || 'U',
+    avatarColor: AVATAR_COLORS[index % AVATAR_COLORS.length],
+    profileImage: f.profile_image || null,
+    community: f.community_name || '',
+    subCommunity: f.sub_community_name || '',
+    tradeName: f.trade_name ?? null,
+    tradeDate: formatFeedbackDate(f.createdAt),
+    profitLoss: profit !== null && Number.isNaN(profit) ? null : profit,
+    sentiment: ratingToSentiment(f.rating),
+    feedback: f.feedback || '',
+  };
+}

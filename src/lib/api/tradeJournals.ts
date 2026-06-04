@@ -23,6 +23,12 @@ export interface BackendTradeJournal {
   target?: string;
   target_1?: string;
   target_2?: string;
+  // RA-filled fields (set via update-trade-journal). May be string or number.
+  points?: string | number;
+  quantity?: string | number;
+  profit?: string | number;
+  exit_price?: string | number;
+  high_of?: string | number;
   date?: string; // "YYYY-MM-DD"
   time?: string; // e.g. "11:34:30 AM"
   createdAt?: string;
@@ -73,6 +79,74 @@ export async function getTradeJournals(
   );
   if (!data.success) {
     throw new Error(data.message || 'Failed to load trade journals');
+  }
+  return data.data;
+}
+
+// ----- Trade stats ----------------------------------------------------------
+
+// Aggregate stats for one sub-community. winRatio is returned as a string with
+// a percent sign (e.g. "16.7%").
+export interface TradeStats {
+  totalTrades: number;
+  totalProfit: number;
+  winRatio: string;
+  activeTrades: number;
+}
+
+interface GetTradeStatsResponse {
+  success: boolean;
+  message: string;
+  data: TradeStats;
+}
+
+export async function getTradeStats(params: {
+  communityId: string;
+  subCommunityId: string;
+}): Promise<TradeStats> {
+  const { data } = await axiosInstance.get<GetTradeStatsResponse>(
+    `${BASE}/get-trade-stats`,
+    {
+      params: {
+        community_id: params.communityId,
+        sub_community_id: params.subCommunityId,
+      },
+    }
+  );
+  if (!data.success) {
+    throw new Error(data.message || 'Failed to load trade stats');
+  }
+  return data.data;
+}
+
+// ----- Update (RA fills the analysis fields) --------------------------------
+
+// The only fields update-trade-journal accepts. Sent as JSON; the backend takes
+// strings for most values and a number for quantity (matching the API example).
+export interface UpdateTradeJournalInput {
+  points?: string;
+  quantity?: number;
+  profit?: string;
+  exit_price?: string;
+  high_of?: string;
+}
+
+interface UpdateTradeJournalResponse {
+  success: boolean;
+  message: string;
+  data: BackendTradeJournal;
+}
+
+export async function updateTradeJournal(
+  journalId: string,
+  input: UpdateTradeJournalInput
+): Promise<BackendTradeJournal> {
+  const { data } = await axiosInstance.patch<UpdateTradeJournalResponse>(
+    `${BASE}/update-trade-journal/${journalId}`,
+    input
+  );
+  if (!data.success) {
+    throw new Error(data.message || 'Failed to update trade journal');
   }
   return data.data;
 }
