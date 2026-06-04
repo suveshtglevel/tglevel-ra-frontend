@@ -2,7 +2,6 @@
 
 import React from 'react';
 import Image from 'next/image';
-import { ArrowLeft, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface BannerLivePreviewProps {
@@ -57,24 +56,6 @@ const BannerLivePreview = ({
 
   return (
     <div className="rounded-[28px] p-2.5 shadow-xl w-full" style={{ backgroundColor: bgColor }}>
-      {/* App chrome */}
-      <div className="flex items-center justify-between px-1.5 pt-1 pb-2.5">
-        <button
-          type="button"
-          className="w-8 h-8 rounded-full bg-black/25 flex items-center justify-center text-white"
-          aria-label="Back"
-        >
-          <ArrowLeft className="w-4 h-4" />
-        </button>
-        <button
-          type="button"
-          className="w-8 h-8 rounded-full bg-black/25 flex items-center justify-center text-white"
-          aria-label="Close"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-
       {/* Banner image */}
       <div className="relative w-full aspect-square rounded-2xl overflow-hidden">
         <Image src={image} alt="Banner preview" fill className="object-cover" unoptimized />

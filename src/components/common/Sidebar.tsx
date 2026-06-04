@@ -13,7 +13,7 @@ import { getApiErrorMessage } from '@/lib/api/errors';
 import { useAppDispatch, useAppSelector } from '@/redux/hooks';
 import { logout as logoutAction, updateUser } from '@/redux/slices/authSlice';
 
-type SidebarTab = 'chat' | 'webinar' | 'tradeJournal' | 'settings';
+type SidebarTab = 'chat' | 'webinar' | 'tradeJournal' | 'tradeFeedback' | 'settings';
 
 const Sidebar = () => {
   const router = useRouter();
@@ -57,6 +57,8 @@ const Sidebar = () => {
     ? 'webinar'
     : pathname?.startsWith('/trade-journal')
     ? 'tradeJournal'
+    : pathname?.startsWith('/trade-feedback')
+    ? 'tradeFeedback'
     : 'chat';
 
   const handleTabClick = (tab: SidebarTab) => {
@@ -71,6 +73,10 @@ const Sidebar = () => {
     if (tab === 'tradeJournal') {
       setShowSettings(false);
       router.push('/trade-journal');
+    }
+    if (tab === 'tradeFeedback') {
+      setShowSettings(false);
+      router.push('/trade-feedback');
     }
     if (tab === 'settings') {
       setShowSettings((prev) => !prev);
@@ -160,6 +166,18 @@ const Sidebar = () => {
         >
           TJ
         </button>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Trade Feedback"
+          onClick={() => handleTabClick('tradeFeedback')}
+          className={cn(
+            "cursor-pointer transition-colors",
+            activeTab === 'tradeFeedback' ? "text-emerald-600 bg-emerald-50 hover:bg-emerald-100" : "text-slate-400 hover:text-slate-600"
+          )}
+        >
+          <Image src="/trade-feedback.png" alt="Trade Feedback" width={24} height={24} className="w-6 h-6 object-contain" />
+        </Button>
       </nav>
 
       {/* Settings button with profile card */}

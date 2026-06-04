@@ -18,6 +18,7 @@ import { PREVIOUS_POSTS, BANNER_CATEGORIES, BannerStatus } from '@/constants/web
 import { useDebounce } from '@/hooks/useDebounce';
 import { useBanners } from '@/hooks/useBanners';
 import { useDeleteBanner } from '@/hooks/useBannerMutations';
+import BannerPreviewModal from './BannerPreviewModal';
 import type { Banner, BannerStatusApi } from '@/lib/api/banners';
 
 const statusBadge: Record<BannerStatus, string> = {
@@ -70,6 +71,7 @@ export const PreviousBannersTable = ({ onEdit }: { onEdit?: (banner: Banner) => 
   const [status, setStatus] = useState<StatusFilter>('All');
   const [category, setCategory] = useState('All');
   const [page, setPage] = useState(1);
+  const [previewBanner, setPreviewBanner] = useState<Banner | null>(null);
   const debouncedQuery = useDebounce(query, 300);
   const deleteBanner = useDeleteBanner();
 
@@ -206,7 +208,7 @@ export const PreviousBannersTable = ({ onEdit }: { onEdit?: (banner: Banner) => 
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex items-center justify-end gap-3 text-slate-400">
-                        <button type="button" className="hover:text-slate-600 cursor-pointer" aria-label="View"><Eye className="w-4 h-4" /></button>
+                        <button type="button" onClick={() => setPreviewBanner(b)} className="hover:text-slate-600 cursor-pointer" aria-label="View"><Eye className="w-4 h-4" /></button>
                         <button
                           type="button"
                           onClick={() => onEdit?.(b)}
@@ -269,6 +271,10 @@ export const PreviousBannersTable = ({ onEdit }: { onEdit?: (banner: Banner) => 
           </button>
         </div>
       </div>
+
+      {previewBanner && (
+        <BannerPreviewModal banner={previewBanner} onClose={() => setPreviewBanner(null)} />
+      )}
     </section>
   );
 };
