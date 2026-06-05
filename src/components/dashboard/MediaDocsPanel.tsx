@@ -6,7 +6,9 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useDebounce } from '@/hooks/useDebounce';
-import type { ChatMessage } from '@/redux/slices/messageSlice';
+import FileViewer from './FileViewer';
+import { openAttachment } from './FileAttachmentView';
+import type { ChatMessage, FileAttachment } from '@/redux/slices/messageSlice';
 
 // Inline-viewable MIME types keyed by extension. Used to re-tag the fetched blob
 // so the browser opens the file in its viewer instead of downloading it when the
@@ -35,44 +37,6 @@ const OFFICE_SCHEME_BY_EXT: Record<string, string> = {
   xlsx: 'ms-excel',
   ppt: 'ms-powerpoint',
   pptx: 'ms-powerpoint',
-};
-
-// Open an attachment from the device: Word/Excel/PowerPoint files launch in their
-// desktop app; PDFs/images/video open in a new browser tab (the browser's native
-// viewer) instead of showing a download dialog. The tab is opened synchronously
-// to survive the popup blocker, then pointed at a blob: URL once the file fetches.
-const openAttachment = async (name: string, url: string) => {
-  const ext = name.split('.').pop()?.toLowerCase() ?? '';
-
-  const officeScheme = OFFICE_SCHEME_BY_EXT[ext];
-  if (officeScheme) {
-    const absoluteUrl = /^https?:\/\//i.test(url)
-      ? url
-      : new URL(url, window.location.origin).href;
-    // Only the Office scheme can reach an http(s) document; for a local
-    // data:/blob: url fall through to the in-browser open below.
-    if (/^https?:\/\//i.test(absoluteUrl)) {
-      window.location.href = `${officeScheme}:ofe|u|${absoluteUrl}`;
-      return;
-    }
-  }
-
-  const win = window.open('', '_blank');
-  try {
-    let blob = await (await fetch(url)).blob();
-    const inlineMime = INLINE_MIME_BY_EXT[ext];
-    if (inlineMime && blob.type !== inlineMime) {
-      blob = new Blob([blob], { type: inlineMime });
-    }
-    const objectUrl = URL.createObjectURL(blob);
-    if (win) win.location.href = objectUrl;
-    else window.location.href = objectUrl;
-    setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
-  } catch {
-    // Network/CORS failure — fall back to opening the original url directly.
-    if (win) win.location.href = url;
-    else window.location.href = url;
-  }
 };
 
 interface MediaDocsPanelProps {
@@ -138,6 +102,7 @@ const MediaDocsPanel = ({ title, messages, onClose }: MediaDocsPanelProps) => {
   const [activeTab, setActiveTab] = React.useState<Tab>('Media');
   const [docFilter, setDocFilter] = React.useState<DocFilter>('All');
   const [search, setSearch] = React.useState('');
+  const [previewAttachment, setPreviewAttachment] = React.useState<FileAttachment | null>(null);
   const debouncedSearch = useDebounce(search, 300);
   const q = debouncedSearch.trim().toLowerCase();
 
@@ -254,11 +219,48 @@ const MediaDocsPanel = ({ title, messages, onClose }: MediaDocsPanelProps) => {
           filteredMedia.length > 0 ? (
             <div className="grid grid-cols-3 gap-2 pb-4">
               {filteredMedia.map((m) => (
-                <button
+                <div
                   key={m.id}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   title={m.name}
-                  onClick={() => openAttachment(m.name, m.url)}
+                  onClick={() => {
+                    if (m.fileType === 'image') {
+                      setPreviewAttachment({
+                        name: m.name,
+                        size: m.size,
+                        url: m.url,
+                        fileType: 'image',
+                      });
+                      return;
+                    }
+                    openAttachment({
+                      name: m.name,
+                      size: m.size,
+                      url: m.url,
+                      fileType: m.fileType,
+                    });
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      if (m.fileType === 'image') {
+                        setPreviewAttachment({
+                          name: m.name,
+                          size: m.size,
+                          url: m.url,
+                          fileType: 'image',
+                        });
+                      } else {
+                        openAttachment({
+                          name: m.name,
+                          size: m.size,
+                          url: m.url,
+                          fileType: m.fileType,
+                        });
+                      }
+                    }
+                  }}
                   className="relative aspect-square rounded-xl overflow-hidden bg-slate-100 border border-slate-200 hover:opacity-90 transition-opacity cursor-pointer p-0"
                 >
                   {m.fileType === 'image' ? (
@@ -272,7 +274,7 @@ const MediaDocsPanel = ({ title, messages, onClose }: MediaDocsPanelProps) => {
                       </div>
                     </>
                   )}
-                </button>
+                </div>
               ))}
             </div>
           ) : (
@@ -287,7 +289,12 @@ const MediaDocsPanel = ({ title, messages, onClose }: MediaDocsPanelProps) => {
                 <button
                   key={doc.id}
                   type="button"
-                  onClick={() => openAttachment(doc.name, doc.url)}
+                  onClick={() => openAttachment({
+                    name: doc.name,
+                    size: doc.size,
+                    url: doc.url,
+                    fileType: doc.fileType,
+                  })}
                   className="flex items-center gap-3 p-4 bg-[#F8FAFC] border border-slate-200 rounded-2xl cursor-pointer hover:border-slate-300 transition-colors text-left w-full"
                 >
                   <DocIcon fileType={doc.fileType} />
@@ -331,6 +338,9 @@ const MediaDocsPanel = ({ title, messages, onClose }: MediaDocsPanelProps) => {
           )
         )}
       </ScrollArea>
+      {previewAttachment && (
+        <FileViewer attachment={previewAttachment} onClose={() => setPreviewAttachment(null)} />
+      )}
     </div>
   );
 };

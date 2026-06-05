@@ -24,11 +24,20 @@ const FileViewer = ({ attachment, onClose }: { attachment: FileAttachment; onClo
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const handleDownload = () => {
+  const handleDownload = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const blob = await (await fetch(attachment.url)).blob();
+    const objectUrl = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = attachment.url;
+    link.href = objectUrl;
     link.download = attachment.name;
+    link.style.display = 'none';
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(objectUrl);
   };
 
   if (!mounted) return null;
@@ -36,10 +45,10 @@ const FileViewer = ({ attachment, onClose }: { attachment: FileAttachment; onClo
   const content = (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80" onClick={onClose}>
       <div className="absolute top-4 right-4 flex items-center gap-3 z-10">
-        <button onClick={(e) => { e.stopPropagation(); handleDownload(); }} className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer transition-colors">
+        <button onClick={(e) => handleDownload(e)} className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer transition-colors">
           <Download className="w-5 h-5 text-white" />
         </button>
-        <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer transition-colors">
+        <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer transition-colors">
           <X className="w-5 h-5 text-white" />
         </button>
       </div>
@@ -65,7 +74,7 @@ const FileViewer = ({ attachment, onClose }: { attachment: FileAttachment; onClo
             </div>
             <p className="text-lg font-bold text-slate-800 break-all">{attachment.name}</p>
             <p className="text-sm text-slate-500">{attachment.fileType.toUpperCase()} &bull; {attachment.size}</p>
-            <button onClick={handleDownload} className="px-6 py-2.5 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 cursor-pointer transition-colors">
+            <button onClick={(e) => handleDownload(e)} className="px-6 py-2.5 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 cursor-pointer transition-colors">
               Download File
             </button>
           </div>
