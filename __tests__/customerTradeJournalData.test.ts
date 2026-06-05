@@ -1,5 +1,5 @@
-import { mapUserJournalToRow } from '@/constants/customerTradeJournalData';
-import type { BackendUserTradeJournal } from '@/lib/api/tradeJournals';
+import { mapUserJournalToRow } from '@/modules/trade-journal/constants/customerTradeJournalData';
+import type { BackendUserTradeJournal } from '@/modules/trade-journal/services/tradeJournals.service';
 
 const baseJournal: BackendUserTradeJournal = {
   _id: '6a216f0e8a438d20983c2d13',

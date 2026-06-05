@@ -1,10 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import BannerThemeColors from '@/components/webinar/BannerThemeColors';
-import { useSuggestedPalette } from '@/hooks/useSuggestedPalette';
-import type { UseWebinarBanner } from '@/hooks/useWebinarBanner';
+import BannerThemeColors from '@/modules/banner/components/BannerThemeColors';
+import { useSuggestedPalette } from '@/modules/banner/hooks/useSuggestedPalette';
+import type { UseWebinarBanner } from '@/modules/banner/hooks/useWebinarBanner';
 
-jest.mock('@/hooks/useSuggestedPalette');
+jest.mock('@/modules/banner/hooks/useSuggestedPalette');
 
 const mockedPalette = useSuggestedPalette as jest.MockedFunction<typeof useSuggestedPalette>;
 

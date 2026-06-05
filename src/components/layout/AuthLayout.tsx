@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import LoginLogo from '@/components/common/LoginLogo';
+import LoginLogo from '@/modules/auth/components/LoginLogo';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (

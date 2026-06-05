@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
-import TradeCard from '@/components/dashboard/TradeCard';
-import type { ChatMessage } from '@/redux/slices/messageSlice';
+import TradeCard from '@/modules/dashboard/components/TradeCard';
+import type { ChatMessage } from '@/store/slices/messageSlice';
 
 const imageAttachment: NonNullable<ChatMessage['attachment']> = {
   name: 'chart.png',

@@ -1,5 +1,5 @@
-import type { BackendMessage, BackendAttachment } from '@/lib/api/messages';
-import type { ChatMessage, FileAttachment } from '@/redux/slices/messageSlice';
+import type { BackendMessage, BackendAttachment } from '@/modules/dashboard/services/messages.service';
+import type { ChatMessage, FileAttachment } from '@/store/slices/messageSlice';
 
 // Format an ISO timestamp as a short "h:mm AM/PM" label for the chat feed.
 export function formatTime(iso?: string): string {

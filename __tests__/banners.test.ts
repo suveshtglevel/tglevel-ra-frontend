@@ -1,4 +1,4 @@
-import axiosInstance from '@/lib/axios';
+import axiosInstance from '@/services/axios';
 import {
   createBanner,
   updateBanner,
@@ -7,11 +7,11 @@ import {
   deleteBanner,
   type Banner,
   type BannerTheme,
-} from '@/lib/api/banners';
+} from '@/modules/banner/services/banners.service';
 
 // The banners API talks through the shared axios instance; mock it so we can
 // assert on the multipart payloads and feed back canned responses.
-jest.mock('@/lib/axios', () => ({
+jest.mock('@/services/axios', () => ({
   __esModule: true,
   default: { get: jest.fn(), post: jest.fn(), put: jest.fn(), delete: jest.fn() },
 }));

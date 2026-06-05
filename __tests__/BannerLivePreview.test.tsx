@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import BannerLivePreview from '@/components/webinar/BannerLivePreview';
+import BannerLivePreview from '@/modules/banner/components/BannerLivePreview';
 
 // next/image renders an <img> in jsdom; mock it to a plain img so alt/role work.
 jest.mock('next/image', () => ({
