@@ -134,10 +134,16 @@ export interface MessageTypeOption {
   name: string;
 }
 
+// The backend's exact field names for message types have varied (`_id` /
+// `message_type_id` vs a plain `id`/`type`), so accept the known aliases and
+// normalize, rather than assuming one shape.
 interface BackendMessageType {
-  _id: string;
-  message_type_id: string;
-  name: string;
+  _id?: string;
+  id?: string | number;
+  message_type_id?: string | number;
+  type?: string | number;
+  name?: string;
+  label?: string;
 }
 
 interface GetMessageTypesResponse {
@@ -152,9 +158,15 @@ export async function getMessageTypes(): Promise<MessageTypeOption[]> {
   if (!data.success) {
     throw new Error('Failed to load message types');
   }
-  return (data.data ?? []).map((t) => ({
-    _id: t._id,
-    id: Number(t.message_type_id),
-    name: t.name,
-  }));
+  return (data.data ?? []).map((t, index) => {
+    // Numeric code sent back as `type` on send-message.
+    const code = t.message_type_id ?? t.id ?? t.type;
+    // Stable, guaranteed-unique key/identity — never undefined or duplicate.
+    const _id = String(t._id ?? code ?? t.name ?? index);
+    return {
+      _id,
+      id: Number(code),
+      name: t.name ?? t.label ?? `Type ${index + 1}`,
+    };
+  });
 }
