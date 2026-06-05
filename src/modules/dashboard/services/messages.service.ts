@@ -1,7 +1,25 @@
+import * as z from 'zod';
 import axiosInstance from '@/services/axios';
+import { parseResponse } from '@/lib/validate';
 import { htmlToWhatsApp, whatsappToHtml, looksLikeHtml } from '@/lib/whatsappMarkdown';
 
 const BASE = '/api/v1/messages';
+
+// Lenient runtime schemas. The backend message schema is open-ended, so we only
+// assert the envelope + that the collections are arrays of objects; element
+// fields stay loose (the service normalizes them).
+const sendMessageResponseSchema = z
+  .object({ success: z.boolean(), data: z.object({}).loose() })
+  .loose();
+
+// `messages`/`data` are optional: the service falls back to [] when absent.
+const getMessagesResponseSchema = z
+  .object({ success: z.boolean(), messages: z.array(z.object({}).loose()).optional() })
+  .loose();
+
+const getMessageTypesResponseSchema = z
+  .object({ success: z.boolean(), data: z.array(z.object({}).loose()).optional() })
+  .loose();
 
 // Message kind, sent as a numeric code the backend understands.
 export type MessageType = number;
@@ -64,6 +82,7 @@ export async function sendMessage(input: SendMessageInput): Promise<SentMessage>
   if (!data.success) {
     throw new Error(data.message || 'Failed to send message');
   }
+  parseResponse(sendMessageResponseSchema, data, 'send-message');
   return data.data;
 }
 
@@ -112,6 +131,7 @@ export async function getMessages(
   if (!data.success) {
     throw new Error('Failed to load messages');
   }
+  parseResponse(getMessagesResponseSchema, data, 'messages');
   // Messages are stored as WhatsApp markdown; the renderer expects HTML. Convert
   // markdown back to HTML, leaving any legacy HTML content untouched.
   return (data.messages ?? []).map((m) => ({
@@ -158,6 +178,7 @@ export async function getMessageTypes(): Promise<MessageTypeOption[]> {
   if (!data.success) {
     throw new Error('Failed to load message types');
   }
+  parseResponse(getMessageTypesResponseSchema, data, 'message types');
   return (data.data ?? []).map((t, index) => {
     // Numeric code sent back as `type` on send-message.
     const code = t.message_type_id ?? t.id ?? t.type;

@@ -1,9 +1,9 @@
-'use client';
+﻿'use client';
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import type { PublishOption } from '@/modules/banner/constants/webinarData';
-import type { UseWebinarBanner } from '@/modules/banner/hooks/useWebinarBanner';
+import type { PublishOption } from '@/modules/banner/constants/bannerData';
+import type { UseBannerForm } from '@/modules/banner/hooks/useBannerForm';
 import TimeField from '@/modules/banner/components/TimeField';
 
 const Radio = ({ active }: { active: boolean }) => (
@@ -20,7 +20,7 @@ const Radio = ({ active }: { active: boolean }) => (
 const scheduleInput =
   'w-full h-11 rounded-lg border border-slate-200 bg-white px-3.5 pr-9 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 transition';
 
-const PublishingOptions = ({ w }: { w: UseWebinarBanner }) => {
+const PublishingOptions = ({ w }: { w: UseBannerForm }) => {
   const option = (value: PublishOption, title: string, subtitle: string) => (
     <button
       type="button"

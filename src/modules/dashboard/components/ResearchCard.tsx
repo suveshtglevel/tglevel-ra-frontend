@@ -43,10 +43,10 @@ const ResearchCard = ({ analysis, status = 'read', onTickClick }: ResearchCardPr
         <div className="font-bold flex items-center gap-2 text-[15px]">
           ✅*RESEARCH ANALYSIS✅
         </div>
-        <div className="font-bold text-[13px] leading-[18.57px] tracking-[0px]" style={{ fontFamily: 'Inter' }}>
+        <div className="font-bold text-[13px] leading-[18.57px] tracking-[0px]">
           {analysis.title}
         </div>
-        <div className="space-y-1.5 font-medium text-[13px] leading-[18.57px] tracking-[0px]" style={{ fontFamily: 'Inter' }}>
+        <div className="space-y-1.5 font-medium text-[13px] leading-[18.57px] tracking-[0px]">
           <p>Entry Above = {analysis.entry}</p>
           <p>SL = {analysis.sl}</p>
           <p>Target 1 = {analysis.target1}</p>
@@ -67,7 +67,7 @@ const ResearchCard = ({ analysis, status = 'read', onTickClick }: ResearchCardPr
         <div className="bg-white/60 p-4 rounded-2xl border border-emerald-100">
           <p className="text-[11px] text-slate-500 font-bold uppercase mb-1.5 tracking-wider">Confidence Level Trade</p>
           <p className="font-bold flex items-center gap-2 text-sm">
-            <span className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
+            <span aria-hidden="true" className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
             {analysis.confidence}
           </p>
         </div>
@@ -84,6 +84,7 @@ const ResearchCard = ({ analysis, status = 'read', onTickClick }: ResearchCardPr
             <button
               type="button"
               onClick={onTickClick}
+              aria-label="View who saw this message"
               className="bg-transparent border-none p-0 cursor-pointer"
             >
               <StatusTick status={status} />

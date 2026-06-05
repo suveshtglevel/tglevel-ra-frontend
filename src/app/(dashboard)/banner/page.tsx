@@ -1,8 +1,8 @@
-'use client';
+﻿'use client';
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { useWebinarBanner } from '@/modules/banner/hooks/useWebinarBanner';
+import { useBannerForm } from '@/modules/banner/hooks/useBannerForm';
 import BannerUpload from '@/modules/banner/components/BannerUpload';
 import BannerDetailsForm from '@/modules/banner/components/BannerDetailsForm';
 import BannerThemeColors from '@/modules/banner/components/BannerThemeColors';
@@ -14,7 +14,7 @@ const headerBtn =
   'h-9 px-4 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer whitespace-nowrap';
 
 export default function WebinarPage() {
-  const w = useWebinarBanner();
+  const w = useBannerForm();
   const hasImage = !!w.image;
 
   return (

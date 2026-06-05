@@ -9,6 +9,7 @@ import ViewedByPanel from './ViewedByPanel';
 import FileViewer from './FileViewer';
 import FileAttachmentView from './FileAttachmentView';
 import { cn } from '@/lib/utils';
+import { SafeHtml } from '@/components/ui/safe-html';
 import { useMessageStats } from '@/modules/dashboard/hooks/useMessageStats';
 import type { ChatMessage, FileAttachment } from '@/store/slices/messageSlice';
 
@@ -82,9 +83,9 @@ const MessageBubble = ({ message, status, communityTag, onOpenFile, onTickClick 
 
       {/* Text content */}
       {message.content && (
-        <div
+        <SafeHtml
           className="text-[13px] leading-relaxed text-slate-700 break-words [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1 [&_li]:my-0.5 [&_a]:underline"
-          dangerouslySetInnerHTML={{ __html: message.content }}
+          html={message.content}
         />
       )}
 

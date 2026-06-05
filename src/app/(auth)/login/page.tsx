@@ -11,6 +11,7 @@ import { Card } from '@/components/ui/card';
 import { Smartphone, Lock, ChevronRight, Loader2 } from 'lucide-react';
 import AuthLayout from '@/components/layout/AuthLayout';
 import { useSendOtp } from '@/modules/auth/hooks/useAuthMutations';
+import { getApiFieldErrors } from '@/lib/errors/api-error';
 
 const loginSchema = z.object({
   mobileNumber: z
@@ -30,7 +31,19 @@ export default function LoginPage() {
   });
 
   function onSubmit(values: LoginFormValues) {
-    callSendOtp.mutate({ mobileNumber: values.mobileNumber });
+    callSendOtp.mutate(
+      { mobileNumber: values.mobileNumber },
+      {
+        // Surface any backend field-level validation (e.g. "number not
+        // registered") inline on the input, in addition to the hook's toast.
+        onError: (error) => {
+          const fieldErrors = getApiFieldErrors(error);
+          if (fieldErrors.mobileNumber) {
+            form.setError('mobileNumber', { message: fieldErrors.mobileNumber });
+          }
+        },
+      }
+    );
   }
 
   return (

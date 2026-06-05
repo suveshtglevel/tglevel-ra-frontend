@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import Image from 'next/image';
@@ -14,7 +14,7 @@ import {
   ImageIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { PREVIOUS_POSTS, BANNER_CATEGORIES, BannerStatus } from '@/modules/banner/constants/webinarData';
+import { PREVIOUS_POSTS, BANNER_CATEGORIES, BannerStatus } from '@/modules/banner/constants/bannerData';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useBanners } from '@/modules/banner/hooks/useBanners';
 import { useDeleteBanner } from '@/modules/banner/hooks/useBannerMutations';

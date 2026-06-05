@@ -1,6 +1,25 @@
+import * as z from 'zod';
 import axiosInstance from '@/services/axios';
+import { parseResponse } from '@/lib/validate';
 
 const BASE = '/api/v1/trade-journals';
+
+// Lenient runtime schemas: assert the envelope + the `data` container shape the
+// UI consumes. Element fields stay loose (the backend is still adding fields).
+const journalsResponseSchema = z
+  .object({
+    success: z.boolean(),
+    data: z.object({ journals: z.array(z.object({}).loose()) }).loose(),
+  })
+  .loose();
+
+const tradeStatsResponseSchema = z
+  .object({ success: z.boolean(), data: z.object({}).loose() })
+  .loose();
+
+const updateJournalResponseSchema = z
+  .object({ success: z.boolean(), data: z.object({}).loose() })
+  .loose();
 
 // A trade journal as returned by get-trade-journals. The backend currently
 // returns only a subset of the fields the UI shows; richer fields (points, lot
@@ -80,6 +99,7 @@ export async function getTradeJournals(
   if (!data.success) {
     throw new Error(data.message || 'Failed to load trade journals');
   }
+  parseResponse(journalsResponseSchema, data, 'trade journals');
   return data.data;
 }
 
@@ -129,6 +149,7 @@ export async function getUserTradeJournals(
   if (!data.success) {
     throw new Error(data.message || 'Failed to load user trade journals');
   }
+  parseResponse(journalsResponseSchema, data, 'user trade journals');
   return data.data;
 }
 
@@ -165,6 +186,7 @@ export async function getTradeStats(params: {
   if (!data.success) {
     throw new Error(data.message || 'Failed to load trade stats');
   }
+  parseResponse(tradeStatsResponseSchema, data, 'trade stats');
   return data.data;
 }
 
@@ -197,5 +219,6 @@ export async function updateTradeJournal(
   if (!data.success) {
     throw new Error(data.message || 'Failed to update trade journal');
   }
+  parseResponse(updateJournalResponseSchema, data, 'update trade journal');
   return data.data;
 }

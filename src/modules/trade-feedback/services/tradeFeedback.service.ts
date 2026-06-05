@@ -1,6 +1,24 @@
+import * as z from 'zod';
 import axiosInstance from '@/services/axios';
+import { parseResponse } from '@/lib/validate';
 
 const BASE = '/api/v1/ra/trade-feedback';
+
+// Lenient runtime schemas: assert the envelope + the container shapes the UI
+// consumes (a stats object, a feedbacks array, a pagination object). Unknown
+// keys pass through and element fields stay loose.
+const getStatsResponseSchema = z
+  .object({ success: z.boolean(), data: z.object({}).loose() })
+  .loose();
+
+const getTradeFeedbackResponseSchema = z
+  .object({
+    success: z.boolean(),
+    // Optional: the service falls back to [] when feedbacks is absent.
+    feedbacks: z.array(z.object({}).loose()).optional(),
+    pagination: z.object({}).loose().optional(),
+  })
+  .loose();
 
 // Overall trade-feedback counts for the RA.
 export interface TradeFeedbackStats {
@@ -20,6 +38,7 @@ export async function getTradeFeedbackStats(): Promise<TradeFeedbackStats> {
   if (!data.success) {
     throw new Error('Failed to load trade feedback stats');
   }
+  parseResponse(getStatsResponseSchema, data, 'trade feedback stats');
   return data.data;
 }
 
@@ -73,5 +92,6 @@ export async function getTradeFeedback(
   if (!data.success) {
     throw new Error('Failed to load trade feedback');
   }
+  parseResponse(getTradeFeedbackResponseSchema, data, 'trade feedback');
   return { feedbacks: data.feedbacks ?? [], pagination: data.pagination };
 }

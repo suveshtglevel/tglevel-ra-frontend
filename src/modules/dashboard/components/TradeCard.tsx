@@ -5,6 +5,7 @@ import { Check, CheckCheck, Pin } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { SafeHtml } from '@/components/ui/safe-html';
 import FileAttachmentView from './FileAttachmentView';
 import type { ChatMessage } from '@/store/slices/messageSlice';
 import {
@@ -32,16 +33,16 @@ const Segment = ({ segment }: { segment: TradeSegment }) => {
     case 'disclaimer':
       return (
         <div className="pt-4 border-t border-emerald-200/50">
-          <div
+          <SafeHtml
             className="text-[11px] text-slate-500 leading-relaxed font-medium [&_p]:my-0"
-            dangerouslySetInnerHTML={{ __html: segment.html }}
+            html={segment.html}
           />
         </div>
       );
     case 'customerCare': {
       const { label, value } = splitLabeledLine(segment.text);
       return (
-        <p className="text-[13px] font-medium" style={{ fontFamily: 'Inter' }}>
+        <p className="text-[13px] font-medium">
           <span className="text-slate-500">{label} </span>
           <span className="text-slate-800">{value}</span>
         </p>
@@ -49,10 +50,9 @@ const Segment = ({ segment }: { segment: TradeSegment }) => {
     }
     case 'rationale':
       return (
-        <div
+        <SafeHtml
           className="text-[13px] font-medium text-slate-500 [&_a]:text-emerald-600 [&_a]:underline [&_a]:break-all [&_p]:my-0"
-          style={{ fontFamily: 'Inter' }}
-          dangerouslySetInnerHTML={{ __html: segment.html }}
+          html={segment.html}
         />
       );
     case 'confidence': {
@@ -62,7 +62,7 @@ const Segment = ({ segment }: { segment: TradeSegment }) => {
           <p className="text-[13px] text-slate-500">{label}</p>
           {value && (
             <p className="text-[14px] font-medium text-slate-800 flex items-center gap-2 mt-1.5">
-              <span className={cn('w-3 h-3 rounded-full shrink-0', DOT_COLOR[level])} />
+              <span aria-hidden="true" className={cn('w-3 h-3 rounded-full shrink-0', DOT_COLOR[level])} />
               {value}
             </p>
           )}
@@ -70,7 +70,7 @@ const Segment = ({ segment }: { segment: TradeSegment }) => {
       );
     }
     default:
-      return <div className={bodyClass} style={{ fontFamily: 'Inter' }} dangerouslySetInnerHTML={{ __html: segment.html }} />;
+      return <SafeHtml className={bodyClass} html={segment.html} />;
   }
 };
 
@@ -139,11 +139,7 @@ const TradeCard = ({ content, timestamp, status = 'read', tag, refId, pinned, on
         {segments ? (
           segments.map((segment, i) => <Segment key={i} segment={segment} />)
         ) : hasBody ? (
-          <div
-            className={bodyClass}
-            style={{ fontFamily: 'Inter' }}
-            dangerouslySetInnerHTML={{ __html: content }}
-          />
+          <SafeHtml className={bodyClass} html={content} />
         ) : null}
 
         <div className="flex items-center justify-between pt-2">
@@ -165,6 +161,7 @@ const TradeCard = ({ content, timestamp, status = 'read', tag, refId, pinned, on
             <button
               type="button"
               onClick={onTickClick}
+              aria-label="View who saw this message"
               className="bg-transparent border-none p-0 cursor-pointer"
             >
               <StatusTick status={status} />

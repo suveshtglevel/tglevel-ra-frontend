@@ -40,6 +40,15 @@ const EditTradeJournalModal = ({ row, onClose }: EditTradeJournalModalProps) => 
   const set = (key: FieldKey, value: string) =>
     setValues((prev) => ({ ...prev, [key]: value }));
 
+  // Close on Escape, matching the other modals in the app.
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   const save = () => {
     if (updateJournal.isPending) return;
 
@@ -80,6 +89,9 @@ const EditTradeJournalModal = ({ row, onClose }: EditTradeJournalModalProps) => 
     >
       <div
         className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-200"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Update Trade Journal"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Header */}

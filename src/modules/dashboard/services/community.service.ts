@@ -1,9 +1,21 @@
+import * as z from 'zod';
 import axiosInstance from '@/services/axios';
+import { parseResponse } from '@/lib/validate';
 import type { CommunityVM } from '@/types/dashboard';
 
 // RA-readable community list. Requires the bearer access token (attached by the
 // axios interceptor from the verify-otp response).
 const BASE = '/api/v1/ra/community';
+
+// Lenient runtime schema: envelope + `data` is an array of community objects
+// carrying the id/name the view-model maps. Unknown keys pass through.
+const getCommunitiesResponseSchema = z
+  .object({
+    success: z.boolean(),
+    // Optional: the service falls back to [] when the field is absent.
+    data: z.array(z.object({ community_id: z.string(), name: z.string() }).loose()).optional(),
+  })
+  .loose();
 
 export interface CommunityAuthor {
   _id: string;
@@ -47,6 +59,7 @@ export async function getCommunities(): Promise<Community[]> {
   if (!data.success) {
     throw new Error(data.message || 'Failed to load communities');
   }
+  parseResponse(getCommunitiesResponseSchema, data, 'communities');
   return data.data ?? [];
 }
 

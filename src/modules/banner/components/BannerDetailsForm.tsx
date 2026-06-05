@@ -1,17 +1,17 @@
-'use client';
+﻿'use client';
 
 import React from 'react';
 import { Link2, ChevronDown } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
-import { BANNER_CATEGORIES } from '@/modules/banner/constants/webinarData';
+import { BANNER_CATEGORIES } from '@/modules/banner/constants/bannerData';
 import TimeField from '@/modules/banner/components/TimeField';
-import type { UseWebinarBanner } from '@/modules/banner/hooks/useWebinarBanner';
+import type { UseBannerForm } from '@/modules/banner/hooks/useBannerForm';
 
 const labelClass = 'block text-[13px] font-medium text-slate-600 mb-1.5';
 const inputClass =
   'w-full h-11 rounded-lg border border-slate-200 bg-white px-3.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 transition';
 
-const BannerDetailsForm = ({ w }: { w: UseWebinarBanner }) => {
+const BannerDetailsForm = ({ w }: { w: UseBannerForm }) => {
   return (
     <section className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-5">
       {/* Title */}

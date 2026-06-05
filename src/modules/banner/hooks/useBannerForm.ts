@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { toast } from 'react-hot-toast';
 import * as z from 'zod';
-import { PublishOption } from '@/modules/banner/constants/webinarData';
+import { PublishOption } from '@/modules/banner/constants/bannerData';
 import { useCreateBanner } from '@/modules/banner/hooks/useCreateBanner';
 import { useUpdateBanner } from '@/modules/banner/hooks/useBannerMutations';
 import { getApiErrorMessage } from '@/lib/errors/api-error';
 import { to12Hour } from '@/lib/time';
 import type { Banner, BannerStatusApi } from '@/modules/banner/services/banners.service';
 
-export interface WebinarBannerState {
+export interface BannerFormState {
   image: string | null;
   // The picked file, kept alongside the data-URL preview so we can upload it.
   imageFile: File | null;
@@ -57,7 +57,7 @@ const toDateInput = (value?: string): string => {
   return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
 };
 
-const INITIAL: WebinarBannerState = {
+const INITIAL: BannerFormState = {
   image: null,
   imageFile: null,
   title: 'Smart Trading Masterclass',
@@ -77,15 +77,15 @@ const INITIAL: WebinarBannerState = {
   scheduleTime: '09:30 AM',
 };
 
-export const useWebinarBanner = () => {
-  const [state, setState] = useState<WebinarBannerState>(INITIAL);
+export const useBannerForm = () => {
+  const [state, setState] = useState<BannerFormState>(INITIAL);
   // The banner_id being edited, or null when creating a new banner.
   const [editingId, setEditingId] = useState<string | null>(null);
   const createBanner = useCreateBanner();
   const updateBanner = useUpdateBanner();
   const saving = createBanner.isPending || updateBanner.isPending;
 
-  const set = <K extends keyof WebinarBannerState>(key: K, value: WebinarBannerState[K]) =>
+  const set = <K extends keyof BannerFormState>(key: K, value: BannerFormState[K]) =>
     setState((prev) => ({ ...prev, [key]: value }));
 
   // Load an existing banner into the form for editing. Times come back 24-hour
@@ -247,4 +247,4 @@ export const useWebinarBanner = () => {
   };
 };
 
-export type UseWebinarBanner = ReturnType<typeof useWebinarBanner>;
+export type UseBannerForm = ReturnType<typeof useBannerForm>;

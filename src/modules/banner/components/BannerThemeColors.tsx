@@ -1,10 +1,10 @@
-'use client';
+﻿'use client';
 
 import React from 'react';
 import { Pipette } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSuggestedPalette } from '@/modules/banner/hooks/useSuggestedPalette';
-import type { UseWebinarBanner } from '@/modules/banner/hooks/useWebinarBanner';
+import type { UseBannerForm } from '@/modules/banner/hooks/useBannerForm';
 
 const isHex6 = (v: string) => /^#[0-9a-fA-F]{6}$/.test(v);
 
@@ -56,7 +56,7 @@ const ColorField = ({ label, value, onChange }: ColorFieldProps) => {
   );
 };
 
-const BannerThemeColors = ({ w }: { w: UseWebinarBanner }) => {
+const BannerThemeColors = ({ w }: { w: UseBannerForm }) => {
   const { data: palette, isLoading } = useSuggestedPalette();
 
   // The three suggested colors mapped to the form fields they apply to.

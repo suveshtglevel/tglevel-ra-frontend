@@ -45,3 +45,7 @@ next-env.d.ts
 
 # local Claude Code state
 .claude/
+
+# Ignore local .github contents, but keep CI workflows tracked.
+.github/*
+!.github/workflows/

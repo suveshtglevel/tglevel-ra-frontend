@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import BannerThemeColors from '@/modules/banner/components/BannerThemeColors';
 import { useSuggestedPalette } from '@/modules/banner/hooks/useSuggestedPalette';
-import type { UseWebinarBanner } from '@/modules/banner/hooks/useWebinarBanner';
+import type { UseBannerForm } from '@/modules/banner/hooks/useBannerForm';
 
 jest.mock('@/modules/banner/hooks/useSuggestedPalette');
 
@@ -10,14 +10,14 @@ const mockedPalette = useSuggestedPalette as jest.MockedFunction<typeof useSugge
 
 // A minimal stand-in for the form hook: just the colour fields the component
 // reads plus a spy `set`.
-const makeW = (): UseWebinarBanner =>
+const makeW = (): UseBannerForm =>
   ({
     ctaColor: '#10B981',
     ctaTextColor: '#FFFFFF',
     textColor: '#F8FAFC',
     bgColor: '#0B1F33',
     set: jest.fn(),
-  }) as unknown as UseWebinarBanner;
+  }) as unknown as UseBannerForm;
 
 const palette = {
   cta_button_color: '#FF5733',

@@ -1,6 +1,30 @@
+import * as z from 'zod';
 import axiosInstance from '@/services/axios';
+import { parseResponse } from '@/lib/validate';
 
 const BASE = '/api/v1/ra';
+
+// Lenient runtime schemas for the responses the app depends on. `.loose()` lets
+// unknown keys through; only fields the UI actually reads are required.
+const sendOtpResponseSchema = z
+  .object({ success: z.boolean(), message: z.string().optional() })
+  .loose();
+
+const loginResponseSchema = z
+  .object({
+    success: z.boolean(),
+    accessToken: z.string(),
+    data: z
+      .object({
+        ra_id: z.string(),
+        display_name: z.string(),
+        phone_number: z.string(),
+        assigned_communities: z.array(z.string()),
+        profile_picture: z.string().optional(),
+      })
+      .loose(),
+  })
+  .loose();
 
 export interface SendOtpPayload {
   mobileNumber: string;
@@ -39,6 +63,7 @@ export async function sendOtp(payload: SendOtpPayload): Promise<SendOtpResponse>
   const { data } = await axiosInstance.post<SendOtpResponse>(`${BASE}/send-otp`, {
     phone_number: payload.mobileNumber,
   });
+  parseResponse(sendOtpResponseSchema, data, 'send-OTP');
   if (!data.success) {
     throw new Error(data.message || 'Failed to send OTP');
   }
@@ -53,6 +78,9 @@ export async function verifyOtp(payload: VerifyOtpPayload): Promise<LoginRespons
   if (!data.success) {
     throw new Error(data.message || 'Login failed');
   }
+  // Validate only a successful login — a broken session shape must never reach
+  // the store. (Failure responses are handled above.)
+  parseResponse(loginResponseSchema, data, 'login');
   return data;
 }
 

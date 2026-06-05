@@ -1,7 +1,28 @@
+import * as z from 'zod';
 import axiosInstance from '@/services/axios';
 import { to24Hour } from '@/lib/time';
+import { parseResponse } from '@/lib/validate';
 
 const BASE = '/api/v1/banners';
+
+// Lenient runtime schemas (unknown keys pass through). A banner must at least
+// have an id, title, image, and status for the UI to render and act on it.
+const bannerSchema = z
+  .object({
+    banner_id: z.string(),
+    title: z.string(),
+    image_url: z.string(),
+    status: z.enum(['draft', 'scheduled', 'published']),
+  })
+  .loose();
+
+const createBannerResponseSchema = z
+  .object({ success: z.boolean(), data: bannerSchema })
+  .loose();
+
+const listBannersResponseSchema = z
+  .object({ success: z.boolean(), banners: z.array(bannerSchema) })
+  .loose();
 
 export type BannerStatusApi = 'draft' | 'scheduled' | 'published';
 
@@ -121,6 +142,7 @@ export async function listBanners(params: ListBannersParams = {}): Promise<Banne
   if (!data.success) {
     throw new Error('Failed to load banners');
   }
+  parseResponse(listBannersResponseSchema, data, 'banners list');
   const banners = data.banners ?? [];
   const total = data.total ?? data.totalCount ?? banners.length;
   const totalPages = data.totalPages ?? data.pages ?? Math.max(1, Math.ceil(total / limit));
@@ -173,6 +195,7 @@ export async function createBanner(input: CreateBannerInput): Promise<Banner> {
   if (!data.success) {
     throw new Error(data.message || 'Failed to create banner');
   }
+  parseResponse(createBannerResponseSchema, data, 'create-banner');
   return data.data;
 }
 

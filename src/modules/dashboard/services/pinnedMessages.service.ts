@@ -1,6 +1,18 @@
+import * as z from 'zod';
 import axiosInstance from '@/services/axios';
+import { parseResponse } from '@/lib/validate';
 
 const BASE = '/api/v1/pinned-messages';
+
+// Lenient runtime schema: envelope + `data` is an array of pinned-message
+// objects carrying the id the UI keys on. Unknown keys pass through.
+const getPinnedResponseSchema = z
+  .object({
+    success: z.boolean(),
+    // Optional: the service falls back to [] when the field is absent.
+    data: z.array(z.object({ message_id: z.string() }).loose()).optional(),
+  })
+  .loose();
 
 export type PinStatus = 'pinned' | 'unpinned';
 
@@ -51,5 +63,6 @@ export async function getPinnedMessages(
   if (!data.success) {
     throw new Error('Failed to load pinned messages');
   }
+  parseResponse(getPinnedResponseSchema, data, 'pinned messages');
   return data.data ?? [];
 }

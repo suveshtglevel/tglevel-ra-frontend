@@ -1,6 +1,14 @@
+import * as z from 'zod';
 import axiosInstance from '@/services/axios';
+import { parseResponse } from '@/lib/validate';
 
 const BASE = '/api/v1/message-stats';
+
+// This endpoint returns the stats object directly (no success envelope), so we
+// assert the field the UI drives the delivery tick from. Unknown keys pass through.
+const messageStatsSchema = z
+  .object({ total_seen: z.number() })
+  .loose();
 
 // One user who has seen a message, as returned by the stats endpoint.
 export interface MessageViewer {
@@ -30,5 +38,6 @@ export interface MessageStats {
 // returns the stats object directly (no `success` envelope).
 export async function getMessageStats(messageId: string): Promise<MessageStats> {
   const { data } = await axiosInstance.get<MessageStats>(`${BASE}/${messageId}`);
+  parseResponse(messageStatsSchema, data, 'message stats');
   return data;
 }
