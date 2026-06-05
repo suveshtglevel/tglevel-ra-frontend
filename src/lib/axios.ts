@@ -2,7 +2,7 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { getAccessToken, setAccessToken } from '@/lib/api/tokenStore';
 import { clearSession } from '@/lib/api/session';
 
-const BASE_URL = 'https://ra-tglevels.duckdns.org';
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ;
 const REFRESH_URL = '/api/v1/ra/refresh-token';
 
 const axiosInstance = axios.create({

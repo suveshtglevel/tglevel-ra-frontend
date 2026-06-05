@@ -262,6 +262,7 @@ const MediaDocsPanel = ({ title, messages, onClose }: MediaDocsPanelProps) => {
                   className="relative aspect-square rounded-xl overflow-hidden bg-slate-100 border border-slate-200 hover:opacity-90 transition-opacity cursor-pointer p-0"
                 >
                   {m.fileType === 'image' ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- dynamic user-uploaded media URL (may be blob:), not optimizable via next/image
                     <img src={m.url} alt={m.name} className="w-full h-full object-cover" />
                   ) : (
                     <>

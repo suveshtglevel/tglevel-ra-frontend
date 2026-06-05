@@ -8,10 +8,15 @@ import type { FileAttachment } from '@/redux/slices/messageSlice';
 // Full-screen viewer for an attachment. Rendered through a portal so it sits
 // above everything regardless of where it's mounted (chat feed, media panel).
 const FileViewer = ({ attachment, onClose }: { attachment: FileAttachment; onClose: () => void }) => {
-  const [mounted, setMounted] = React.useState(false);
+  // True only after client-side mount (document.body exists for the portal),
+  // without calling setState inside an effect.
+  const mounted = React.useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   React.useEffect(() => {
-    setMounted(true);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
@@ -44,6 +49,7 @@ const FileViewer = ({ attachment, onClose }: { attachment: FileAttachment; onClo
       </div>
       <div onClick={(e) => e.stopPropagation()} className="max-w-[90vw] max-h-[85vh] flex items-center justify-center">
         {attachment.fileType === 'image' && (
+          // eslint-disable-next-line @next/next/no-img-element -- dynamic user-uploaded attachment URL (may be blob:), not optimizable via next/image
           <img src={attachment.url} alt={attachment.name} className="max-w-full max-h-[85vh] object-contain rounded-lg" />
         )}
         {attachment.fileType === 'video' && (
