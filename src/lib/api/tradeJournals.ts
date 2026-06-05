@@ -83,6 +83,55 @@ export async function getTradeJournals(
   return data.data;
 }
 
+// ----- User (customer) trade journals --------------------------------------
+
+// A trade journal logged by an end user (customer), returned by
+// get-user-trade-journals. Numeric values arrive as numbers here. phone_number
+// and the community id arrays are not present on every record.
+export interface BackendUserTradeJournal {
+  _id: string;
+  user_id: string;
+  user_name: string;
+  phone_number?: string;
+  community_ids?: string[];
+  sub_community_ids?: string[];
+  entry: number;
+  exit: number;
+  qty: number;
+  points: number;
+  pnl: number;
+  trade_date: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+interface GetUserTradeJournalsResponse {
+  success: boolean;
+  message: string;
+  data: {
+    journals: BackendUserTradeJournal[];
+    pagination: TradeJournalPagination;
+  };
+}
+
+export interface UserTradeJournalsResult {
+  journals: BackendUserTradeJournal[];
+  pagination: TradeJournalPagination;
+}
+
+export async function getUserTradeJournals(
+  params: { page?: number; limit?: number } = {}
+): Promise<UserTradeJournalsResult> {
+  const { data } = await axiosInstance.get<GetUserTradeJournalsResponse>(
+    `${BASE}/get-user-trade-journals`,
+    { params: { page: params.page ?? 1, limit: params.limit ?? 1000 } }
+  );
+  if (!data.success) {
+    throw new Error(data.message || 'Failed to load user trade journals');
+  }
+  return data.data;
+}
+
 // ----- Trade stats ----------------------------------------------------------
 
 // Aggregate stats for one sub-community. winRatio is returned as a string with

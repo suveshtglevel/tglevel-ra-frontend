@@ -1,5 +1,8 @@
-// Mock data for the Customer Trade Journal view. The real data will come from a
-// backend API later; this is shaped to make that swap straightforward.
+// Row shape + mapping for the Customer Trade Journal view. Rows are populated
+// from the get-user-trade-journals API (see mapUserJournalToRow); the mock
+// dataset below is kept for reference/fallback.
+
+import type { BackendUserTradeJournal } from '@/lib/api/tradeJournals';
 
 export interface CustomerTradeRow {
   id: string;
@@ -91,3 +94,32 @@ function generate(count: number): CustomerTradeRow[] {
 }
 
 export const CUSTOMER_TRADE_ROWS: CustomerTradeRow[] = generate(36);
+
+// Pick a stable avatar colour from a key (user id) so a customer keeps the same
+// bubble colour across renders.
+const colorFor = (key: string): string => {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+};
+
+// Map a backend user trade journal to a table row. The API does not return a
+// community name, so that field is left blank (the community filter only
+// narrows when a name is present).
+export function mapUserJournalToRow(j: BackendUserTradeJournal): CustomerTradeRow {
+  const name = j.user_name || j.phone_number || 'Unknown';
+  return {
+    id: j._id,
+    name,
+    initials: initialsOf(name),
+    avatarColor: colorFor(j.user_id || j._id),
+    mobile: j.phone_number || '—',
+    community: '',
+    date: (j.trade_date ?? '').slice(0, 10),
+    entry: j.entry ?? 0,
+    qty: j.qty ?? 0,
+    exit: j.exit ?? 0,
+    points: j.points ?? 0,
+    pnl: j.pnl ?? 0,
+  };
+}

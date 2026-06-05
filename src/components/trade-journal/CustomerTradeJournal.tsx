@@ -18,12 +18,12 @@ import { cn } from '@/lib/utils';
 import FilterDropdown from '@/components/trade-journal/FilterDropdown';
 import JournalTabs, { type JournalTab } from '@/components/trade-journal/JournalTabs';
 import {
-  CUSTOMER_TRADE_ROWS,
-  CUSTOMER_STATS,
-  CUSTOMER_COMMUNITY_OPTIONS,
   CUSTOMER_PAGE_SIZE,
+  mapUserJournalToRow,
   type CustomerTradeRow,
 } from '@/constants/customerTradeJournalData';
+import { useUserTradeJournals } from '@/hooks/useUserTradeJournals';
+import { getApiErrorMessage } from '@/lib/api/errors';
 
 interface CustomerTradeJournalProps {
   tab: JournalTab;
@@ -48,15 +48,41 @@ export default function CustomerTradeJournal({ tab, onTab }: CustomerTradeJourna
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
 
-  const stats = [
-    { label: 'Total Trades', value: CUSTOMER_STATS.totalTrades.toLocaleString('en-IN'), icon: BarChart3, valueClass: 'text-slate-900' },
-    { label: 'Total Profit', value: `₹ ${CUSTOMER_STATS.totalProfit.toLocaleString('en-IN')}`, icon: TrendingUp, valueClass: 'text-emerald-600' },
-    { label: 'Win Ratio', value: `${CUSTOMER_STATS.winRatio.toFixed(1)}%`, icon: Target, valueClass: 'text-slate-900' },
-    { label: 'Active Trades', value: String(CUSTOMER_STATS.activeTrades), icon: Activity, valueClass: 'text-slate-900' },
-  ];
+  const journalsQuery = useUserTradeJournals();
+  const isLoading = journalsQuery.isLoading;
+  const isError = journalsQuery.isError;
+  const errorMessage = journalsQuery.error ? getApiErrorMessage(journalsQuery.error) : '';
+
+  // Map the API journals to table rows once per fetch.
+  const allRows = useMemo<CustomerTradeRow[]>(
+    () => (journalsQuery.data?.journals ?? []).map(mapUserJournalToRow),
+    [journalsQuery.data]
+  );
+
+  // Community options derived from the data ("All" + any names present).
+  const communityOptions = useMemo(() => {
+    const names = Array.from(new Set(allRows.map((r) => r.community).filter(Boolean)));
+    return ['All Communities', ...names];
+  }, [allRows]);
+
+  // Stats computed from the fetched journals. Active trades aren't exposed by
+  // this endpoint, so that card shows a count of break-even (pnl === 0) trades.
+  const stats = useMemo(() => {
+    const totalTrades = allRows.length;
+    const totalProfit = allRows.reduce((s, r) => s + r.pnl, 0);
+    const wins = allRows.filter((r) => r.pnl > 0).length;
+    const winRatio = totalTrades > 0 ? (wins / totalTrades) * 100 : 0;
+    const activeTrades = allRows.filter((r) => r.pnl === 0).length;
+    return [
+      { label: 'Total Trades', value: totalTrades.toLocaleString('en-IN'), icon: BarChart3, valueClass: 'text-slate-900' },
+      { label: 'Total Profit', value: `₹ ${totalProfit.toLocaleString('en-IN')}`, icon: TrendingUp, valueClass: totalProfit >= 0 ? 'text-emerald-600' : 'text-red-500' },
+      { label: 'Win Ratio', value: `${winRatio.toFixed(1)}%`, icon: Target, valueClass: 'text-slate-900' },
+      { label: 'Active Trades', value: String(activeTrades), icon: Activity, valueClass: 'text-slate-900' },
+    ];
+  }, [allRows]);
 
   const filtered = useMemo(() => {
-    const rows = CUSTOMER_TRADE_ROWS.filter((r) => {
+    const rows = allRows.filter((r) => {
       if (from && r.date < from) return false;
       if (to && r.date > to) return false;
       if (community !== 'All Communities' && r.community !== community) return false;
@@ -67,7 +93,7 @@ export default function CustomerTradeJournal({ tab, onTab }: CustomerTradeJourna
       if (sortKey === 'name') return a.name.localeCompare(b.name) * dir;
       return (a.points - b.points) * dir;
     });
-  }, [from, to, community, sortKey, sortDir]);
+  }, [allRows, from, to, community, sortKey, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / CUSTOMER_PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -195,7 +221,7 @@ export default function CustomerTradeJournal({ tab, onTab }: CustomerTradeJourna
               <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Community</label>
               <FilterDropdown
                 value={community}
-                options={CUSTOMER_COMMUNITY_OPTIONS}
+                options={communityOptions}
                 onChange={(v) => { setCommunity(v); setPage(1); }}
               />
             </div>
@@ -247,7 +273,19 @@ export default function CustomerTradeJournal({ tab, onTab }: CustomerTradeJourna
                 </tr>
               </thead>
               <tbody className="text-sm">
-                {rows.length === 0 ? (
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-16 text-center text-slate-400">
+                      Loading trade journals…
+                    </td>
+                  </tr>
+                ) : isError ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-16 text-center text-red-500">
+                      {errorMessage || 'Failed to load trade journals.'}
+                    </td>
+                  </tr>
+                ) : rows.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-6 py-16 text-center text-slate-400">
                       No trades match the selected filters.

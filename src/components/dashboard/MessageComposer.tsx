@@ -319,11 +319,8 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
     }
     const content = editor.getHTML();
     const hasContent = !editor.isEmpty && content !== '<p></p>';
-    // An attachment must be accompanied by a message — block image/doc-only sends.
-    if (filePreview && !hasContent) {
-      toast.error('Please enter a message before sending an image or document');
-      return;
-    }
+    // Allow sending an attachment on its own (image/doc with no caption); only
+    // block a completely empty send (no text and no file).
     if (!hasContent && !filePreview) return;
 
     const sendOptions: SendOptions = {
