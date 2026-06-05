@@ -91,6 +91,7 @@ export default function WebinarPage() {
                   time={w.webinarTime}
                   ctaText={w.ctaText}
                   ctaColor={w.ctaColor}
+                  ctaTextColor={w.ctaTextColor}
                   textColor={w.textColor}
                   bgColor={w.bgColor}
                 />

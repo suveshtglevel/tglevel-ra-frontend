@@ -9,6 +9,7 @@ export interface BannerTheme {
   cta_button_color: string;
   text_color: string;
   background_color: string;
+  cta_button_text_color: string;
 }
 
 // A banner as returned by create-banner.

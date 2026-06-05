@@ -63,6 +63,7 @@ const BannerThemeColors = ({ w }: { w: UseWebinarBanner }) => {
   const suggestions = palette
     ? ([
         { label: 'CTA', color: palette.cta_button_color, key: 'ctaColor' },
+        { label: 'CTA Text', color: palette.cta_button_text_color, key: 'ctaTextColor' },
         { label: 'Text', color: palette.text_color, key: 'textColor' },
         { label: 'Background', color: palette.background_color, key: 'bgColor' },
       ] as const)
@@ -71,6 +72,7 @@ const BannerThemeColors = ({ w }: { w: UseWebinarBanner }) => {
   const applyAll = () => {
     if (!palette) return;
     w.set('ctaColor', palette.cta_button_color.toUpperCase());
+    w.set('ctaTextColor', palette.cta_button_text_color.toUpperCase());
     w.set('textColor', palette.text_color.toUpperCase());
     w.set('bgColor', palette.background_color.toUpperCase());
   };
@@ -84,9 +86,10 @@ const BannerThemeColors = ({ w }: { w: UseWebinarBanner }) => {
 
       <div className="grid sm:grid-cols-2 gap-5 mt-5">
         <ColorField label="CTA Button Color" value={w.ctaColor} onChange={(v) => w.set('ctaColor', v)} />
-        <ColorField label="Text Color" value={w.textColor} onChange={(v) => w.set('textColor', v)} />
+        <ColorField label="CTA Button Text Color" value={w.ctaTextColor} onChange={(v) => w.set('ctaTextColor', v)} />
       </div>
       <div className="grid sm:grid-cols-2 gap-5 mt-5">
+        <ColorField label="Text Color" value={w.textColor} onChange={(v) => w.set('textColor', v)} />
         <ColorField label="Background Color" value={w.bgColor} onChange={(v) => w.set('bgColor', v)} />
       </div>
 
@@ -111,7 +114,9 @@ const BannerThemeColors = ({ w }: { w: UseWebinarBanner }) => {
           <p className="text-[12px] text-slate-400">No suggested palette available.</p>
         ) : (
           <div className="flex items-center gap-5">
-            {suggestions.map(({ label, color, key }) => {
+            {suggestions
+              .filter(({ color }) => isHex6(color))
+              .map(({ label, color, key }) => {
               const selected = color.toUpperCase() === w[key].toUpperCase();
               return (
                 <button

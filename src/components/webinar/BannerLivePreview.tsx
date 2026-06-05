@@ -12,6 +12,7 @@ interface BannerLivePreviewProps {
   time: string;
   ctaText: string;
   ctaColor: string;
+  ctaTextColor: string;
   textColor: string;
   bgColor: string;
 }
@@ -33,6 +34,7 @@ const BannerLivePreview = ({
   time,
   ctaText,
   ctaColor,
+  ctaTextColor,
   textColor,
   bgColor,
 }: BannerLivePreviewProps) => {
@@ -97,8 +99,8 @@ const BannerLivePreview = ({
 
         <button
           type="button"
-          className="w-full h-11 rounded-xl mt-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-          style={{ backgroundColor: ctaColor }}
+          className="w-full h-11 rounded-xl mt-3 text-sm font-semibold transition-opacity hover:opacity-90"
+          style={{ backgroundColor: ctaColor, color: ctaTextColor }}
         >
           {ctaText || 'Register'}
         </button>

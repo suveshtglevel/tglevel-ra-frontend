@@ -21,6 +21,7 @@ export interface WebinarBannerState {
   category: string;
   notify: boolean;
   ctaColor: string;
+  ctaTextColor: string;
   textColor: string;
   bgColor: string;
   // No option is selected by default; the user must pick one manually.
@@ -68,6 +69,7 @@ const INITIAL: WebinarBannerState = {
   category: 'Webinar',
   notify: true,
   ctaColor: '#10B981',
+  ctaTextColor: '#FFFFFF',
   textColor: '#F8FAFC',
   bgColor: '#0B1F33',
   publishOption: null,
@@ -102,6 +104,7 @@ export const useWebinarBanner = () => {
       category: banner.category ?? 'Webinar',
       notify: banner.notify_users ?? true,
       ctaColor: banner.theme?.cta_button_color ?? INITIAL.ctaColor,
+      ctaTextColor: banner.theme?.cta_button_text_color ?? INITIAL.ctaTextColor,
       textColor: banner.theme?.text_color ?? INITIAL.textColor,
       bgColor: banner.theme?.background_color ?? INITIAL.bgColor,
       publishOption: OPTION_BY_STATUS[banner.status] ?? null,
@@ -156,6 +159,7 @@ export const useWebinarBanner = () => {
       cta_button_color: state.ctaColor,
       text_color: state.textColor,
       background_color: state.bgColor,
+      cta_button_text_color: state.ctaTextColor,
     };
     const successLabel = () =>
       option === 'now'

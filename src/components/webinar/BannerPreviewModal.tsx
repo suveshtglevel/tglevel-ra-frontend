@@ -51,6 +51,7 @@ const BannerPreviewModal = ({ banner, onClose }: { banner: Banner; onClose: () =
           time={to12Hour(banner.webinar_time ?? '') || banner.webinar_time || ''}
           ctaText={banner.cta_text ?? ''}
           ctaColor={banner.theme?.cta_button_color ?? '#10B981'}
+          ctaTextColor={banner.theme?.cta_button_text_color ?? '#FFFFFF'}
           textColor={banner.theme?.text_color ?? '#F8FAFC'}
           bgColor={banner.theme?.background_color ?? '#0B1F33'}
         />

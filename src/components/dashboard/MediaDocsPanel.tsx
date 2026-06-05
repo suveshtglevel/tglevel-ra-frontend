@@ -7,37 +7,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useDebounce } from '@/hooks/useDebounce';
 import FileViewer from './FileViewer';
-import { openAttachment } from './FileAttachmentView';
+import { openAttachment as openFileAttachment } from './FileAttachmentView';
 import type { ChatMessage, FileAttachment } from '@/redux/slices/messageSlice';
 
-// Inline-viewable MIME types keyed by extension. Used to re-tag the fetched blob
-// so the browser opens the file in its viewer instead of downloading it when the
-// source type is missing or generic.
-const INLINE_MIME_BY_EXT: Record<string, string> = {
-  pdf: 'application/pdf',
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  gif: 'image/gif',
-  webp: 'image/webp',
-  svg: 'image/svg+xml',
-  mp4: 'video/mp4',
-  webm: 'video/webm',
-  txt: 'text/plain',
-  csv: 'text/csv',
-};
-
-// Office documents open straight in their desktop app via the Office URI scheme
-// (ms-word:/ms-excel:/ms-powerpoint:). The app fetches the document itself, so it
-// needs a reachable http(s) url (a data:/blob: url won't work).
-const OFFICE_SCHEME_BY_EXT: Record<string, string> = {
-  doc: 'ms-word',
-  docx: 'ms-word',
-  xls: 'ms-excel',
-  xlsx: 'ms-excel',
-  ppt: 'ms-powerpoint',
-  pptx: 'ms-powerpoint',
-};
 
 interface MediaDocsPanelProps {
   title: string;
@@ -234,7 +206,7 @@ const MediaDocsPanel = ({ title, messages, onClose }: MediaDocsPanelProps) => {
                       });
                       return;
                     }
-                    openAttachment({
+                    openFileAttachment({
                       name: m.name,
                       size: m.size,
                       url: m.url,
@@ -252,7 +224,7 @@ const MediaDocsPanel = ({ title, messages, onClose }: MediaDocsPanelProps) => {
                           fileType: 'image',
                         });
                       } else {
-                        openAttachment({
+                        openFileAttachment({
                           name: m.name,
                           size: m.size,
                           url: m.url,
@@ -289,7 +261,7 @@ const MediaDocsPanel = ({ title, messages, onClose }: MediaDocsPanelProps) => {
                 <button
                   key={doc.id}
                   type="button"
-                  onClick={() => openAttachment({
+                  onClick={() => openFileAttachment({
                     name: doc.name,
                     size: doc.size,
                     url: doc.url,
