@@ -35,7 +35,6 @@ yarn-error.log*
 
 # env files: secrets stay local, but the public template is committed
 .env*
-!.env.example
 
 # vercel
 .vercel
