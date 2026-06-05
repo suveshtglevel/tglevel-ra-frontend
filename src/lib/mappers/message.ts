@@ -35,6 +35,7 @@ export function mapBackendMessage(m: BackendMessage, typeName?: string): ChatMes
     id: m.message_id ?? m._id ?? '',
     communityId: m.sub_community_id ?? m.community_id,
     content: m.content,
+    sequenceKey: m.sequence_key ?? m.sequenceKey,
     type: 'received',
     messageType: typeName,
     messageTypeId: m.type ?? undefined,

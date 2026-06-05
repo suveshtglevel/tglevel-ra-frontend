@@ -67,7 +67,7 @@ const MESSAGE_TYPE_LABELS: Record<number, string> = {
 // regardless of who sent it or its type.
 const MessageBubble = ({ message, status, communityTag, onOpenFile, onTickClick }: { message: ChatMessage; status: ChatMessage['status']; communityTag?: string; onOpenFile: (attachment: FileAttachment) => void; onTickClick: () => void }) => {
   const typeLabel = message.messageTypeId != null ? MESSAGE_TYPE_LABELS[message.messageTypeId] : undefined;
-  const shortId = message.id ? message.id.slice(-3) : '';
+  const shortId = message.sequenceKey != null ? String(message.sequenceKey) : message.id ? message.id.slice(-3) : '';
   return (
     <div className="max-w-[380px] rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm bg-white border border-slate-200 text-slate-800">
       <div className="flex items-center justify-between gap-2 mb-1">
@@ -171,6 +171,7 @@ const MessageRow = ({
             tag={communityTag ?? msg.tradeTag}
             refId={msg.tradeRefId}
             messageId={msg.id}
+            sequenceKey={msg.sequenceKey}
             messageType={msg.messageType ?? (msg.messageTypeId != null ? MESSAGE_TYPE_LABELS[msg.messageTypeId] : undefined)}
             attachment={msg.attachment}
             onOpenFile={onOpenFile}

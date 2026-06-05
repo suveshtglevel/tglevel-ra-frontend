@@ -89,6 +89,7 @@ interface TradeCardProps {
   messageType?: string;
   // Optional file attached to the trade message (image / video / document).
   attachment?: ChatMessage['attachment'];
+  sequenceKey?: number;
   onOpenFile?: (attachment: NonNullable<ChatMessage['attachment']>) => void;
 }
 
@@ -107,15 +108,15 @@ const StatusTick = ({ status }: { status: MessageStatus }) => {
 // structured layout (disclaimer / customer care / rationale / confidence);
 // otherwise the typed content is shown as-is in the green card — no header or
 // structure is fabricated.
-const TradeCard = ({ content, timestamp, status = 'read', tag, refId, pinned, onTickClick, messageId, messageType, attachment, onOpenFile }: TradeCardProps) => {
+const TradeCard = ({ content, timestamp, status = 'read', tag, refId, pinned, onTickClick, messageId, sequenceKey, messageType, attachment, onOpenFile }: TradeCardProps) => {
   // Only treat the message as a structured research analysis when its text
   // actually matches the pattern; otherwise render the plain content.
   const isResearch = isResearchAnalysis(content);
   const segments = isResearch ? parseTradeSegments(content) : null;
   // Whether there's any real text to render (an attachment-only trade has none).
   const hasBody = Boolean(content && content !== '<p></p>');
-  // Show the last 3 chars of the message id (falling back to refId).
-  const shortId = messageId ? messageId.slice(-3) : refId;
+  // Show the sequence key when it exists; otherwise fall back to the last 3 chars of the message id.
+  const shortId = sequenceKey != null ? String(sequenceKey) : messageId ? messageId.slice(-3) : refId;
 
   return (
     <Card className="w-[380px] max-w-full bg-[#E6F9F3] border-[#C2EDDF] p-4 sm:p-5 rounded-3xl shadow-none">

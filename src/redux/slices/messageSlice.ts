@@ -25,6 +25,7 @@ export interface ChatMessage {
   sender: string;
   pinned?: boolean;
   attachment?: FileAttachment;
+  sequenceKey?: number;
   // Trade-card metadata (only present when messageType === 'Trade')
   tradeTag?: string;
   tradeRefId?: string;

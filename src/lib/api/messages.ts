@@ -81,6 +81,8 @@ export interface BackendMessage {
   // UUID-style message id (e.g. "msg_..."); used as message_id when pinning.
   message_id?: string;
   _id?: string;
+  sequence_key?: number;
+  sequenceKey?: number;
   community_id: string;
   sub_community_id?: string;
   type?: MessageType;
