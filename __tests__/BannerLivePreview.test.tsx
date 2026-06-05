@@ -2,11 +2,26 @@ import { render, screen } from '@testing-library/react';
 import BannerLivePreview from '@/modules/banner/components/BannerLivePreview';
 
 // next/image renders an <img> in jsdom; mock it to a plain img so alt/role work.
+// Strip the next/image-only props (fill, unoptimized, priority, …) so React
+// doesn't warn about non-boolean attributes being written to the DOM.
 jest.mock('next/image', () => ({
   __esModule: true,
   default: (props: Record<string, unknown>) => {
+    // Drop the next/image-only props that aren't valid DOM attributes.
+    const NEXT_IMAGE_PROPS = [
+      'fill',
+      'unoptimized',
+      'priority',
+      'loader',
+      'placeholder',
+      'blurDataURL',
+      'quality',
+    ];
+    const imgProps = Object.fromEntries(
+      Object.entries(props).filter(([key]) => !NEXT_IMAGE_PROPS.includes(key))
+    );
     // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
-    return <img {...(props as Record<string, string>)} />;
+    return <img {...(imgProps as Record<string, string>)} />;
   },
 }));
 
