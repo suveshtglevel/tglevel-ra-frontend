@@ -4,7 +4,6 @@ import React from 'react';
 import { Check, CheckCheck, Pin } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
 import { SafeHtml } from '@/components/ui/safe-html';
 import FileAttachmentView from './FileAttachmentView';
 import type { ChatMessage } from '@/store/slices/messageSlice';
@@ -14,15 +13,7 @@ import {
   parseConfidence,
   splitLabeledLine,
   type TradeSegment,
-  type ConfidenceLevel,
 } from '@/lib/researchAnalysis';
-
-const DOT_COLOR: Record<ConfidenceLevel, string> = {
-  high: 'bg-emerald-500',
-  medium: 'bg-amber-400',
-  low: 'bg-red-500',
-  unknown: 'bg-slate-400',
-};
 
 const bodyClass =
   'text-[13px] leading-[18.57px] font-medium space-y-1.5 break-words [&_p]:my-0 [&_b]:font-bold [&_strong]:font-bold [&_a]:text-emerald-600 [&_a]:underline [&_a]:break-all [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1 [&_li]:my-0.5';
@@ -56,13 +47,15 @@ const Segment = ({ segment }: { segment: TradeSegment }) => {
         />
       );
     case 'confidence': {
-      const { label, value, level } = parseConfidence(segment.text);
+      // The confidence value already carries its own status icon from the
+      // message content (e.g. "🟡 Medium probability"), so we render the text
+      // as-is and don't add a frontend colour dot.
+      const { label, value } = parseConfidence(segment.text);
       return (
         <div className="rounded-xl border border-slate-200 bg-white/70 px-4 py-3">
           <p className="text-[13px] text-slate-500">{label}</p>
           {value && (
-            <p className="text-[14px] font-medium text-slate-800 flex items-center gap-2 mt-1.5">
-              <span aria-hidden="true" className={cn('w-3 h-3 rounded-full shrink-0', DOT_COLOR[level])} />
+            <p className="text-[14px] font-medium text-slate-800 mt-1.5">
               {value}
             </p>
           )}

@@ -117,6 +117,9 @@ describe('response interceptor — refresh on 401', () => {
   it('clears the session and rejects when refresh fails (bounce path)', async () => {
     mockedGetToken.mockReturnValue('old');
     setPath('/dashboard');
+    // Setting location.href makes jsdom log "Not implemented: navigation"; that
+    // log is expected here, so suppress it to keep the run output clean.
+    jest.spyOn(console, 'error').mockImplementation(() => {});
     jest.spyOn(axios, 'post').mockRejectedValue(new Error('refresh failed'));
 
     axiosInstance.defaults.adapter = async (config) => {

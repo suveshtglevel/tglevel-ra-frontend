@@ -4,6 +4,17 @@ import { parseResponse } from '@/lib/validate';
 const schema = z.object({ id: z.string(), name: z.string() }).loose();
 
 describe('parseResponse', () => {
+  // The failure cases intentionally feed bad data, which makes parseResponse log
+  // the schema issues (its dev-mode behaviour). Silence that expected noise so a
+  // green run stays clean, while still leaving real errors visible elsewhere.
+  let errorSpy: jest.SpyInstance;
+  beforeEach(() => {
+    errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    errorSpy.mockRestore();
+  });
+
   it('returns the data when it matches the schema', () => {
     const out = parseResponse(schema, { id: '1', name: 'x' }, 'thing');
     expect(out).toEqual({ id: '1', name: 'x' });
