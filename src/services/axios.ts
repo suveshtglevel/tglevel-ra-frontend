@@ -36,7 +36,7 @@ let refreshPromise: Promise<string> | null = null;
 
 // Exchange the HttpOnly refresh-token cookie for a fresh access token.
 // Uses a bare axios call (no interceptors) so a 401 here can't recurse.
-async function requestRefresh(): Promise<string> {
+async function callRefreshEndpoint(): Promise<string> {
   const { data } = await axios.post(
     `${BASE_URL}${REFRESH_URL}`,
     null,
@@ -48,6 +48,19 @@ async function requestRefresh(): Promise<string> {
   }
   setAccessToken(token);
   return token;
+}
+
+// The backend rotates the refresh-token cookie on every call, so two refreshes
+// that run at the same time across tabs would both send the *same* cookie — the
+// first rotates it and the second is rejected as a reused token, logging the
+// user out even though a valid cookie is present. We serialize refreshes across
+// all tabs with the Web Locks API: while one tab refreshes, others wait and
+// then reuse the freshly rotated cookie. Sequential refreshes are safe.
+async function requestRefresh(): Promise<string> {
+  if (typeof navigator !== 'undefined' && navigator.locks) {
+    return navigator.locks.request('ra-token-refresh', () => callRefreshEndpoint());
+  }
+  return callRefreshEndpoint();
 }
 
 // Auth pages live at /login and /verify-otp (the (auth) route group is stripped

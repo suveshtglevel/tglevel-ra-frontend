@@ -1,7 +1,70 @@
 import type { NextConfig } from "next";
 
+const isDev = process.env.NODE_ENV === "development";
+
+// Origin of the backend API, so the CSP can allow XHR/fetch to it while still
+// blocking every other destination. Derived from the same env the app uses.
+const apiOrigin = (() => {
+  const raw = process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (!raw) return "";
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return "";
+  }
+})();
+
+// Content-Security-Policy. The high-value protection for our setup (access token
+// in sessionStorage) is `connect-src`: even if an XSS script slipped past
+// DOMPurify, this blocks it from exfiltrating the token to any origin other
+// than our own API. `object-src`/`base-uri`/`frame-ancestors`/`form-action`
+// close the other common injection and clickjacking vectors.
+//
+// `script-src`/`style-src` keep `'unsafe-inline'` because Radix UI applies
+// inline style attributes for positioning and Next injects inline bootstrap
+// scripts; a stricter script policy would require per-request nonces and forcing
+// every page into dynamic rendering. The token's exfiltration path is shut
+// regardless, which is what matters here.
+const csp = [
+  `default-src 'self'`,
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+  `style-src 'self' 'unsafe-inline'`,
+  `img-src 'self' blob: data: https:`,
+  `font-src 'self' data:`,
+  `connect-src 'self'${apiOrigin ? ` ${apiOrigin}` : ""}${isDev ? " ws: wss:" : ""}`,
+  `object-src 'none'`,
+  `base-uri 'self'`,
+  `form-action 'self'`,
+  `frame-ancestors 'none'`,
+  // Only force HTTPS in production; on http://localhost this would break dev.
+  ...(isDev ? [] : ["upgrade-insecure-requests"]),
+].join("; ");
+
+const securityHeaders = [
+  { key: "Content-Security-Policy", value: csp },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), microphone=(), geolocation=(), browsing-topics=()",
+  },
+  // Ignored by browsers over plain http (e.g. localhost), enforced over HTTPS.
+  {
+    key: "Strict-Transport-Security",
+    value: "max-age=63072000; includeSubDomains; preload",
+  },
+];
+
 const nextConfig: NextConfig = {
-  /* config options here */
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: securityHeaders,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
