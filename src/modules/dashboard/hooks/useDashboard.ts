@@ -44,6 +44,9 @@ export interface SendOptions {
   group?: string;
   notifyUsers?: boolean;
   targetCommunityIds?: string[];
+  // Set when this message is a follow-up reply to an existing message; carries
+  // the parent message's id so the backend can thread it.
+  parentMessageId?: string;
   // Attachment to upload with the message (send-message is multipart). `file`
   // is the raw upload; `attachment` carries the composer's local preview metadata.
   file?: File;
@@ -294,6 +297,7 @@ export const useDashboard = () => {
           sub_community_id: subId,
           type: options!.messageTypeId!,
           content: hasContent ? content : '',
+          parent_message_id: options?.parentMessageId,
           notification_sent: options?.notifyUsers ?? false,
           imageFile: isImage ? options?.file : undefined,
           docFile: !isImage ? options?.file : undefined,

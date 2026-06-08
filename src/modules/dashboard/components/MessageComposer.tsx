@@ -36,7 +36,8 @@ import {
   X,
   FileText,
   FileSpreadsheet,
-  File as FileIcon
+  File as FileIcon,
+  Reply
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
@@ -58,6 +59,13 @@ import type { CommunityVM, BundleVM } from '@/types/dashboard';
 import type { MessageTypeOption } from '@/modules/dashboard/services/messages.service';
 import type { SendOptions } from '@/modules/dashboard/hooks/useDashboard';
 
+// The message being followed-up on (WhatsApp-style reply context).
+export interface ReplyContext {
+  id: string; // parent message id, sent as parent_message_id
+  sender?: string;
+  preview: string;
+}
+
 interface MessageComposerProps {
   communities: CommunityVM[];
   messageTypes: MessageTypeOption[];
@@ -68,16 +76,23 @@ interface MessageComposerProps {
   onCreateBundle?: (payload: { name: string; communityId: string; subIds: string[] }) => void;
   onSend?: (content: string, options?: SendOptions) => void;
   disabled?: boolean;
+  // Active follow-up reply (set when the RA picks "Follow up message" on a
+  // trade card); null when not replying. onCancelReply dismisses it.
+  replyTo?: ReplyContext | null;
+  onCancelReply?: () => void;
 }
 
 type FilePreview = NonNullable<SendOptions['attachment']> & {
   file: File;
 };
 
-const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, onCreateBundle, onSend, disabled = false }: MessageComposerProps) => {
+const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, onCreateBundle, onSend, disabled = false, replyTo, onCancelReply }: MessageComposerProps) => {
   const [isEditorEmpty, setIsEditorEmpty] = React.useState(true);
   const [selectedBundleId, setSelectedBundleId] = React.useState<string | null>(null);
   const [selectedType, setSelectedType] = React.useState<MessageTypeOption | null>(null);
+  // Open state for the two selection dropdowns, so they close on pick.
+  const [groupOpen, setGroupOpen] = React.useState(false);
+  const [typeOpen, setTypeOpen] = React.useState(false);
   const [notifyUsers, setNotifyUsers] = React.useState(false);
   // In-progress draft for the bundle builder (the saved list comes from props).
   const [bundleOpen, setBundleOpen] = React.useState(false);
@@ -112,6 +127,11 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
   const selectedBundle = bundles.find((b) => b.id === selectedBundleId) ?? null;
   const messageTypeRequiredText = 'Select message type before sending';
 
+  // Trade messages must always notify users: the toggle is forced on and the RA
+  // can't switch it off. Every other type defaults to off and stays toggleable.
+  const isTradeType = selectedType?.id === 1 || selectedType?.name?.toLowerCase() === 'trade';
+  const notifyEffective = isTradeType ? true : notifyUsers;
+
   // Toggle a sub-community in the draft. A draft is locked to one parent
   // community — picking a sub from a different community is disallowed.
   const toggleDraftSub = (communityId: string, subId: string) => {
@@ -137,6 +157,22 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
     const community = communities.find((c) => c.id === draftCommunityId);
     const subs = community?.subCommunities?.filter((s) => draftSubIds.includes(s.id)) ?? [];
     const name = draftName.trim() || subs.map((s) => s.name).join(', ');
+
+    // Catch duplicates up front: the backend only returns a generic "API error"
+    // for an existing bundle, so detect it here (same name, or the same set of
+    // sub-communities in the same community) and show a clear message instead.
+    const sameSet = (a: string[], b: string[]) =>
+      a.length === b.length && [...a].sort().join('|') === [...b].sort().join('|');
+    const alreadyExists = bundles.some(
+      (b) =>
+        b.name.trim().toLowerCase() === name.trim().toLowerCase() ||
+        (b.communityId === draftCommunityId && sameSet(b.subIds, draftSubIds))
+    );
+    if (alreadyExists) {
+      toast.error('This bundle already exists');
+      return;
+    }
+
     onCreateBundle?.({ name, communityId: draftCommunityId, subIds: [...draftSubIds] });
     resetDraft();
     setBundleOpen(false);
@@ -327,8 +363,10 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
       messageType: selectedType.name,
       messageTypeId: selectedType.id,
       group: selectedBundle?.name,
-      notifyUsers,
+      notifyUsers: notifyEffective,
       targetCommunityIds: selectedBundle?.subIds,
+      // Thread this send under the message being followed up on, if any.
+      parentMessageId: replyTo?.id,
     };
 
     if (filePreview) {
@@ -350,7 +388,19 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
     setNotifyUsers(false);
     setFilePreview(null);
     setShowFullPreview(false);
+    onCancelReply?.();
   };
+
+  // When a follow-up reply starts, pre-select the "Followup" message type (id 3)
+  // so the RA doesn't have to, and focus the editor. Keyed on the parent id so it
+  // runs once per reply target, not on every render.
+  useEffect(() => {
+    if (!replyTo) return;
+    const followup = messageTypes.find((t) => t.id === 3 || /follow/i.test(t.name));
+    if (followup) setSelectedType(followup);
+    editor?.commands.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [replyTo?.id]);
   // Keep the editor's static keydown handler pointed at the latest closure
   // without writing to the ref during render.
   useEffect(() => {
@@ -491,14 +541,14 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
       {/* Top Control Bar */}
       <div className="px-3 sm:px-5 py-2 flex flex-wrap items-center justify-between gap-2 border-b border-[#E2E8F0] shrink-0 bg-[#F8FAFC]">
         <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
-          <Popover>
+          <Popover open={groupOpen} onOpenChange={setGroupOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 size="sm"
                 className={cn(
                   "h-9 rounded-xl border-slate-200 bg-white text-slate-600 gap-2 font-bold px-4 hover:bg-slate-50 transition-colors shadow-none cursor-pointer max-w-[220px]",
-                  selectedBundle && "bg-[#0F172A] text-white border-[#0F172A] hover:bg-[#1E293B] hover:text-white"
+                  selectedBundle && "bg-[#00bc7d] text-white border-[#00bc7d] hover:bg-[#00a06a] hover:text-white"
                 )}
               >
                 <span className="truncate">{selectedBundle ? selectedBundle.name : "Select Group"}</span>
@@ -506,82 +556,120 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
               </Button>
             </PopoverTrigger>
             <PopoverContent
-              className="w-auto min-w-[160px] max-w-[300px] p-0 bg-[#FDFDFD] border-[1.97px] border-[#E2E8F0] text-[11.75px] rounded-[6.73px] shadow-lg overflow-hidden"
+              className="w-[260px] max-w-[90vw] p-0 bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden"
               align="start"
-              side="bottom"
+              // Composer sits at the bottom of the screen, so open upward into the
+              // chat area where there's room for a larger list.
+              side="top"
               sideOffset={8}
               avoidCollisions={false}
             >
-              <div className="flex flex-col py-0 max-h-[260px] overflow-y-auto">
-                {bundles.length === 0 ? (
-                  <div className="px-3 py-3 text-[11.5px] text-slate-400 font-medium text-center">
-                    No bundles yet.<br />Create one with <span className="font-bold text-emerald-600">+ Bundle</span>.
+              {bundles.length === 0 ? (
+                <div className="px-4 py-5 text-[12px] text-slate-400 font-medium text-center">
+                  No bundles yet.<br />Create one with <span className="font-bold text-emerald-600">+ Bundle</span>.
+                </div>
+              ) : (
+                <>
+                  {/* Header with the total count, so the RA can tell how many
+                      groups exist even before scrolling. */}
+                  <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-slate-50">
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Groups</span>
+                    <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                      {bundles.length}
+                    </span>
                   </div>
-                ) : (
-                  bundles.map((bundle) => (
-                    <button
-                      key={bundle.id}
-                      onClick={() => setSelectedBundleId(bundle.id)}
-                      className={cn(
-                        "w-full text-left px-[12px] py-[7px] text-[11.75px] font-medium transition-colors border-b border-[#E2E8F0] last:border-none hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer",
-                        selectedBundleId === bundle.id ? "bg-[#CFDCE8] text-[#0F172A]" : "text-[#0F172A]"
-                      )}
-                    >
-                      {selectedBundleId === bundle.id && <Check className="w-3 h-3 text-emerald-600 shrink-0" />}
-                      <span className="truncate">{bundle.name}</span>
-                    </button>
-                  ))
-                )}
-              </div>
+                  {/* `dropdown-scroll` keeps a visible scrollbar so the RA knows
+                      there's more below when the list overflows. */}
+                  <div className="dropdown-scroll flex flex-col py-1 max-h-[280px] overflow-y-auto">
+                    {bundles.map((bundle) => (
+                      <button
+                        key={bundle.id}
+                        onClick={() => { setSelectedBundleId(bundle.id); setGroupOpen(false); }}
+                        className={cn(
+                          "w-full text-left mx-1 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors hover:bg-slate-50 flex items-center gap-2 cursor-pointer",
+                          selectedBundleId === bundle.id ? "bg-emerald-50 text-emerald-700" : "text-slate-700"
+                        )}
+                        style={{ width: 'calc(100% - 0.5rem)' }}
+                      >
+                        <span className="flex-1 truncate">{bundle.name}</span>
+                        {selectedBundleId === bundle.id && <Check className="w-4 h-4 text-emerald-600 shrink-0" />}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </PopoverContent>
           </Popover>
 
-          <Popover>
+          <Popover open={typeOpen} onOpenChange={setTypeOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 size="sm"
                 className={cn(
                   "h-9 rounded-xl border-slate-200 bg-white text-slate-600 gap-2 font-bold px-4 hover:bg-slate-50 transition-colors shadow-none cursor-pointer",
-                  selectedType && "bg-[#0F172A] text-white border-[#0F172A] hover:bg-[#1E293B] hover:text-white"
+                  selectedType && "bg-[#00bc7d] text-white border-[#00bc7d] hover:bg-[#00a06a] hover:text-white"
                 )}
               >
                 {selectedType?.name || "Select Message Type"} <ChevronDown className={cn("w-4 h-4 text-slate-400", selectedType && "text-white/70")} />
               </Button>
             </PopoverTrigger>
             <PopoverContent
-              className="w-auto min-w-[142.88px] max-w-[300px] p-0 bg-[#FDFDFD] border-[1.97px] border-[#E2E8F0] rounded-[6.73px] shadow-lg overflow-hidden"
+              className="w-[220px] max-w-[90vw] p-0 bg-white border border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden"
               align="start"
-              side="bottom"
+              // Open upward — the composer is anchored at the bottom of the screen.
+              side="top"
               sideOffset={8}
               avoidCollisions={false}
             >
-              <div className="flex flex-col py-0">
-                {messageTypes.length === 0 ? (
-                  <div className="px-3 py-3 text-[11.5px] text-slate-400 font-medium text-center">
-                    No message types available
+              {messageTypes.length === 0 ? (
+                <div className="px-4 py-5 text-[12px] text-slate-400 font-medium text-center">
+                  No message types available
+                </div>
+              ) : (
+                <>
+                  {/* Header with the total count, so the RA can tell how many
+                      types exist even before scrolling. */}
+                  <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-slate-50">
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Types</span>
+                    <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                      {messageTypes.length}
+                    </span>
                   </div>
-                ) : (
-                  messageTypes.map((type) => (
-                    <button
-                      key={type._id}
-                      onClick={() => setSelectedType(type)}
-                      className={cn(
-                        "w-full text-left px-[12px] py-[5.38px] text-[11.75px] font-normal transition-colors border-b border-[#E2E8F0] last:border-none hover:bg-slate-50 flex items-center whitespace-nowrap cursor-pointer",
-                        selectedType?._id === type._id ? "bg-[#CFDCE8] text-[#0F172A]" : "text-[#0F172A]"
-                      )}
-                      style={{ height: '23.77px' }}
-                    >
-                      {type.name}
-                    </button>
-                  ))
-                )}
-              </div>
+                  {/* Always-visible `dropdown-scroll` scrollbar so overflow is
+                      obvious when there are many types. */}
+                  <div className="dropdown-scroll flex flex-col py-1 max-h-[280px] overflow-y-auto">
+                    {messageTypes.map((type) => (
+                      <button
+                        key={type._id}
+                        onClick={() => { setSelectedType(type); setTypeOpen(false); }}
+                        className={cn(
+                          "text-left mx-1 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors hover:bg-slate-50 flex items-center gap-2 cursor-pointer",
+                          selectedType?._id === type._id ? "bg-emerald-50 text-emerald-700" : "text-slate-700"
+                        )}
+                        style={{ width: 'calc(100% - 0.5rem)' }}
+                      >
+                        <span className="flex-1 truncate">{type.name}</span>
+                        {selectedType?._id === type._id && <Check className="w-4 h-4 text-emerald-600 shrink-0" />}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </PopoverContent>
           </Popover>
           <div className="hidden sm:block h-6 w-[1px] bg-slate-100 mx-1.5" />
           <div className="flex items-center gap-2 sm:gap-2.5">
-            <Switch checked={notifyUsers} onCheckedChange={setNotifyUsers} className="data-[state=checked]:bg-emerald-500 cursor-pointer" />
+            <Switch
+              checked={notifyEffective}
+              onCheckedChange={setNotifyUsers}
+              disabled={isTradeType}
+              title={isTradeType ? 'Trade messages always notify users' : undefined}
+              className={cn(
+                'data-[state=checked]:bg-emerald-500',
+                isTradeType ? 'cursor-not-allowed' : 'cursor-pointer'
+              )}
+            />
             <span className="text-[13px] font-bold text-slate-500 tracking-tight whitespace-nowrap">Notify Users</span>
           </div>
         </div>
@@ -746,6 +834,30 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
 
       {renderPreviewModal()}
 
+      {/* Follow-up reply context — WhatsApp-style preview of the message being
+          replied to, shown just above the input. The send threads under it. */}
+      {replyTo && (
+        <div className="px-3 sm:px-5 pt-2 shrink-0">
+          <div className="flex items-start gap-2 rounded-lg border-l-4 border-emerald-500 bg-emerald-50/70 px-3 py-2">
+            <Reply className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-bold text-emerald-700">
+                Following up on {replyTo.sender ? replyTo.sender : 'trade message'}
+              </p>
+              <p className="text-[12px] text-slate-600 truncate">{replyTo.preview}</p>
+            </div>
+            <button
+              type="button"
+              onClick={onCancelReply}
+              aria-label="Cancel follow-up"
+              className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Editor Area */}
       <div
         className={cn(
@@ -837,6 +949,29 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
         }
         .composer-scroll::-webkit-scrollbar-track {
           background: transparent;
+        }
+        /* Always-visible scrollbar for dropdown lists, so the RA can tell there
+           are more items below the fold. Reserves gutter space (no layout jump)
+           and keeps the track + thumb coloured rather than overlay/auto-hidden. */
+        .dropdown-scroll {
+          scrollbar-width: thin;
+          scrollbar-color: #94a3b8 #e2e8f0;
+          scrollbar-gutter: stable;
+        }
+        .dropdown-scroll::-webkit-scrollbar {
+          width: 8px;
+        }
+        .dropdown-scroll::-webkit-scrollbar-track {
+          background: #eef2f6;
+          border-radius: 9999px;
+        }
+        .dropdown-scroll::-webkit-scrollbar-thumb {
+          background-color: #94a3b8;
+          border-radius: 9999px;
+          border: 2px solid #eef2f6;
+        }
+        .dropdown-scroll::-webkit-scrollbar-thumb:hover {
+          background-color: #64748b;
         }
         .tiptap {
           /* Keep the text caret black instead of the browser's default/accent

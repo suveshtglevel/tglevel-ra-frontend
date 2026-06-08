@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { X, Download, FileText, FileSpreadsheet } from 'lucide-react';
+import { X, FileText, FileSpreadsheet } from 'lucide-react';
 import type { FileAttachment } from '@/store/slices/messageSlice';
 
 // Full-screen viewer for an attachment. Rendered through a portal so it sits
@@ -23,6 +23,36 @@ const FileViewer = ({ attachment, onClose }: { attachment: FileAttachment; onClo
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  // For PDFs, fetch the file and hand the iframe a blob: URL tagged as
+  // application/pdf. Pointing the iframe straight at the S3 url downloads the
+  // file instead of rendering it, because S3 serves it with
+  // `Content-Disposition: attachment` (and sometimes a generic content-type).
+  // A re-tagged blob always previews inline.
+  const [pdfUrl, setPdfUrl] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (attachment.fileType !== 'pdf') return;
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    (async () => {
+      try {
+        const blob = await (await fetch(attachment.url)).blob();
+        const pdf =
+          blob.type === 'application/pdf'
+            ? blob
+            : new Blob([blob], { type: 'application/pdf' });
+        objectUrl = URL.createObjectURL(pdf);
+        if (!cancelled) setPdfUrl(objectUrl);
+      } catch {
+        // Network/CORS failure — fall back to the raw url (may download).
+        if (!cancelled) setPdfUrl(attachment.url);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [attachment.url, attachment.fileType]);
 
   const handleDownload = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -45,9 +75,6 @@ const FileViewer = ({ attachment, onClose }: { attachment: FileAttachment; onClo
   const content = (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80" onClick={onClose}>
       <div className="absolute top-4 right-4 flex items-center gap-3 z-10">
-        <button onClick={(e) => handleDownload(e)} className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer transition-colors">
-          <Download className="w-5 h-5 text-white" />
-        </button>
         <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer transition-colors">
           <X className="w-5 h-5 text-white" />
         </button>
@@ -65,7 +92,13 @@ const FileViewer = ({ attachment, onClose }: { attachment: FileAttachment; onClo
           <video src={attachment.url} controls autoPlay className="max-w-full max-h-[85vh] rounded-lg" />
         )}
         {attachment.fileType === 'pdf' && (
-          <iframe src={attachment.url} className="w-[90vw] sm:w-[80vw] h-[85vh] rounded-lg bg-white" title={attachment.name} />
+          pdfUrl ? (
+            <iframe src={pdfUrl} className="w-[90vw] sm:w-[80vw] h-[85vh] rounded-lg bg-white" title={attachment.name} />
+          ) : (
+            <div className="w-[90vw] sm:w-[80vw] h-[85vh] rounded-lg bg-white flex items-center justify-center">
+              <p className="text-sm text-slate-500">Loading preview…</p>
+            </div>
+          )
         )}
         {(attachment.fileType === 'doc' || attachment.fileType === 'excel' || attachment.fileType === 'file') && (
           <div className="bg-white rounded-2xl p-8 sm:p-10 flex flex-col items-center gap-4 text-center mx-4">

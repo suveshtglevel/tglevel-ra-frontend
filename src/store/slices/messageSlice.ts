@@ -26,6 +26,9 @@ export interface ChatMessage {
   pinned?: boolean;
   attachment?: FileAttachment;
   sequenceKey?: number;
+  // Set on a follow-up reply: the id of the message it follows up on. Drives the
+  // WhatsApp-style quoted-reply UI in the feed.
+  parentMessageId?: string;
   // Trade-card metadata (only present when messageType === 'Trade')
   tradeTag?: string;
   tradeRefId?: string;

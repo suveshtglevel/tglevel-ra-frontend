@@ -259,7 +259,11 @@ const MediaDocsPanel = ({ title, messages, onClose }: MediaDocsPanelProps) => {
                 <button
                   key={doc.id}
                   type="button"
-                  onClick={() => openFileAttachment({
+                  // Open the doc in the in-app viewer (PDF shows inline, others
+                  // show a card) instead of opening/downloading in a new tab; the
+                  // viewer carries the download button so nothing downloads until
+                  // the RA explicitly chooses to.
+                  onClick={() => setPreviewAttachment({
                     name: doc.name,
                     size: doc.size,
                     url: doc.url,

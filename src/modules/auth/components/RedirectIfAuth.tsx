@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppSelector } from '@/store/hooks';
+import { useHydrated } from '@/lib/hooks/useHydrated';
 
 // Full-screen spinner shown while the session bootstrap is still running.
 function AuthLoading() {
@@ -18,6 +19,11 @@ function AuthLoading() {
 export default function RedirectIfAuth({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const status = useAppSelector((state) => state.auth.status);
+  // Render the spinner on the server and the first client render, so the
+  // hydrated HTML matches before we branch on client-only auth state. Without
+  // this, the login layout could render on the client while the server sent the
+  // spinner, causing a hydration mismatch.
+  const hydrated = useHydrated();
 
   useEffect(() => {
     if (status === 'authenticated') {
@@ -25,7 +31,7 @@ export default function RedirectIfAuth({ children }: { children: React.ReactNode
     }
   }, [status, router]);
 
-  if (status === 'pending' || status === 'authenticated') {
+  if (!hydrated || status === 'pending' || status === 'authenticated') {
     return <AuthLoading />;
   }
   return <>{children}</>;

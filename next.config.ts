@@ -14,6 +14,22 @@ const apiOrigin = (() => {
   }
 })();
 
+// Origin where message attachments live (S3 bucket). Needed so the app can
+// fetch/download files, preview PDFs in an iframe, and play videos. Override via
+// NEXT_PUBLIC_MEDIA_BASE_URL; defaults to the current S3 bucket. Scoped to this
+// one origin (not a blanket `https:`) so the connect-src token protection holds.
+const mediaOrigin = (() => {
+  const raw = process.env.NEXT_PUBLIC_MEDIA_BASE_URL;
+  if (raw) {
+    try {
+      return new URL(raw).origin;
+    } catch {
+      /* fall through to default */
+    }
+  }
+  return "https://inhouse-panels.s3.ap-south-1.amazonaws.com";
+})();
+
 // Content-Security-Policy. The high-value protection for our setup (access token
 // in sessionStorage) is `connect-src`: even if an XSS script slipped past
 // DOMPurify, this blocks it from exfiltrating the token to any origin other
@@ -31,7 +47,10 @@ const csp = [
   `style-src 'self' 'unsafe-inline'`,
   `img-src 'self' blob: data: https:`,
   `font-src 'self' data:`,
-  `connect-src 'self'${apiOrigin ? ` ${apiOrigin}` : ""}${isDev ? " ws: wss:" : ""}`,
+  `media-src 'self' blob: data: ${mediaOrigin}`,
+  `connect-src 'self'${apiOrigin ? ` ${apiOrigin}` : ""} ${mediaOrigin}${isDev ? " ws: wss:" : ""}`,
+  // Attachment previews (PDF) load in an <iframe> from the media bucket.
+  `frame-src 'self' blob: ${mediaOrigin}`,
   `object-src 'none'`,
   `base-uri 'self'`,
   `form-action 'self'`,

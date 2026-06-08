@@ -43,5 +43,6 @@ export function mapBackendMessage(m: BackendMessage, typeName?: string): ChatMes
     status: 'read',
     sender: m.author_name ?? 'RA',
     attachment,
+    parentMessageId: m.parent_message_id || undefined,
   };
 }

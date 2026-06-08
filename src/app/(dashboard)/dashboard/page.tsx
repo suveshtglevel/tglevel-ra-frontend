@@ -7,7 +7,9 @@ import ChatHeader from '@/modules/dashboard/components/ChatHeader';
 import PinnedAlert from '@/modules/dashboard/components/PinnedAlert';
 import MessageComposer from '@/modules/dashboard/components/MessageComposer';
 import ChatFeed from '@/modules/dashboard/components/ChatFeed';
+import type { ReplyContext } from '@/modules/dashboard/components/MessageComposer';
 import { useDashboard } from '@/modules/dashboard/hooks/useDashboard';
+import type { ChatMessage } from '@/store/slices/messageSlice';
 
 export default function DashboardPage() {
   const {
@@ -35,6 +37,22 @@ export default function DashboardPage() {
 
   // Community list is an off-canvas drawer below `lg`; static side-by-side at lg+.
   const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false);
+
+  // Active follow-up reply (the trade message the RA is following up on).
+  const [replyTo, setReplyTo] = React.useState<ReplyContext | null>(null);
+
+  // Build the composer's reply context from the picked message; the preview is
+  // its plain text (or attachment name), capped so the banner stays one line.
+  const startFollowUp = (message: ChatMessage) => {
+    const text = (message.content || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    const preview = (text || message.attachment?.name || 'Attachment').slice(0, 140);
+    setReplyTo({ id: message.id, sender: message.sender, preview });
+  };
+
+  // Cancel any in-progress reply when switching chats.
+  React.useEffect(() => {
+    setReplyTo(null);
+  }, [selectedSubCommunityId]);
 
   const headerTitle = selectedSubCommunity?.name ?? selectedCommunity?.name ?? '';
   const headerMembers = selectedSubCommunity
@@ -99,6 +117,7 @@ export default function DashboardPage() {
           <ChatFeed
             messages={currentMessages}
             onTogglePin={handleTogglePin}
+            onFollowUp={startFollowUp}
           />
         )}
 
@@ -113,6 +132,8 @@ export default function DashboardPage() {
                 creatingBundle={creatingBundle}
                 onCreateBundle={handleCreateBundle}
                 onSend={handleSendMessage}
+                replyTo={replyTo}
+                onCancelReply={() => setReplyTo(null)}
               />
             ) : selectedSubCommunityId ? (
               <p className="text-center text-[13px] font-semibold text-slate-400 py-3 bg-slate-100/50 rounded-xl border border-slate-200">

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MoreVertical, Pin, Check, CheckCheck, Link as LinkIcon, ChevronLeft } from 'lucide-react';
+import { MoreVertical, Pin, Check, CheckCheck, Link as LinkIcon, ChevronLeft, Reply } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import TradeCard from './TradeCard';
 import ViewedByPanel from './ViewedByPanel';
@@ -11,23 +11,21 @@ import FileAttachmentView from './FileAttachmentView';
 import { cn } from '@/lib/utils';
 import { extractLinks, linkifyHtml, type DetectedLink } from '@/lib/extractLinks';
 import { SafeHtml } from '@/components/ui/safe-html';
-import { useMessageStats } from '@/modules/dashboard/hooks/useMessageStats';
 import type { ChatMessage, FileAttachment } from '@/store/slices/messageSlice';
-
-// Backend-issued message ids look like "msg_<uuid>"; optimistic locally-sent
-// ones use "msg-<community>-<ts>". Only the former have seen-by stats.
-const isBackendMessageId = (id: string) => /^msg_/.test(id);
 
 interface ChatFeedProps {
   communityTag?: string; // shown on trade cards instead of the message type
   messages?: ChatMessage[];
   onTogglePin?: (messageId: string) => void;
+  // Start a follow-up reply to a (trade) message — opens the composer's reply
+  // context with this message as the parent.
+  onFollowUp?: (message: ChatMessage) => void;
 }
 
 // Three-dots menu overlaid at the top-right of every message; offers pin/unpin
 // and — when the message contains links — a "Links" tab that lists every link
 // detected in the card. Controlled so it closes itself right after an action.
-const MessageMenu = ({ pinned, onTogglePin, links }: { pinned: boolean; onTogglePin: () => void; links: DetectedLink[] }) => {
+const MessageMenu = ({ pinned, onTogglePin, links, onFollowUp }: { pinned: boolean; onTogglePin: () => void; links: DetectedLink[]; onFollowUp?: () => void }) => {
   const [open, setOpen] = React.useState(false);
   const [view, setView] = React.useState<'menu' | 'links'>('menu');
 
@@ -61,6 +59,19 @@ const MessageMenu = ({ pinned, onTogglePin, links }: { pinned: boolean; onToggle
               <Pin className={cn("w-4 h-4", pinned ? "text-emerald-500 rotate-45" : "text-slate-400")} />
               {pinned ? 'Unpin message' : 'Pin message'}
             </button>
+            {onFollowUp && (
+              <button
+                type="button"
+                onClick={() => {
+                  onFollowUp();
+                  setOpen(false);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
+              >
+                <Reply className="w-4 h-4 text-slate-400" />
+                Follow up message
+              </button>
+            )}
             {links.length > 0 && (
               <button
                 type="button"
@@ -115,9 +126,56 @@ const MESSAGE_TYPE_LABELS: Record<number, string> = {
   5: 'Flaunt',
 };
 
+// Scroll to a message and briefly flash its container, matching the pinned-jump
+// highlight so the RA can spot the message the reply points at.
+const scrollToMessage = (id: string) => {
+  const el = document.getElementById(`feed-msg-${id}`);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.classList.remove('pinned-flash');
+  // Force reflow so the animation restarts even on repeated clicks.
+  void el.offsetWidth;
+  el.classList.add('pinned-flash');
+  window.setTimeout(() => el.classList.remove('pinned-flash'), 1800);
+};
+
+// Short plain-text preview from a message's HTML body (for the reply quote).
+const plainPreview = (html: string) =>
+  html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+// First sentence of a message, with a trailing ellipsis when there's more —
+// the WhatsApp-style truncated snippet for a reply quote.
+const firstSentence = (text: string) => {
+  const clean = text.trim();
+  if (!clean) return '';
+  const match = clean.match(/^.*?[.!?](?=\s|$)/);
+  let snippet = (match ? match[0] : clean).trim();
+  if (snippet.length > 80) snippet = snippet.slice(0, 80).trim();
+  return snippet.length < clean.length ? `${snippet} …` : snippet;
+};
+
+// WhatsApp-style quoted reply shown at the top of a follow-up message: the
+// parent's sender + the first sentence of its content. Clicking it scrolls to
+// the parent.
+const QuotedReply = ({ parent, parentId }: { parent?: ChatMessage; parentId: string }) => {
+  const preview = parent
+    ? firstSentence(plainPreview(parent.content) || parent.attachment?.name || '')
+    : '';
+  return (
+    <button
+      type="button"
+      onClick={() => scrollToMessage(parentId)}
+      className="w-full text-left mb-2 rounded-lg border-l-4 border-emerald-500 bg-emerald-50/70 px-2.5 py-1.5 hover:bg-emerald-100/70 transition-colors cursor-pointer"
+    >
+      <p className="text-[10px] font-bold text-emerald-700 truncate">{parent?.sender ?? 'Trade message'}</p>
+      {preview && <p className="text-[11px] text-slate-500 truncate">{preview}</p>}
+    </button>
+  );
+};
+
 // Every message renders as a left-aligned post (like the seed messages),
 // regardless of who sent it or its type.
-const MessageBubble = ({ message, status, communityTag, onOpenFile, onTickClick }: { message: ChatMessage; status: ChatMessage['status']; communityTag?: string; onOpenFile: (attachment: FileAttachment) => void; onTickClick: () => void }) => {
+const MessageBubble = ({ message, status, communityTag, parentMessage, onOpenFile, onTickClick }: { message: ChatMessage; status: ChatMessage['status']; communityTag?: string; parentMessage?: ChatMessage; onOpenFile: (attachment: FileAttachment) => void; onTickClick: () => void }) => {
   const typeLabel = message.messageTypeId != null ? MESSAGE_TYPE_LABELS[message.messageTypeId] : undefined;
   const shortId = message.sequenceKey != null ? String(message.sequenceKey) : message.id ? message.id.slice(-3) : '';
   return (
@@ -126,6 +184,12 @@ const MessageBubble = ({ message, status, communityTag, onOpenFile, onTickClick 
         <p className="text-[10px] font-bold text-emerald-600">{message.sender}</p>
         {message.pinned && <Pin className="w-3 h-3 text-emerald-500 rotate-45 shrink-0" />}
       </div>
+
+      {/* Follow-up reply quote — only for messages that follow up on another. A
+          direct follow-up (no parent) keeps the plain white bubble. */}
+      {message.parentMessageId && (
+        <QuotedReply parent={parentMessage} parentId={message.parentMessageId} />
+      )}
 
       {/* File attachment */}
       {message.attachment && (
@@ -178,31 +242,29 @@ const MessageBubble = ({ message, status, communityTag, onOpenFile, onTickClick 
   );
 };
 
-// One message row: fetches the seen-by stats (for backend messages) to drive
-// the delivery tick — single tick when no one has seen it, double tick once any
-// user has — and opens the "Viewed by" panel when the tick is clicked.
+// One message row. The delivery tick reflects the message's own status; the
+// seen-by stats API is NOT called here. Previously every row eagerly fetched its
+// stats just to colour the tick, which fired one request per message on open and
+// tripped the backend rate limiter. Those stats are now fetched on demand only,
+// inside ViewedByPanel, when the tick is actually clicked.
 const MessageRow = ({
   msg,
   communityTag,
+  parentMessage,
   onTogglePin,
   onOpenFile,
   onShowStats,
+  onFollowUp,
 }: {
   msg: ChatMessage;
   communityTag?: string;
+  parentMessage?: ChatMessage;
   onTogglePin?: (messageId: string) => void;
   onOpenFile: (attachment: FileAttachment) => void;
   onShowStats: (messageId: string) => void;
+  onFollowUp?: (message: ChatMessage) => void;
 }) => {
-  const hasStats = isBackendMessageId(msg.id);
-  const { data: stats } = useMessageStats(msg.id, hasStats);
-  // Seen by at least one user -> read (double tick); otherwise fall back to the
-  // message's own status (a freshly sent message shows a single tick).
-  const status: ChatMessage['status'] = stats
-    ? stats.total_seen > 0
-      ? 'read'
-      : 'sent'
-    : msg.status;
+  const status = msg.status;
 
   // Only render the green research/trade card for messages the backend marks as
   // Trade (type label or numeric id 1). A message whose text merely matches the
@@ -239,17 +301,31 @@ const MessageRow = ({
             message={msg}
             status={status}
             communityTag={communityTag}
+            parentMessage={parentMessage}
             onOpenFile={onOpenFile}
             onTickClick={() => onShowStats(msg.id)}
           />
         )}
-        <MessageMenu pinned={!!msg.pinned} onTogglePin={() => onTogglePin?.(msg.id)} links={links} />
+        <MessageMenu
+          pinned={!!msg.pinned}
+          onTogglePin={() => onTogglePin?.(msg.id)}
+          links={links}
+          // Follow-up replies target trade messages.
+          onFollowUp={isTrade && onFollowUp ? () => onFollowUp(msg) : undefined}
+        />
       </div>
     </div>
   );
 };
 
-const ChatFeed = ({ communityTag, messages = [], onTogglePin }: ChatFeedProps) => {
+const ChatFeed = ({ communityTag, messages = [], onTogglePin, onFollowUp }: ChatFeedProps) => {
+  // Lookup so a follow-up can resolve and quote its parent message.
+  const messageById = React.useMemo(() => {
+    const map = new Map<string, ChatMessage>();
+    messages.forEach((m) => map.set(m.id, m));
+    return map;
+  }, [messages]);
+
   // Message id whose "Viewed by" panel is open (null = closed).
   const [statsMessageId, setStatsMessageId] = React.useState<string | null>(null);
   const [viewingFile, setViewingFile] = React.useState<FileAttachment | null>(null);
@@ -288,9 +364,11 @@ const ChatFeed = ({ communityTag, messages = [], onTogglePin }: ChatFeedProps) =
                 key={msg.id}
                 msg={msg}
                 communityTag={communityTag}
+                parentMessage={msg.parentMessageId ? messageById.get(msg.parentMessageId) : undefined}
                 onTogglePin={onTogglePin}
                 onOpenFile={(att) => setViewingFile(att)}
                 onShowStats={handleShowStats}
+                onFollowUp={onFollowUp}
               />
             ))}
           </div>
