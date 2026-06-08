@@ -2,13 +2,14 @@
 
 import React from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MoreVertical, Pin, Check, CheckCheck } from 'lucide-react';
+import { MoreVertical, Pin, Check, CheckCheck, Link as LinkIcon, ChevronLeft } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import TradeCard from './TradeCard';
 import ViewedByPanel from './ViewedByPanel';
 import FileViewer from './FileViewer';
 import FileAttachmentView from './FileAttachmentView';
 import { cn } from '@/lib/utils';
+import { extractLinks, linkifyHtml, type DetectedLink } from '@/lib/extractLinks';
 import { SafeHtml } from '@/components/ui/safe-html';
 import { useMessageStats } from '@/modules/dashboard/hooks/useMessageStats';
 import type { ChatMessage, FileAttachment } from '@/store/slices/messageSlice';
@@ -23,10 +24,18 @@ interface ChatFeedProps {
   onTogglePin?: (messageId: string) => void;
 }
 
-// Three-dots menu overlaid at the top-right of every message; offers pin/unpin.
-// Controlled so it closes itself right after the action (no extra click needed).
-const MessageMenu = ({ pinned, onTogglePin }: { pinned: boolean; onTogglePin: () => void }) => {
+// Three-dots menu overlaid at the top-right of every message; offers pin/unpin
+// and — when the message contains links — a "Links" tab that lists every link
+// detected in the card. Controlled so it closes itself right after an action.
+const MessageMenu = ({ pinned, onTogglePin, links }: { pinned: boolean; onTogglePin: () => void; links: DetectedLink[] }) => {
   const [open, setOpen] = React.useState(false);
+  const [view, setView] = React.useState<'menu' | 'links'>('menu');
+
+  // Always reopen on the main menu, never the leftover links tab.
+  React.useEffect(() => {
+    if (!open) setView('menu');
+  }, [open]);
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -38,18 +47,60 @@ const MessageMenu = ({ pinned, onTogglePin }: { pinned: boolean; onTogglePin: ()
           <MoreVertical className="w-4 h-4" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-40 p-1 rounded-xl border-white bg-white shadow-lg" align="end" side="right" sideOffset={4}>
-        <button
-          type="button"
-          onClick={() => {
-            onTogglePin();
-            setOpen(false);
-          }}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
-        >
-          <Pin className={cn("w-4 h-4", pinned ? "text-emerald-500 rotate-45" : "text-slate-400")} />
-          {pinned ? 'Unpin message' : 'Pin message'}
-        </button>
+      <PopoverContent className="w-56 p-1 rounded-xl border-white bg-white shadow-lg" align="end" side="right" sideOffset={4}>
+        {view === 'menu' ? (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                onTogglePin();
+                setOpen(false);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
+            >
+              <Pin className={cn("w-4 h-4", pinned ? "text-emerald-500 rotate-45" : "text-slate-400")} />
+              {pinned ? 'Unpin message' : 'Pin message'}
+            </button>
+            {links.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setView('links')}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
+              >
+                <LinkIcon className="w-4 h-4 text-slate-400" />
+                Links
+                <span className="ml-auto text-[11px] font-semibold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
+                  {links.length}
+                </span>
+              </button>
+            )}
+          </>
+        ) : (
+          <div>
+            <button
+              type="button"
+              onClick={() => setView('menu')}
+              className="w-full flex items-center gap-1.5 px-2 py-2 rounded-lg text-[12px] font-semibold text-slate-500 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Links ({links.length})
+            </button>
+            <div className="max-h-60 overflow-y-auto mt-0.5">
+              {links.map((link) => (
+                <a
+                  key={link.url}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex flex-col gap-0.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 transition-colors"
+                >
+                  <span className="text-[12px] font-medium text-slate-700 truncate">{link.label}</span>
+                  <span className="text-[10px] text-emerald-600 underline truncate">{link.url}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );
@@ -84,8 +135,8 @@ const MessageBubble = ({ message, status, communityTag, onOpenFile, onTickClick 
       {/* Text content */}
       {message.content && (
         <SafeHtml
-          className="text-[13px] leading-relaxed text-slate-700 break-words [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1 [&_li]:my-0.5 [&_a]:underline"
-          html={message.content}
+          className="text-[13px] leading-relaxed text-slate-700 break-words [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1 [&_li]:my-0.5 [&_a]:text-blue-600 [&_a]:underline [&_a]:break-all"
+          html={linkifyHtml(message.content)}
         />
       )}
 
@@ -159,6 +210,9 @@ const MessageRow = ({
   // the type from the content.
   const isTrade = msg.messageType === 'Trade' || msg.messageTypeId === 1;
 
+  // Links detected in this message's body, surfaced via the three-dots menu.
+  const links = React.useMemo(() => extractLinks(msg.content), [msg.content]);
+
   return (
     // Full-width row carries the scroll/highlight target so the pinned
     // flash spans the whole width; the bubble stays inset & content-width.
@@ -167,6 +221,7 @@ const MessageRow = ({
         {isTrade ? (
           <TradeCard
             content={msg.content}
+            sender={msg.sender}
             timestamp={msg.timestamp}
             status={status}
             tag={communityTag ?? msg.tradeTag}
@@ -188,7 +243,7 @@ const MessageRow = ({
             onTickClick={() => onShowStats(msg.id)}
           />
         )}
-        <MessageMenu pinned={!!msg.pinned} onTogglePin={() => onTogglePin?.(msg.id)} />
+        <MessageMenu pinned={!!msg.pinned} onTogglePin={() => onTogglePin?.(msg.id)} links={links} />
       </div>
     </div>
   );

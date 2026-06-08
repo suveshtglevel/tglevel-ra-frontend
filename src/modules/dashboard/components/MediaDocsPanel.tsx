@@ -5,6 +5,7 @@ import { X, Search, FileText, FileSpreadsheet, File, Play, Link as LinkIcon } fr
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { extractLinks as extractLinksFromHtml } from '@/lib/extractLinks';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import FileViewer from './FileViewer';
 import { openAttachment as openFileAttachment } from './FileAttachmentView';
@@ -27,19 +28,16 @@ interface MediaEntry { id: string; name: string; size: string; url: string; file
 interface DocEntry { id: string; name: string; size: string; url: string; fileType: 'pdf' | 'doc' | 'excel' | 'file'; }
 interface LinkEntry { id: string; url: string; text: string; }
 
-// Pull every <a href> out of a message's HTML content.
-const LINK_REGEX = /<a[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/gi;
+// Collect every link in the chat — both <a href> anchors and bare URLs typed
+// into the message text — using the shared detector so this tab matches the
+// links surfaced on the cards themselves.
 const extractLinks = (messages: ChatMessage[]): LinkEntry[] => {
   const links: LinkEntry[] = [];
   messages.forEach((m) => {
     if (!m.content) return;
-    LINK_REGEX.lastIndex = 0;
-    let match: RegExpExecArray | null;
-    while ((match = LINK_REGEX.exec(m.content)) !== null) {
-      const url = match[1];
-      const text = match[2].replace(/<[^>]*>/g, '').trim() || url;
-      links.push({ id: `${m.id}-${links.length}`, url, text });
-    }
+    extractLinksFromHtml(m.content).forEach((link) => {
+      links.push({ id: `${m.id}-${links.length}`, url: link.url, text: link.label });
+    });
   });
   return links;
 };
@@ -111,7 +109,7 @@ const MediaDocsPanel = ({ title, messages, onClose }: MediaDocsPanelProps) => {
     activeTab === 'Media' ? 'Search media' : activeTab === 'Docs' ? 'Search documents' : 'Search links';
 
   return (
-    <div className="w-[90vw] max-w-[380px] max-h-[520px] bg-white border border-slate-200 rounded-2xl flex flex-col">
+    <div className="w-[90vw] max-w-[380px] h-[80vh] max-h-[520px] bg-white border border-slate-200 rounded-2xl flex flex-col">
       {/* Header */}
       <div className="px-5 pt-5 pb-3 shrink-0">
         <div className="flex items-center justify-between mb-1">

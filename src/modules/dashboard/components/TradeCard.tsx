@@ -14,9 +14,10 @@ import {
   splitLabeledLine,
   type TradeSegment,
 } from '@/lib/researchAnalysis';
+import { linkifyHtml } from '@/lib/extractLinks';
 
 const bodyClass =
-  'text-[13px] leading-[18.57px] font-medium space-y-1.5 break-words [&_p]:my-0 [&_b]:font-bold [&_strong]:font-bold [&_a]:text-emerald-600 [&_a]:underline [&_a]:break-all [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1 [&_li]:my-0.5';
+  'text-[13px] leading-[18.57px] font-medium space-y-1.5 break-words [&_p]:my-0 [&_b]:font-bold [&_strong]:font-bold [&_a]:text-blue-600 [&_a]:underline [&_a]:break-all [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1 [&_li]:my-0.5';
 
 // Renders one parsed paragraph with the design that matches its role.
 const Segment = ({ segment }: { segment: TradeSegment }) => {
@@ -42,8 +43,8 @@ const Segment = ({ segment }: { segment: TradeSegment }) => {
     case 'rationale':
       return (
         <SafeHtml
-          className="text-[13px] font-medium text-slate-500 [&_a]:text-emerald-600 [&_a]:underline [&_a]:break-all [&_p]:my-0"
-          html={segment.html}
+          className="text-[13px] font-medium text-slate-500 [&_a]:text-blue-600 [&_a]:underline [&_a]:break-all [&_p]:my-0"
+          html={linkifyHtml(segment.html)}
         />
       );
     case 'confidence': {
@@ -63,7 +64,7 @@ const Segment = ({ segment }: { segment: TradeSegment }) => {
       );
     }
     default:
-      return <SafeHtml className={bodyClass} html={segment.html} />;
+      return <SafeHtml className={bodyClass} html={linkifyHtml(segment.html)} />;
   }
 };
 
@@ -71,6 +72,7 @@ type MessageStatus = 'sent' | 'delivered' | 'read';
 
 interface TradeCardProps {
   content: string; // HTML body (free text or seed analysis)
+  sender?: string; // name of who sent the message
   timestamp: string;
   status?: MessageStatus;
   tag?: string;
@@ -101,7 +103,7 @@ const StatusTick = ({ status }: { status: MessageStatus }) => {
 // structured layout (disclaimer / customer care / rationale / confidence);
 // otherwise the typed content is shown as-is in the green card — no header or
 // structure is fabricated.
-const TradeCard = ({ content, timestamp, status = 'read', tag, refId, pinned, onTickClick, messageId, sequenceKey, messageType, attachment, onOpenFile }: TradeCardProps) => {
+const TradeCard = ({ content, sender, timestamp, status = 'read', tag, refId, pinned, onTickClick, messageId, sequenceKey, messageType, attachment, onOpenFile }: TradeCardProps) => {
   // Only treat the message as a structured research analysis when its text
   // actually matches the pattern; otherwise render the plain content.
   const isResearch = isResearchAnalysis(content);
@@ -114,9 +116,14 @@ const TradeCard = ({ content, timestamp, status = 'read', tag, refId, pinned, on
   return (
     <Card className="w-[380px] max-w-full bg-[#E6F9F3] border-[#C2EDDF] p-4 sm:p-5 rounded-3xl shadow-none">
       <div className="space-y-3 text-slate-800">
-        {pinned && (
-          <div className="flex justify-end">
-            <Pin className="w-3.5 h-3.5 text-emerald-500 rotate-45 shrink-0" />
+        {(sender || pinned) && (
+          <div className="flex items-center justify-between gap-2">
+            {sender ? (
+              <p className="text-[10px] font-bold text-emerald-600">{sender}</p>
+            ) : (
+              <span />
+            )}
+            {pinned && <Pin className="w-3.5 h-3.5 text-emerald-500 rotate-45 shrink-0" />}
           </div>
         )}
 
@@ -132,7 +139,7 @@ const TradeCard = ({ content, timestamp, status = 'read', tag, refId, pinned, on
         {segments ? (
           segments.map((segment, i) => <Segment key={i} segment={segment} />)
         ) : hasBody ? (
-          <SafeHtml className={bodyClass} html={content} />
+          <SafeHtml className={bodyClass} html={linkifyHtml(content)} />
         ) : null}
 
         <div className="flex items-center justify-between pt-2">
