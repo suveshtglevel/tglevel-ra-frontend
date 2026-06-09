@@ -101,6 +101,9 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
   const [draftSubIds, setDraftSubIds] = React.useState<string[]>([]);
   const [filePreview, setFilePreview] = React.useState<FilePreview | null>(null);
   const [showFullPreview, setShowFullPreview] = React.useState(false);
+  // Tracks which reply we've already reacted to, so we pre-select the Followup
+  // type exactly once per reply target (see the render-time adjustment below).
+  const [reactedReplyId, setReactedReplyId] = React.useState<string | null>(replyTo?.id ?? null);
   const mounted = useHydrated();
 
   useEffect(() => {
@@ -131,6 +134,19 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
   // can't switch it off. Every other type defaults to off and stays toggleable.
   const isTradeType = selectedType?.id === 1 || selectedType?.name?.toLowerCase() === 'trade';
   const notifyEffective = isTradeType ? true : notifyUsers;
+
+  // When a new follow-up reply starts, pre-select the "Followup" type (id 3) so
+  // the RA doesn't have to. Done as a render-time state adjustment (React's
+  // pattern for "change state when a prop changes") rather than in an effect,
+  // which avoids the extra render pass — runs once per reply target.
+  const currentReplyId = replyTo?.id ?? null;
+  if (currentReplyId !== reactedReplyId) {
+    setReactedReplyId(currentReplyId);
+    if (replyTo) {
+      const followup = messageTypes.find((t) => t.id === 3 || /follow/i.test(t.name));
+      if (followup) setSelectedType(followup);
+    }
+  }
 
   // Toggle a sub-community in the draft. A draft is locked to one parent
   // community — picking a sub from a different community is disallowed.
@@ -187,6 +203,9 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
   // The capped, scrollable wrapper around the editor — used to keep the caret
   // visible as the message grows past the max height.
   const editorScrollRef = React.useRef<HTMLDivElement>(null);
+  // Pending rAF for the caret-follow measurement, so rapid keystrokes coalesce
+  // into one layout read per frame instead of forcing a reflow on every update.
+  const followRafRef = React.useRef<number | null>(null);
 
   // Turn a picked/pasted/dropped file into the single attachment preview.
   // Defined before the editor (and stable) so the editor's paste/drop handlers
@@ -251,8 +270,12 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
       setIsEditorEmpty(editor.isEmpty);
       // Follow the caret as the message grows so the latest line stays visible
       // (e.g. when adding line breaks with Shift+Enter) instead of being hidden
-      // below the scroll viewport.
-      requestAnimationFrame(() => {
+      // below the scroll viewport. Coalesce to one rAF: cancel any frame still
+      // pending from a previous keystroke so we read layout at most once per
+      // frame (avoids a forced reflow on every single update).
+      if (followRafRef.current !== null) cancelAnimationFrame(followRafRef.current);
+      followRafRef.current = requestAnimationFrame(() => {
+        followRafRef.current = null;
         const el = editorScrollRef.current;
         if (!el) return;
         const coords = editor.view.coordsAtPos(editor.state.selection.head);
@@ -391,16 +414,11 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
     onCancelReply?.();
   };
 
-  // When a follow-up reply starts, pre-select the "Followup" message type (id 3)
-  // so the RA doesn't have to, and focus the editor. Keyed on the parent id so it
-  // runs once per reply target, not on every render.
+  // When a follow-up reply starts, move focus into the editor (a DOM side
+  // effect — no state — so it belongs in an effect, keyed on the parent id).
   useEffect(() => {
-    if (!replyTo) return;
-    const followup = messageTypes.find((t) => t.id === 3 || /follow/i.test(t.name));
-    if (followup) setSelectedType(followup);
-    editor?.commands.focus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [replyTo?.id]);
+    if (replyTo) editor?.commands.focus();
+  }, [replyTo?.id, replyTo, editor]);
   // Keep the editor's static keydown handler pointed at the latest closure
   // without writing to the ref during render.
   useEffect(() => {
@@ -414,10 +432,24 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
     }
   }, [editor, disabled]);
 
-  // TipTap initialises asynchronously; render nothing until the editor is ready.
-  // Placed after the hooks above so hook order stays stable across renders.
+  // Cancel any pending caret-follow frame on unmount.
+  useEffect(
+    () => () => {
+      if (followRafRef.current !== null) cancelAnimationFrame(followRafRef.current);
+    },
+    []
+  );
+
+  // TipTap initialises asynchronously on the client. Render a placeholder of the
+  // same footprint as the empty composer so the surrounding layout doesn't shift
+  // (avoids a CLS jump) when the real editor mounts a moment later.
   if (!editor) {
-    return null;
+    return (
+      <div
+        aria-hidden
+        className="w-full max-w-[1100px] min-h-[150px] bg-white border border-slate-200 shadow-sm rounded-[14px]"
+      />
+    );
   }
 
   const toggleBold = () => editor.chain().focus().toggleBold().run();

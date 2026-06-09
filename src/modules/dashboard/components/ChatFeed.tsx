@@ -1,26 +1,50 @@
 'use client';
 
 import React from 'react';
+import dynamic from 'next/dynamic';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MoreVertical, Pin, Check, CheckCheck, Link as LinkIcon, ChevronLeft, Reply } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import TradeCard from './TradeCard';
-import ViewedByPanel from './ViewedByPanel';
-import FileViewer from './FileViewer';
 import FileAttachmentView from './FileAttachmentView';
+
+// Both only render after a user action (clicking the seen tick / opening a
+// file), so defer their code until then instead of shipping it with the feed.
+const ViewedByPanel = dynamic(() => import('./ViewedByPanel'), { ssr: false });
+const FileViewer = dynamic(() => import('./FileViewer'), { ssr: false });
 import { cn } from '@/lib/utils';
 import { extractLinks, linkifyHtml, type DetectedLink } from '@/lib/extractLinks';
 import { SafeHtml } from '@/components/ui/safe-html';
+import { Skeleton } from '@/components/ui/skeleton';
 import type { ChatMessage, FileAttachment } from '@/store/slices/messageSlice';
 
 interface ChatFeedProps {
   communityTag?: string; // shown on trade cards instead of the message type
   messages?: ChatMessage[];
+  // True while the open chat's messages are being fetched (and none are cached
+  // yet); drives the skeleton placeholders.
+  loading?: boolean;
   onTogglePin?: (messageId: string) => void;
   // Start a follow-up reply to a (trade) message — opens the composer's reply
   // context with this message as the parent.
   onFollowUp?: (message: ChatMessage) => void;
 }
+
+// Placeholder message bubbles shown while a chat's messages load, alternating
+// width/alignment so the feed reads as "loading content" rather than frozen.
+const ChatFeedSkeleton = () => (
+  <div className="flex flex-col gap-3 w-full px-3 sm:px-6">
+    {[60, 80, 45, 70, 55, 75].map((w, i) => (
+      <div key={i} className="w-full">
+        <div className="max-w-[380px] rounded-2xl rounded-bl-sm px-4 py-3 bg-white border border-slate-200 space-y-2">
+          <Skeleton className="h-2.5 w-20" />
+          <Skeleton className="h-3 w-full" style={{ maxWidth: `${w}%` }} />
+          <Skeleton className="h-3" style={{ width: `${Math.max(30, w - 20)}%` }} />
+        </div>
+      </div>
+    ))}
+  </div>
+);
 
 // Three-dots menu overlaid at the top-right of every message; offers pin/unpin
 // and — when the message contains links — a "Links" tab that lists every link
@@ -29,13 +53,15 @@ const MessageMenu = ({ pinned, onTogglePin, links, onFollowUp }: { pinned: boole
   const [open, setOpen] = React.useState(false);
   const [view, setView] = React.useState<'menu' | 'links'>('menu');
 
-  // Always reopen on the main menu, never the leftover links tab.
-  React.useEffect(() => {
-    if (!open) setView('menu');
-  }, [open]);
+  // Reset to the main menu as the popover closes (never leave the links tab open
+  // for next time) — done in the event, not an effect.
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (!next) setView('menu');
+  };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -247,7 +273,7 @@ const MessageBubble = ({ message, status, communityTag, parentMessage, onOpenFil
 // stats just to colour the tick, which fired one request per message on open and
 // tripped the backend rate limiter. Those stats are now fetched on demand only,
 // inside ViewedByPanel, when the tick is actually clicked.
-const MessageRow = ({
+const MessageRow = React.memo(function MessageRow({
   msg,
   communityTag,
   parentMessage,
@@ -263,7 +289,7 @@ const MessageRow = ({
   onOpenFile: (attachment: FileAttachment) => void;
   onShowStats: (messageId: string) => void;
   onFollowUp?: (message: ChatMessage) => void;
-}) => {
+}) {
   const status = msg.status;
 
   // Only render the green research/trade card for messages the backend marks as
@@ -316,9 +342,9 @@ const MessageRow = ({
       </div>
     </div>
   );
-};
+});
 
-const ChatFeed = ({ communityTag, messages = [], onTogglePin, onFollowUp }: ChatFeedProps) => {
+const ChatFeed = ({ communityTag, messages = [], loading = false, onTogglePin, onFollowUp }: ChatFeedProps) => {
   // Lookup so a follow-up can resolve and quote its parent message.
   const messageById = React.useMemo(() => {
     const map = new Map<string, ChatMessage>();
@@ -331,9 +357,14 @@ const ChatFeed = ({ communityTag, messages = [], onTogglePin, onFollowUp }: Chat
   const [viewingFile, setViewingFile] = React.useState<FileAttachment | null>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
-  // Toggle the panel: clicking the same message's tick again closes it.
-  const handleShowStats = (messageId: string) =>
-    setStatsMessageId((current) => (current === messageId ? null : messageId));
+  // Stable handlers so memoized rows don't re-render when the stats/file panels
+  // toggle (those are ChatFeed-local state changes, unrelated to the rows).
+  const handleShowStats = React.useCallback(
+    (messageId: string) =>
+      setStatsMessageId((current) => (current === messageId ? null : messageId)),
+    []
+  );
+  const handleOpenFile = React.useCallback((att: FileAttachment) => setViewingFile(att), []);
 
   // Auto-scroll to bottom when new messages arrive
   React.useEffect(() => {
@@ -357,21 +388,26 @@ const ChatFeed = ({ communityTag, messages = [], onTogglePin, onFollowUp }: Chat
 
           {/* Messages — Trade-type messages render as the green research card,
               everything else renders as a normal chat bubble. Each row carries
-              a three-dots menu for pinning. */}
-          <div className="flex flex-col gap-3 w-full">
-            {messages.map((msg) => (
-              <MessageRow
-                key={msg.id}
-                msg={msg}
-                communityTag={communityTag}
-                parentMessage={msg.parentMessageId ? messageById.get(msg.parentMessageId) : undefined}
-                onTogglePin={onTogglePin}
-                onOpenFile={(att) => setViewingFile(att)}
-                onShowStats={handleShowStats}
-                onFollowUp={onFollowUp}
-              />
-            ))}
-          </div>
+              a three-dots menu for pinning. While the chat is still loading and
+              nothing is cached yet, show skeleton bubbles instead of a blank gap. */}
+          {loading && messages.length === 0 ? (
+            <ChatFeedSkeleton />
+          ) : (
+            <div className="flex flex-col gap-3 w-full">
+              {messages.map((msg) => (
+                <MessageRow
+                  key={msg.id}
+                  msg={msg}
+                  communityTag={communityTag}
+                  parentMessage={msg.parentMessageId ? messageById.get(msg.parentMessageId) : undefined}
+                  onTogglePin={onTogglePin}
+                  onOpenFile={handleOpenFile}
+                  onShowStats={handleShowStats}
+                  onFollowUp={onFollowUp}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </ScrollArea>
 

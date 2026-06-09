@@ -10,9 +10,11 @@ import type { FilterType } from './CommunityFilters';
 import type { CommunityVM } from '@/types/dashboard';
 import { cn } from '@/lib/utils';
 import { useDebounce } from '@/lib/hooks/useDebounce';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface CommunitySidebarProps {
   communities: CommunityVM[];
+  loading?: boolean;
   selectedCommunityId: string | null;
   selectedSubCommunityId: string | null;
   targetCommunityId: string | null;
@@ -25,8 +27,25 @@ interface CommunitySidebarProps {
   onToggleCommunityTargets: (communityId: string, allSubIds: string[]) => void;
 }
 
+// Placeholder rows shown while the community list is loading, so the sidebar
+// reads as instant instead of blank.
+const SidebarSkeleton = () => (
+  <div className="flex flex-col gap-2 pb-4">
+    {Array.from({ length: 6 }).map((_, i) => (
+      <div key={i} className="flex items-center gap-3 rounded-xl border border-slate-100 p-3">
+        <Skeleton className="h-9 w-9 rounded-full shrink-0" />
+        <div className="flex-1 space-y-2">
+          <Skeleton className="h-3 w-2/3" />
+          <Skeleton className="h-2.5 w-1/3" />
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
 const CommunitySidebar = ({
   communities,
+  loading = false,
   selectedCommunityId,
   selectedSubCommunityId,
   targetCommunityId,
@@ -111,6 +130,9 @@ const CommunitySidebar = ({
         <CommunityFilters activeFilter={activeFilter} onFilterChange={setActiveFilter} />
 
         <ScrollArea className="flex-1 min-h-0 px-4">
+          {loading && communities.length === 0 ? (
+            <SidebarSkeleton />
+          ) : (
           <div className="flex flex-col gap-2 pb-4">
             {filteredCommunities.length > 0 ? (
               filteredCommunities.map((comm, index) => (
@@ -135,6 +157,7 @@ const CommunitySidebar = ({
               </div>
             )}
           </div>
+          )}
         </ScrollArea>
       </section>
     </>

@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { TableRowsSkeleton } from '@/components/ui/skeleton';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useTradeFeedbackStats } from '@/modules/trade-feedback/hooks/useTradeFeedbackStats';
 import { useTradeFeedback } from '@/modules/trade-feedback/hooks/useTradeFeedback';
@@ -154,11 +155,7 @@ export default function TradeFeedbackPage() {
               </thead>
               <tbody className="text-sm">
                 {feedbackQuery.isLoading ? (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-16 text-center text-slate-400">
-                      Loading feedback…
-                    </td>
-                  </tr>
+                  <TableRowsSkeleton cols={5} />
                 ) : feedbackQuery.isError ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-16 text-center text-red-500">

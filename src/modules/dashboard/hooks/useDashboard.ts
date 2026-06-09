@@ -141,7 +141,7 @@ export const useDashboard = () => {
   }, [messageTypes]);
 
   // ----- Server state: messages + pinned messages for the open chat ----------
-  const { data: fetchedMessages } = useMessages(
+  const { data: fetchedMessages, isLoading: messagesLoading } = useMessages(
     selectedCommunityId ?? undefined,
     selectedSubCommunityId ?? undefined
   );
@@ -334,6 +334,7 @@ export const useDashboard = () => {
     selectedCommunity,
     selectedSubCommunity,
     currentMessages,
+    messagesLoading,
     pinnedItems,
     checkboxTargets,
     toggleSubTarget,

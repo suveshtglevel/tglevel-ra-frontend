@@ -1,15 +1,28 @@
 'use client';
 
 import React from 'react';
-import { Loader2 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import CommunitySidebar from '@/modules/dashboard/components/CommunitySidebar';
 import ChatHeader from '@/modules/dashboard/components/ChatHeader';
 import PinnedAlert from '@/modules/dashboard/components/PinnedAlert';
-import MessageComposer from '@/modules/dashboard/components/MessageComposer';
 import ChatFeed from '@/modules/dashboard/components/ChatFeed';
 import type { ReplyContext } from '@/modules/dashboard/components/MessageComposer';
 import { useDashboard } from '@/modules/dashboard/hooks/useDashboard';
 import type { ChatMessage } from '@/store/slices/messageSlice';
+
+// The composer drags in TipTap/ProseMirror (a large chunk) and is below the
+// fold, so load it lazily — the feed paints first and the editor streams in.
+// We reserve its space with a plain (non-skeleton) frame so the layout doesn't
+// jump, but show no shimmer on the composer input.
+const MessageComposer = dynamic(
+  () => import('@/modules/dashboard/components/MessageComposer'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full max-w-[1100px] min-h-[150px] bg-white border border-slate-200 shadow-sm rounded-[14px]" />
+    ),
+  }
+);
 
 export default function DashboardPage() {
   const {
@@ -25,6 +38,7 @@ export default function DashboardPage() {
     selectedCommunity,
     selectedSubCommunity,
     currentMessages,
+    messagesLoading,
     pinnedItems,
     checkboxTargets,
     toggleSubTarget,
@@ -49,11 +63,6 @@ export default function DashboardPage() {
     setReplyTo({ id: message.id, sender: message.sender, preview });
   };
 
-  // Cancel any in-progress reply when switching chats.
-  React.useEffect(() => {
-    setReplyTo(null);
-  }, [selectedSubCommunityId]);
-
   const headerTitle = selectedSubCommunity?.name ?? selectedCommunity?.name ?? '';
   const headerMembers = selectedSubCommunity
     ? `${selectedSubCommunity.members} members`
@@ -61,14 +70,18 @@ export default function DashboardPage() {
       ? `${selectedCommunity.members} members`
       : '';
 
-  // On mobile, picking a chat should also close the drawer.
+  // On mobile, picking a chat should also close the drawer. Switching chats also
+  // cancels any in-progress follow-up reply (handled here, in the event, rather
+  // than in an effect that would setState on every render after a switch).
   const selectSubCommunity = (id: string) => {
     handleSelectSubCommunity(id);
     setMobileSidebarOpen(false);
+    setReplyTo(null);
   };
   const selectCommunity = (id: string) => {
     handleSelectCommunity(id);
     setMobileSidebarOpen(false);
+    setReplyTo(null);
   };
 
   // Whether the RA may post to the currently open chat.
@@ -78,6 +91,7 @@ export default function DashboardPage() {
     <>
       <CommunitySidebar
         communities={communities}
+        loading={communitiesLoading}
         selectedCommunityId={selectedCommunityId}
         selectedSubCommunityId={selectedSubCommunityId}
         targetCommunityId={checkboxTargets.communityId}
@@ -101,21 +115,20 @@ export default function DashboardPage() {
 
         <PinnedAlert pinnedMessages={pinnedItems} />
 
-        {communitiesLoading ? (
-          <div className="flex-1 flex items-center justify-center text-slate-400">
-            <Loader2 className="w-6 h-6 animate-spin mr-2" /> Loading communities…
-          </div>
-        ) : communitiesError ? (
+        {communitiesError ? (
           <div className="flex-1 flex items-center justify-center text-red-400 text-sm font-medium">
             Failed to load communities. Please try again.
           </div>
-        ) : communities.length === 0 ? (
+        ) : !communitiesLoading && communities.length === 0 ? (
           <div className="flex-1 flex items-center justify-center text-slate-400 text-sm font-medium">
             No communities available.
           </div>
         ) : (
+          // Render the feed shell immediately; show skeleton bubbles while the
+          // communities or the open chat's messages are still loading.
           <ChatFeed
             messages={currentMessages}
+            loading={communitiesLoading || messagesLoading}
             onTogglePin={handleTogglePin}
             onFollowUp={startFollowUp}
           />

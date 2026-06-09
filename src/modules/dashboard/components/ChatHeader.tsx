@@ -1,11 +1,15 @@
 'use client';
 
 import React from 'react';
+import dynamic from 'next/dynamic';
 import { TrendingUp, FileSpreadsheet, MoreVertical, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'react-hot-toast';
-import MediaDocsPanel from './MediaDocsPanel';
 import type { ChatMessage } from '@/store/slices/messageSlice';
+
+// Opened only from the header menu, so defer its code (incl. the file viewer)
+// until the RA actually opens it.
+const MediaDocsPanel = dynamic(() => import('./MediaDocsPanel'), { ssr: false });
 
 interface ChatHeaderProps {
   title: string;

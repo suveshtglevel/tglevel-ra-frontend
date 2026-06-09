@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { cn } from '@/lib/utils';
+import { TableRowsSkeleton } from '@/components/ui/skeleton';
 import FilterDropdown from '@/modules/trade-journal/components/FilterDropdown';
 import JournalTabs, { type JournalTab } from '@/modules/trade-journal/components/JournalTabs';
 import {
@@ -274,11 +275,7 @@ export default function CustomerTradeJournal({ tab, onTab }: CustomerTradeJourna
               </thead>
               <tbody className="text-sm">
                 {isLoading ? (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-16 text-center text-slate-400">
-                      Loading trade journals…
-                    </td>
-                  </tr>
+                  <TableRowsSkeleton cols={7} />
                 ) : isError ? (
                   <tr>
                     <td colSpan={7} className="px-6 py-16 text-center text-red-500">

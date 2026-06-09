@@ -61,6 +61,14 @@ const Sidebar = () => {
     ? 'tradeFeedback'
     : 'chat';
 
+  // Warm the route's code/data on hover so the click navigates instantly.
+  const prefetchTab = (tab: SidebarTab) => {
+    if (tab === 'chat') router.prefetch('/dashboard');
+    else if (tab === 'webinar') router.prefetch('/banner');
+    else if (tab === 'tradeJournal') router.prefetch('/trade-journal');
+    else if (tab === 'tradeFeedback') router.prefetch('/trade-feedback');
+  };
+
   const handleTabClick = (tab: SidebarTab) => {
     if (tab === 'chat') {
       setShowSettings(false);
@@ -135,6 +143,7 @@ const Sidebar = () => {
           variant="ghost"
           size="icon"
           onClick={() => handleTabClick('chat')}
+          onMouseEnter={() => prefetchTab('chat')}
           className={cn(
             "cursor-pointer transition-colors",
             activeTab === 'chat' ? "text-emerald-600 bg-emerald-50 hover:bg-emerald-100" : "text-slate-400 hover:text-slate-600"
@@ -146,6 +155,7 @@ const Sidebar = () => {
           variant="ghost"
           size="icon"
           onClick={() => handleTabClick('webinar')}
+          onMouseEnter={() => prefetchTab('webinar')}
           className={cn(
             "cursor-pointer transition-colors",
             activeTab === 'webinar' ? "text-emerald-600 bg-emerald-50 hover:bg-emerald-100" : "text-slate-400 hover:text-slate-600"
@@ -157,6 +167,7 @@ const Sidebar = () => {
           type="button"
           aria-label="Trade Journal"
           onClick={() => handleTabClick('tradeJournal')}
+          onMouseEnter={() => prefetchTab('tradeJournal')}
           className={cn(
             "w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs cursor-pointer transition-colors",
             activeTab === 'tradeJournal'
@@ -171,6 +182,7 @@ const Sidebar = () => {
           size="icon"
           aria-label="Trade Feedback"
           onClick={() => handleTabClick('tradeFeedback')}
+          onMouseEnter={() => prefetchTab('tradeFeedback')}
           className={cn(
             "cursor-pointer transition-colors",
             activeTab === 'tradeFeedback' ? "text-emerald-600 bg-emerald-50 hover:bg-emerald-100" : "text-slate-400 hover:text-slate-600"

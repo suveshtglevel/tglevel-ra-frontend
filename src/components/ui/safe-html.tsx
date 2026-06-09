@@ -9,7 +9,9 @@ interface SafeHtmlProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'dang
 
 // Drop-in replacement for `<div dangerouslySetInnerHTML={{ __html }} />` that
 // sanitizes the markup. Use this instead of `dangerouslySetInnerHTML` anywhere
-// backend-/user-supplied HTML is rendered.
+// backend-/user-supplied HTML is rendered. Sanitizing is memoized on the input
+// so re-renders (e.g. of a long message feed) don't re-run DOMPurify needlessly.
 export function SafeHtml({ html, ...rest }: SafeHtmlProps) {
-  return <div {...rest} dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }} />;
+  const clean = React.useMemo(() => sanitizeHtml(html), [html]);
+  return <div {...rest} dangerouslySetInnerHTML={{ __html: clean }} />;
 }

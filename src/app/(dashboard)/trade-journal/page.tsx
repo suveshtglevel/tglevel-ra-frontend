@@ -12,15 +12,22 @@ import {
   ChevronRight,
   Pencil,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
+import { TableRowsSkeleton } from '@/components/ui/skeleton';
 import { useTradeJournal } from '@/modules/trade-journal/hooks/useTradeJournal';
 import { PAGE_SIZE_OPTIONS, type TradeRow } from '@/modules/trade-journal/constants/tradeJournalData';
 import DateRangePicker from '@/modules/trade-journal/components/DateRangePicker';
 import FilterDropdown from '@/modules/trade-journal/components/FilterDropdown';
 import PLFilter from '@/modules/trade-journal/components/PLFilter';
-import EditTradeJournalModal from '@/modules/trade-journal/components/EditTradeJournalModal';
 import JournalTabs, { type JournalTab } from '@/modules/trade-journal/components/JournalTabs';
 import CustomerTradeJournal from '@/modules/trade-journal/components/CustomerTradeJournal';
+
+// The edit modal only mounts when a row's Edit is clicked — load it on demand.
+const EditTradeJournalModal = dynamic(
+  () => import('@/modules/trade-journal/components/EditTradeJournalModal'),
+  { ssr: false }
+);
 
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DASH = '—';
@@ -173,11 +180,7 @@ export default function TradeJournalPage() {
               </thead>
               <tbody className="text-sm">
                 {tj.isLoading ? (
-                  <tr>
-                    <td colSpan={13} className="px-6 py-16 text-center text-slate-400">
-                      Loading trade journals…
-                    </td>
-                  </tr>
+                  <TableRowsSkeleton cols={13} />
                 ) : tj.isError ? (
                   <tr>
                     <td colSpan={13} className="px-6 py-16 text-center text-red-500">
