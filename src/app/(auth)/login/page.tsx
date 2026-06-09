@@ -100,7 +100,9 @@ export default function LoginPage() {
             <Button
               type="submit"
               disabled={callSendOtp.isPending}
-              className="w-full h-[60px] bg-[#042F23] hover:bg-[#03241b] text-white rounded-xl text-base font-bold transition-all duration-300 group flex items-center justify-center gap-2 shadow-lg shadow-[#042F23]/10 disabled:opacity-70 disabled:cursor-not-allowed"
+              className="w-full h-[60px] bg-[#042F23] hover:bg-[#03241b] text-white rounded-xl text-base font-bold transition-all duration-300 group flex items-center justify-center gap-2 shadow-lg shadow-[#042F23]/10 disabled:opacity-70 
+              disabled:cursor-not-allowed
+              cursor-pointer"
             >
               {callSendOtp.isPending ? (
                 <>
