@@ -248,7 +248,15 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      // Trim StarterKit to only what the toolbar/renderer uses (drop code,
+      // code blocks, blockquote, horizontal rule) so the editor initialises with
+      // a smaller schema/plugin set — the input box is the slowest part to mount.
+      StarterKit.configure({
+        code: false,
+        codeBlock: false,
+        blockquote: false,
+        horizontalRule: false,
+      }),
       Underline,
       Link.configure({
         openOnClick: false,
