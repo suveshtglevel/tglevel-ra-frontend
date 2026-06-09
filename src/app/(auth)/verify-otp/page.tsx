@@ -12,7 +12,7 @@ import { Lock, ChevronRight, Loader2 } from 'lucide-react';
 import AuthLayout from '@/components/layout/AuthLayout';
 import { useVerifyOtp, useResendOtp } from '@/modules/auth/hooks/useAuthMutations';
 
-const RESEND_SECONDS = 30;
+const RESEND_SECONDS = 60;
 
 const otpSchema = z.object({
   otp: z.string().length(4, 'OTP must be 4 digits').regex(/^[0-9]+$/, 'OTP must be numeric'),
