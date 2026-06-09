@@ -13,16 +13,11 @@ interface PinnedAlertProps {
   pinnedMessages: PinnedItem[];
 }
 
+// Ask the feed to jump to a message. The feed owns this because the target may
+// be older than its rendered window — it reveals the history first, then scrolls
+// and flashes the row.
 const scrollToMessage = (id: string) => {
-  const el = document.getElementById(`feed-msg-${id}`);
-  if (!el) return;
-  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  // Briefly highlight the target so the RA can spot which message is pinned.
-  el.classList.remove('pinned-flash');
-  // Force reflow so the animation restarts even on repeated clicks.
-  void el.offsetWidth;
-  el.classList.add('pinned-flash');
-  window.setTimeout(() => el.classList.remove('pinned-flash'), 1800);
+  window.dispatchEvent(new CustomEvent('feed:jump', { detail: id }));
 };
 
 const PinnedAlert = ({ pinnedMessages }: PinnedAlertProps) => {

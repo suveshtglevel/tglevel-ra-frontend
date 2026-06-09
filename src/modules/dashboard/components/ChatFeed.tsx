@@ -49,9 +49,16 @@ const ChatFeedSkeleton = () => (
 // Three-dots menu overlaid at the top-right of every message; offers pin/unpin
 // and — when the message contains links — a "Links" tab that lists every link
 // detected in the card. Controlled so it closes itself right after an action.
+const triggerClass =
+  'absolute top-2 right-2 z-10 p-1 text-slate-500 hover:text-slate-700 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity cursor-pointer';
+
 const MessageMenu = ({ pinned, onTogglePin, links, onFollowUp }: { pinned: boolean; onTogglePin: () => void; links: DetectedLink[]; onFollowUp?: () => void }) => {
   const [open, setOpen] = React.useState(false);
   const [view, setView] = React.useState<'menu' | 'links'>('menu');
+  // Defer the (heavy) Radix Popover until the menu is first opened. Until then
+  // each row renders just a plain button, so a feed of many messages doesn't pay
+  // for a Popper tree per row — the dominant per-row cost on first render.
+  const [activated, setActivated] = React.useState(false);
 
   // Reset to the main menu as the popover closes (never leave the links tab open
   // for next time) — done in the event, not an effect.
@@ -60,14 +67,26 @@ const MessageMenu = ({ pinned, onTogglePin, links, onFollowUp }: { pinned: boole
     if (!next) setView('menu');
   };
 
+  if (!activated) {
+    return (
+      <button
+        type="button"
+        aria-label="Message options"
+        className={triggerClass}
+        onClick={() => {
+          setActivated(true);
+          setOpen(true);
+        }}
+      >
+        <MoreVertical className="w-4 h-4" />
+      </button>
+    );
+  }
+
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          aria-label="Message options"
-          className="absolute top-2 right-2 z-10 p-1 text-slate-500 hover:text-slate-700 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity cursor-pointer"
-        >
+        <button type="button" aria-label="Message options" className={triggerClass}>
           <MoreVertical className="w-4 h-4" />
         </button>
       </PopoverTrigger>
@@ -190,7 +209,7 @@ const QuotedReply = ({ parent, parentId }: { parent?: ChatMessage; parentId: str
   return (
     <button
       type="button"
-      onClick={() => scrollToMessage(parentId)}
+      onClick={() => window.dispatchEvent(new CustomEvent('feed:jump', { detail: parentId }))}
       className="w-full text-left mb-2 rounded-lg border-l-4 border-emerald-500 bg-emerald-50/70 px-2.5 py-1.5 hover:bg-emerald-100/70 transition-colors cursor-pointer"
     >
       <p className="text-[10px] font-bold text-emerald-700 truncate">{parent?.sender ?? 'Trade message'}</p>
@@ -344,13 +363,27 @@ const MessageRow = React.memo(function MessageRow({
   );
 });
 
+// How many of the most recent messages render initially, and how many more each
+// "load earlier" reveals. A full chat can hold hundreds of messages; rendering
+// them all at once (each row is a card + sanitized HTML + a popover) is what
+// made opening a chat take several seconds. The RA is auto-scrolled to the
+// bottom, so only the tail is ever visible.
+const MESSAGE_WINDOW_STEP = 40;
+
 const ChatFeed = ({ communityTag, messages = [], loading = false, onTogglePin, onFollowUp }: ChatFeedProps) => {
-  // Lookup so a follow-up can resolve and quote its parent message.
+  // Lookup (over ALL messages, not just the visible window) so a follow-up can
+  // resolve and quote its parent even when the parent is above the fold.
   const messageById = React.useMemo(() => {
     const map = new Map<string, ChatMessage>();
     messages.forEach((m) => map.set(m.id, m));
     return map;
   }, [messages]);
+
+  // Only render the most recent `visibleCount` messages; "load earlier" grows it.
+  const [visibleCount, setVisibleCount] = React.useState(MESSAGE_WINDOW_STEP);
+  const visibleMessages =
+    visibleCount >= messages.length ? messages : messages.slice(messages.length - visibleCount);
+  const hasOlder = messages.length > visibleMessages.length;
 
   // Message id whose "Viewed by" panel is open (null = closed).
   const [statsMessageId, setStatsMessageId] = React.useState<string | null>(null);
@@ -376,6 +409,56 @@ const ChatFeed = ({ communityTag, messages = [], loading = false, onTogglePin, o
     }
   }, [messages.length]);
 
+  // Central jump-to-message handler (pinned bar / reply quote dispatch this). If
+  // the target is older than the rendered window it isn't in the DOM yet, so we
+  // reveal the full history first, then scroll + flash once it has rendered.
+  React.useEffect(() => {
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      if (!id) return;
+      if (!document.getElementById(`feed-msg-${id}`)) {
+        setVisibleCount(Number.MAX_SAFE_INTEGER);
+      }
+      // Defer so the (possibly just-revealed) row is in the DOM before scrolling.
+      setTimeout(() => scrollToMessage(id), 0);
+    };
+    window.addEventListener('feed:jump', handler);
+    return () => window.removeEventListener('feed:jump', handler);
+  }, []);
+
+  // Render older messages in chunks as the RA scrolls toward the top, and stash
+  // the pre-load scroll metrics so we can keep the viewport anchored (prepending
+  // rows would otherwise shove the content down).
+  const viewportRef = React.useRef<HTMLElement | null>(null);
+  const anchorRef = React.useRef<{ height: number; top: number } | null>(null);
+
+  React.useEffect(() => {
+    const viewport = scrollRef.current?.querySelector<HTMLElement>(
+      '[data-radix-scroll-area-viewport]'
+    );
+    if (!viewport) return;
+    viewportRef.current = viewport;
+    const onScroll = () => {
+      if (viewport.scrollTop <= 120 && !anchorRef.current && visibleCount < messages.length) {
+        anchorRef.current = { height: viewport.scrollHeight, top: viewport.scrollTop };
+        setVisibleCount((c) => c + MESSAGE_WINDOW_STEP);
+      }
+    };
+    viewport.addEventListener('scroll', onScroll, { passive: true });
+    return () => viewport.removeEventListener('scroll', onScroll);
+  }, [visibleCount, messages.length]);
+
+  // After a chunk is prepended, restore the scroll so the row the RA was looking
+  // at stays put (offset by however much taller the content became).
+  React.useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    const anchor = anchorRef.current;
+    if (viewport && anchor) {
+      viewport.scrollTop = anchor.top + (viewport.scrollHeight - anchor.height);
+      anchorRef.current = null;
+    }
+  }, [visibleCount]);
+
   return (
     <div className="flex-1 flex min-h-0 relative">
       <ScrollArea className="flex-1" ref={scrollRef}>
@@ -394,7 +477,22 @@ const ChatFeed = ({ communityTag, messages = [], loading = false, onTogglePin, o
             <ChatFeedSkeleton />
           ) : (
             <div className="flex flex-col gap-3 w-full">
-              {messages.map((msg) => (
+              {hasOlder && (
+                <div className="flex justify-center py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const viewport = viewportRef.current;
+                      if (viewport) anchorRef.current = { height: viewport.scrollHeight, top: viewport.scrollTop };
+                      setVisibleCount((c) => c + MESSAGE_WINDOW_STEP);
+                    }}
+                    className="text-[12px] font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-4 py-1.5 rounded-full transition-colors cursor-pointer"
+                  >
+                    Load earlier messages
+                  </button>
+                </div>
+              )}
+              {visibleMessages.map((msg) => (
                 <MessageRow
                   key={msg.id}
                   msg={msg}
