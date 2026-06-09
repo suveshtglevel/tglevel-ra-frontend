@@ -20,6 +20,7 @@ const loginResponseSchema = z
         display_name: z.string(),
         phone_number: z.string(),
         assigned_communities: z.array(z.string()),
+        profile: z.string().optional(),
         profile_picture: z.string().optional(),
       })
       .loose(),
@@ -46,6 +47,7 @@ export interface ResearchAnalyst {
   phone_number: string;
   status: string;
   assigned_communities: string[];
+  profile?: string;
   profile_picture?: string;
   ra_id: string;
   createdAt: string;

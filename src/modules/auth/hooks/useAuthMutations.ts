@@ -34,7 +34,7 @@ export function useVerifyOtp() {
         id: result.data.ra_id,
         name: result.data.display_name,
         phone: result.data.phone_number,
-        avatarUrl: result.data.profile_picture,
+        avatarUrl: result.data.profile || result.data.profile_picture,
         assignedCommunities: result.data.assigned_communities,
       };
       persistUser(user);
