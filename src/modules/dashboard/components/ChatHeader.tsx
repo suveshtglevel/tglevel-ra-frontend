@@ -2,9 +2,8 @@
 
 import React from 'react';
 import dynamic from 'next/dynamic';
-import { TrendingUp, FileSpreadsheet, MoreVertical, Menu } from 'lucide-react';
+import { TrendingUp, MoreVertical, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { toast } from 'react-hot-toast';
 import type { ChatMessage } from '@/store/slices/messageSlice';
 
 // Opened only from the header menu, so defer its code (incl. the file viewer)
@@ -33,30 +32,6 @@ const ChatHeader = ({ title, members, messages = [], onMenuClick }: ChatHeaderPr
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showPanel]);
 
-  const handleExcelExport = () => {
-    // Generate CSV content from dummy data
-    const csvContent = [
-      ['Community', 'Members', 'Status'],
-      [title, members, 'Active'],
-      ['', '', ''],
-      ['Trade History', '', '', ''],
-      ['Date', 'Type', 'Symbol', 'Entry', 'SL', 'Target 1', 'Target 2', 'Status'],
-      ['2023-10-24', 'BUY', 'NIFTY 24100 PE', '180', '165', '195', '210', 'Target 1 Hit'],
-      ['2023-10-23', 'BUY', 'BANKNIFTY 44200 CE', '250', '220', '280', '310', 'SL Hit'],
-      ['2023-10-22', 'SELL', 'NIFTY 24300 CE', '150', '170', '130', '110', 'Target 2 Hit'],
-      ['2023-10-21', 'BUY', 'NIFTY 24000 PE', '200', '180', '220', '240', 'Active'],
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${title.replace(/\s+/g, '_')}_export.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-    toast.success('Excel exported successfully!');
-  };
-
   return (
     <header className="h-16 bg-white border-b border-slate-200 px-3 sm:px-4 lg:px-6 flex items-center justify-between gap-2 shrink-0">
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -77,15 +52,6 @@ const ChatHeader = ({ title, members, messages = [], onMenuClick }: ChatHeaderPr
         </div>
       </div>
       <div className="flex items-center gap-1.5 sm:gap-4 shrink-0">
-        <Button
-          variant="outline"
-          size="sm"
-          className="text-emerald-600 border-emerald-100 bg-emerald-50 hover:bg-emerald-100 gap-2 font-bold h-9 px-2.5 sm:px-3 cursor-pointer"
-          onClick={handleExcelExport}
-        >
-          <FileSpreadsheet className="w-4 h-4" />
-          <span className="hidden sm:inline">Excel</span>
-        </Button>
         <div className="relative" ref={menuRef}>
           <Button
             variant="ghost"
