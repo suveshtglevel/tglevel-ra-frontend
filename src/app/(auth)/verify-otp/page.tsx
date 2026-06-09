@@ -12,7 +12,7 @@ import { Lock, ChevronRight, Loader2 } from 'lucide-react';
 import AuthLayout from '@/components/layout/AuthLayout';
 import { useVerifyOtp, useResendOtp } from '@/modules/auth/hooks/useAuthMutations';
 
-const RESEND_SECONDS = 30;
+const RESEND_SECONDS = 60;
 
 const otpSchema = z.object({
   otp: z.string().length(4, 'OTP must be 4 digits').regex(/^[0-9]+$/, 'OTP must be numeric'),
@@ -134,7 +134,10 @@ function VerifyOtpContent() {
             <Button
               type="submit"
               disabled={callVerifyOtp.isPending}
-              className="w-full h-[60px] bg-[#042F23] hover:bg-[#03241b] text-white rounded-xl text-base font-bold transition-all duration-300 group flex items-center justify-center gap-2 shadow-lg shadow-[#042F23]/10 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
+              className="w-full h-[60px] bg-[#042F23] hover:bg-[#03241b] text-white rounded-xl text-base font-bold transition-all duration-300 group flex items-center justify-center gap-2 shadow-lg shadow-[#042F23]/10 disabled:opacity-70 
+              cursor-pointer
+              disabled:cursor-not-allowed
+              "
             >
               {callVerifyOtp.isPending ? (
                 <>

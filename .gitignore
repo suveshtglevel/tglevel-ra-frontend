@@ -49,3 +49,5 @@ next-env.d.ts
 # Ignore local .github contents, but keep CI workflows tracked.
 .github/*
 !.github/workflows/
+
+docs/
