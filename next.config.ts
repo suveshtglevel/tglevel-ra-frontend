@@ -76,6 +76,9 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Emit a self-contained server bundle (`.next/standalone`) so the Docker
+  // image only needs the runtime files instead of the whole node_modules tree.
+  output: "standalone",
   async headers() {
     return [
       {
