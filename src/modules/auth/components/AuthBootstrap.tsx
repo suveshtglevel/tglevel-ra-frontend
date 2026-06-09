@@ -28,6 +28,9 @@ function recoverUser(token: string, current: AuthUser | null): AuthUser {
     id: claims?.user?.id ?? '',
     name: claims?.user?.display_name ?? '',
     role: claims?.user?.role,
+    // Keep the avatar across a refresh when the token carries it (the persisted
+    // user is the primary source; this is the fallback).
+    avatarUrl: claims?.user?.profile_picture,
     assignedCommunities: [],
   };
 }

@@ -2,7 +2,7 @@
 // backend does that); used to recover basic user info and check expiry.
 
 export interface RaJwtPayload {
-  user?: { id?: string; display_name?: string; role?: string };
+  user?: { id?: string; display_name?: string; role?: string; profile_picture?: string };
   iat?: number;
   exp?: number;
 }
