@@ -40,7 +40,9 @@ export function mapBackendMessage(m: BackendMessage, typeName?: string): ChatMes
     messageType: typeName,
     messageTypeId: m.type ?? undefined,
     timestamp: formatTime(m.createdAt),
-    status: 'read',
+    // Messages only flow outward from the RA (no per-recipient read receipts on
+    // the feed), so show the WhatsApp "delivered" state: a grey double tick.
+    status: 'delivered',
     sender: m.author_name ?? 'RA',
     attachment,
     parentMessageId: m.parent_message_id || undefined,
