@@ -33,6 +33,7 @@ function recoverUser(token: string, current: AuthUser | null): AuthUser {
     avatarUrl: claims?.user?.profile_picture,
     assignedCommunities: [],
   };
+
 }
 
 // On first load the in-memory access token is gone, so we try a silent refresh
