@@ -24,9 +24,10 @@ const AVATAR_COLORS = [
   'bg-emerald-200 text-emerald-700',
 ];
 
-// First two initials of a viewer's name, for the avatar fallback.
-const initialsOf = (name: string) =>
-  name
+// First two initials of a viewer's name, for the avatar fallback. The name can
+// come back null/empty from the API, so guard before splitting.
+const initialsOf = (name?: string | null) =>
+  (name ?? '')
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
@@ -56,7 +57,7 @@ const ViewedByPanel = ({ messageId, onClose }: ViewedByPanelProps) => {
 
   const filteredViewers = viewers.filter((viewer) =>
     debouncedSearch
-      ? viewer.name.toLowerCase().includes(debouncedSearch.toLowerCase())
+      ? (viewer.name ?? '').toLowerCase().includes(debouncedSearch.toLowerCase())
       : true
   );
 
@@ -155,7 +156,7 @@ const ViewedByPanel = ({ messageId, onClose }: ViewedByPanelProps) => {
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-bold text-slate-800 truncate">{viewer.name}</p>
+                  <p className="text-[13px] font-bold text-slate-800 truncate">{viewer.name ?? 'Unknown user'}</p>
                   <div className="flex items-center gap-1 mt-0.5">
                     <Eye className="w-3 h-3 text-slate-400 shrink-0" />
                     <span className="text-[11px] font-medium text-slate-400 truncate">
