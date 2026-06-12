@@ -16,8 +16,12 @@ import {
 } from '@/lib/researchAnalysis';
 import { linkifyHtml } from '@/lib/extractLinks';
 
+// `whitespace-pre-wrap` keeps the message's own spaces/indentation (HTML would
+// otherwise collapse runs of spaces); `[&_p:empty]:min-h-[1em]` gives the empty
+// <p> that whatsappToHtml emits for a blank line a real line's height, so the
+// section breaks in the original message are preserved instead of collapsing.
 const bodyClass =
-  'text-[13px] leading-[18.57px] font-medium space-y-1.5 break-words [&_p]:my-0 [&_b]:font-bold [&_strong]:font-bold [&_a]:text-blue-600 [&_a]:underline [&_a]:break-all [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1 [&_li]:my-0.5';
+  'text-[13px] leading-[18.57px] font-medium space-y-1.5 break-words whitespace-pre-wrap [&_p:empty]:min-h-[1em] [&_p]:my-0 [&_b]:font-bold [&_strong]:font-bold [&_a]:text-blue-600 [&_a]:underline [&_a]:break-all [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1 [&_li]:my-0.5';
 
 // Renders one parsed paragraph with the design that matches its role.
 const Segment = ({ segment }: { segment: TradeSegment }) => {

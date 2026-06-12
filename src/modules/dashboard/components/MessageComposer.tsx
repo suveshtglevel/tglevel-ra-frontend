@@ -345,6 +345,37 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
         const clipboard = event.clipboardData;
         const htmlData = clipboard?.getData('text/html') ?? '';
         const textData = clipboard?.getData('text/plain') ?? '';
+
+        // Telegram Web (and some other web apps) encode emojis in the clipboard
+        // HTML as <img alt="😀"> instead of plain unicode. The editor schema has
+        // no image node, so a default paste discards those <img>s and the emojis
+        // vanish — yet the same copy from the Telegram desktop app works because
+        // it puts unicode straight into the text. Replace each <img> with its alt
+        // (the emoji), then paste the cleaned HTML ourselves so formatting and
+        // emojis both survive.
+        if (/<img\b/i.test(htmlData)) {
+          const container = document.createElement('div');
+          container.innerHTML = htmlData;
+          container.querySelectorAll('img').forEach((img) => {
+            img.replaceWith(document.createTextNode(img.getAttribute('alt') ?? ''));
+          });
+          // Default whitespace handling (collapse) — NOT preserveWhitespace:
+          // 'full' — so the newlines/indentation Telegram puts between the <img>
+          // and wrapper tags don't paste as extra spaces around the emojis.
+          const slice = ProseMirrorDOMParser.fromSchema(view.state.schema).parseSlice(container, {
+            context: view.state.selection.$from,
+          });
+          event.preventDefault();
+          view.dispatch(
+            view.state.tr
+              .replaceSelection(slice)
+              .scrollIntoView()
+              .setMeta('paste', true)
+              .setMeta('uiEvent', 'paste')
+          );
+          return true;
+        }
+
         // Real formatting in the clipboard HTML (bold/italic/…) — paste it as-is.
         const hasRichFormatting = /<(strong|b|em|i|s|del|u)\b/i.test(htmlData);
         if (!hasRichFormatting && /[*_~]/.test(textData)) {
@@ -499,7 +530,13 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
     if (!filePreview || !mounted || !showFullPreview) return null;
 
     const modalContent = (
-      <div className="fixed inset-0 z-[9999] bg-[#0b141a] text-white flex flex-col select-none animate-in fade-in duration-200">
+      <div
+        className="fixed inset-0 z-[9999] bg-[#0b141a] text-white flex flex-col select-none animate-in fade-in duration-200 cursor-pointer"
+        // Click anywhere to dismiss — easier than aiming for the small close
+        // button. Interactive media (the video + its controls) stops propagation
+        // below so using the controls doesn't close the preview.
+        onClick={() => setShowFullPreview(false)}
+      >
         {/* Header */}
         <div className="h-16 flex items-center justify-between px-6 shrink-0 bg-[#0b141a] border-b border-white/10">
           <div className="flex items-center gap-4">
@@ -539,7 +576,10 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
               />
             </div>
           ) : filePreview.fileType === 'video' ? (
-            <div className="relative max-h-[65vh] max-w-[85vw] flex items-center justify-center">
+            <div
+              className="relative max-h-[65vh] max-w-[85vw] flex items-center justify-center cursor-default"
+              onClick={(e) => e.stopPropagation()}
+            >
               <video
                 src={filePreview.url}
                 controls

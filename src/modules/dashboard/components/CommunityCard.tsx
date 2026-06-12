@@ -69,6 +69,13 @@ const SubCommunityRow = ({ sub, checked, isSelected, sendable, onToggle, onSelec
         e.stopPropagation();
         onSelect();
       }}
+      // Double-click anywhere on the row toggles its selection (same as the
+      // check-circle) — a bigger, easier target than the 16px circle. Stops
+      // propagation so it doesn't also hit the community's "select all".
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        if (sendable) onToggle();
+      }}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
@@ -145,6 +152,17 @@ const CommunityCard = ({ community, active, selectedSubCommunityId, targetSubIds
       role="button"
       tabIndex={0}
       onClick={handleHeaderClick}
+      // Double-click the community selects all of its sub-communities at once
+      // (or the community itself when it has none) — the same action as the
+      // master check-circle. Locked (non-sendable) communities are skipped.
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        if (!community.sendable) return;
+        onToggleCommunityTargets(
+          community.id,
+          hasSubCommunities ? subCommunities.map((s) => s.id) : [community.id]
+        );
+      }}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
