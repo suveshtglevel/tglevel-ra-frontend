@@ -20,14 +20,8 @@ const loginResponseSchema = z
         display_name: z.string(),
         phone_number: z.string(),
         assigned_communities: z.array(z.string()),
-        profile: z                          // 👈 fixed
-          .object({
-            profile_picture_url: z.string().nullable().optional(),
-          })
-          .loose()
-          .nullable()                       // 👈 allows null
-          .optional(),                      // 👈 allows missing
-        profile_picture: z.string().nullable().optional(),
+        profile: z.string().optional(),
+        profile_picture: z.string().optional(),
       })
       .loose(),
   })
@@ -53,11 +47,8 @@ export interface ResearchAnalyst {
   phone_number: string;
   status: string;
   assigned_communities: string[];
-  profile?: {
-    profile_picture_url?: string | null;  // 👈 fixed
-    [key: string]: any;
-  } | null;                               // 👈 allows null
-  profile_picture?: string | null;
+  profile?: string;
+  profile_picture?: string;
   ra_id: string;
   createdAt: string;
   updatedAt: string;
