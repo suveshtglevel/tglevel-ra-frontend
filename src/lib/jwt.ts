@@ -5,6 +5,7 @@ export interface RaJwtPayload {
   user?: { id?: string; display_name?: string; role?: string; profile_picture?: string };
   iat?: number;
   exp?: number;
+  
 }
 
 export function decodeJwt(token: string): RaJwtPayload | null {
