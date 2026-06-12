@@ -64,9 +64,9 @@ jobs:
           script: |
             set -euo pipefail
 
-            IMAGE="${{ env.IMAGE_NAME }}:latest"
-            CONTAINER="${{ env.CONTAINER_NAME }}"
-            PORT="${{ env.APP_PORT }}"
+            IMAGE="suveshtglevel/ra-frontend:latest"
+            CONTAINER="ra-frontend"
+            PORT="3000"
 
             echo "==> Pulling latest image..."
             docker pull "$IMAGE"
@@ -81,6 +81,12 @@ jobs:
             docker stop "$CONTAINER" 2>/dev/null || true
             docker rm "$CONTAINER" 2>/dev/null || true
 
+            echo "==> Killing any process holding port $PORT..."
+            EXISTING=$(docker ps -q --filter "publish=$PORT")
+            if [ -n "$EXISTING" ]; then
+              docker stop "$EXISTING" || true
+            fi
+
             echo "==> Starting new container..."
             docker run -d \
               --name "$CONTAINER" \
@@ -89,25 +95,22 @@ jobs:
               "$IMAGE"
 
             echo "==> Waiting for container to be healthy..."
-            RETRIES=10
-            until curl -f http://localhost:$PORT > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do
-            echo "  Waiting... ($RETRIES retries left)"
-            sleep 3
-            RETRIES=$((RETRIES - 1))
+            HEALTHY=false
+            for i in $(seq 1 10); do
+              echo "  Attempt $i/10..."
+              if docker exec "$CONTAINER" wget -qO- http://localhost:$PORT > /dev/null 2>&1; then
+                HEALTHY=true
+                break
+              fi
+              sleep 3
             done
 
-            if [ $RETRIES -eq 0 ]; then
-              echo "!!! New container failed health check. Rolling back..."
+            if [ "$HEALTHY" != "true" ]; then
+              echo "!!! Container failed health check. Dumping logs..."
+              docker logs "$CONTAINER" --tail 50
               docker stop "$CONTAINER" && docker rm "$CONTAINER"
-              docker rename "${CONTAINER}-old" "$CONTAINER"
-              docker start "$CONTAINER"
-              echo "Rollback complete."
               exit 1
             fi
-
-            echo "==> Removing old container..."
-            docker stop "${CONTAINER}-old" 2>/dev/null || true
-            docker rm "${CONTAINER}-old" 2>/dev/null || true
 
             echo "==> Pruning dangling images..."
             docker image prune -f
