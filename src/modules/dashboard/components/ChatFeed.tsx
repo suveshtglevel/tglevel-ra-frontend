@@ -52,13 +52,32 @@ const ChatFeedSkeleton = () => (
 const triggerClass =
   'absolute top-2 right-2 z-10 p-1 text-slate-500 hover:text-slate-700 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity cursor-pointer';
 
-const MessageMenu = ({ pinned, onTogglePin, links, onFollowUp }: { pinned: boolean; onTogglePin: () => void; links: DetectedLink[]; onFollowUp?: () => void }) => {
+type MessageMenuHandle = { open: () => void };
+
+const MessageMenu = React.forwardRef<
+  MessageMenuHandle,
+  { pinned: boolean; onTogglePin: () => void; links: DetectedLink[]; onFollowUp?: () => void }
+>(function MessageMenu({ pinned, onTogglePin, links, onFollowUp }, ref) {
   const [open, setOpen] = React.useState(false);
   const [view, setView] = React.useState<'menu' | 'links'>('menu');
   // Defer the (heavy) Radix Popover until the menu is first opened. Until then
   // each row renders just a plain button, so a feed of many messages doesn't pay
   // for a Popper tree per row — the dominant per-row cost on first render.
   const [activated, setActivated] = React.useState(false);
+
+  // Let the parent open this menu from a right-click anywhere on the card (see
+  // MessageRow's onContextMenu) — activates + opens the popover, exactly as
+  // clicking the three-dots button does.
+  React.useImperativeHandle(
+    ref,
+    () => ({
+      open: () => {
+        setActivated(true);
+        setOpen(true);
+      },
+    }),
+    []
+  );
 
   // Reset to the main menu as the popover closes (never leave the links tab open
   // for next time) — done in the event, not an effect.
@@ -160,7 +179,8 @@ const MessageMenu = ({ pinned, onTogglePin, links, onFollowUp }: { pinned: boole
       </PopoverContent>
     </Popover>
   );
-};
+});
+MessageMenu.displayName = 'MessageMenu';
 
 // Numeric backend message type -> display label.
 const MESSAGE_TYPE_LABELS: Record<number, string> = {
@@ -310,6 +330,8 @@ const MessageRow = React.memo(function MessageRow({
   onFollowUp?: (message: ChatMessage) => void;
 }) {
   const status = msg.status;
+  // Imperative handle so a right-click on the card opens the three-dots menu.
+  const menuRef = React.useRef<MessageMenuHandle>(null);
 
   // Only render the green research/trade card for messages the backend marks as
   // Trade (type label or numeric id 1). A message whose text merely matches the
@@ -324,7 +346,15 @@ const MessageRow = React.memo(function MessageRow({
     // Full-width row carries the scroll/highlight target so the pinned
     // flash spans the whole width; the bubble stays inset & content-width.
     <div id={`feed-msg-${msg.id}`} className="w-full scroll-mt-4 px-3 sm:px-6 py-1">
-      <div className="group relative w-fit max-w-full">
+      <div
+        className="group relative w-fit max-w-full"
+        // Right-click anywhere on the card opens the three-dots menu instead of
+        // the browser's native context menu.
+        onContextMenu={(e) => {
+          e.preventDefault();
+          menuRef.current?.open();
+        }}
+      >
         {isTrade ? (
           <TradeCard
             content={msg.content}
@@ -352,6 +382,7 @@ const MessageRow = React.memo(function MessageRow({
           />
         )}
         <MessageMenu
+          ref={menuRef}
           pinned={!!msg.pinned}
           onTogglePin={() => onTogglePin?.(msg.id)}
           links={links}
