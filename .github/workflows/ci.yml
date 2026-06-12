@@ -1,32 +1,119 @@
-name: CI
+name: RA Frontend Docker Deploy
 
 on:
   push:
     branches: [main]
-  pull_request:
+
+env:
+  IMAGE_NAME: suveshtglevel/ra-frontend
+  CONTAINER_NAME: ra-frontend
+  APP_PORT: 3000
 
 jobs:
-  verify:
+  docker-build-push:
     runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.meta.outputs.version }}
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
         with:
-          node-version: 20
-          cache: npm
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest
 
-      - name: Type check
-        run: npm run typecheck
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            NEXT_PUBLIC_API_BASE_URL=${{ secrets.NEXT_PUBLIC_API_BASE_URL }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Lint
-        run: npm run lint
+  deploy:
+    needs: docker-build-push
+    runs-on: ubuntu-latest
+    environment: production
 
-      - name: Test
-        run: npm test -- --coverage
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script_stop: true
+          script: |
+            set -euo pipefail
 
-      - name: Build
-        run: npm run build
+            IMAGE="${{ env.IMAGE_NAME }}:latest"
+            CONTAINER="${{ env.CONTAINER_NAME }}"
+            PORT="${{ env.APP_PORT }}"
+
+            echo "==> Pulling latest image..."
+            docker pull "$IMAGE"
+
+            echo "==> Running health check on new image..."
+            docker run --rm "$IMAGE" node --version || {
+              echo "Image health check failed"
+              exit 1
+            }
+
+            echo "==> Backing up current container if running..."
+            if docker ps -q --filter "name=^${CONTAINER}$" | grep -q .; then
+              docker rename "$CONTAINER" "${CONTAINER}-old" 2>/dev/null || true
+            fi
+
+            echo "==> Starting new container..."
+            docker run -d \
+              --name "$CONTAINER" \
+              --restart unless-stopped \
+              -p "$PORT:$PORT" \
+              "$IMAGE"
+
+            echo "==> Waiting for container to be healthy..."
+            RETRIES=10
+            until docker exec "$CONTAINER" wget -qO- http://localhost:$PORT/ > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do
+              echo "  Waiting... ($RETRIES retries left)"
+              sleep 3
+              RETRIES=$((RETRIES - 1))
+            done
+
+            if [ $RETRIES -eq 0 ]; then
+              echo "!!! New container failed health check. Rolling back..."
+              docker stop "$CONTAINER" && docker rm "$CONTAINER"
+              docker rename "${CONTAINER}-old" "$CONTAINER"
+              docker start "$CONTAINER"
+              echo "Rollback complete."
+              exit 1
+            fi
+
+            echo "==> Removing old container..."
+            docker stop "${CONTAINER}-old" 2>/dev/null || true
+            docker rm "${CONTAINER}-old" 2>/dev/null || true
+
+            echo "==> Pruning dangling images..."
+            docker image prune -f
+
+            echo "==> Container status:"
+            docker ps --filter "name=$CONTAINER"
+
+            echo "Deployment successful!"
