@@ -491,7 +491,9 @@ const ChatFeed = ({ communityTag, messages = [], loading = false, onTogglePin, o
   }, [visibleCount]);
 
   return (
-    <div className="flex-1 flex min-h-0 relative">
+    // `data-select-all` marks this as the one region where Ctrl/Cmd+A is allowed
+    // to select-all (see the global guard in Providers).
+    <div className="flex-1 flex min-h-0 relative" data-select-all>
       <ScrollArea className="flex-1" ref={scrollRef}>
         <div className="w-full py-4 sm:py-8 flex flex-col items-stretch">
           <div className="mb-6 sm:mb-8 flex items-center gap-4 w-full px-3 sm:px-6">
