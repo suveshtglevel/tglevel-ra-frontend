@@ -20,8 +20,11 @@ const loginResponseSchema = z
         display_name: z.string(),
         phone_number: z.string(),
         assigned_communities: z.array(z.string()),
-        profile: z.string().optional(),
-        profile_picture: z.string().optional(),
+        // Backend sends `null` (not an omitted key) when an RA has no image.
+        // `.nullish()` accepts string | null | undefined; `.optional()` would
+        // reject the `null` and fail the whole login validation.
+        profile: z.string().nullish(),
+        profile_picture: z.string().nullish(),
       })
       .loose(),
   })
