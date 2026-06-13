@@ -163,20 +163,19 @@ const Sidebar = () => {
         >
           <MonitorPlay className="w-6 h-6" />
         </Button>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon"
           aria-label="Trade Journal"
           onClick={() => handleTabClick('tradeJournal')}
           onMouseEnter={() => prefetchTab('tradeJournal')}
           className={cn(
-            "w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs cursor-pointer transition-colors",
-            activeTab === 'tradeJournal'
-              ? "bg-emerald-50 text-emerald-600 ring-2 ring-emerald-300"
-              : "bg-slate-100 text-slate-500 hover:ring-2 hover:ring-slate-200"
+            "cursor-pointer transition-colors",
+            activeTab === 'tradeJournal' ? "text-emerald-600 bg-emerald-50 hover:bg-emerald-100" : "text-slate-400 hover:text-slate-600"
           )}
         >
-          TJ
-        </button>
+          <span className="w-6 h-6 flex items-center justify-center font-bold text-xs">TJ</span>
+        </Button>
         <Button
           variant="ghost"
           size="icon"
