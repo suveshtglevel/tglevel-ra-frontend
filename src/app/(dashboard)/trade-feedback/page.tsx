@@ -7,6 +7,8 @@ import { TableRowsSkeleton } from '@/components/ui/skeleton';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useTradeFeedbackStats } from '@/modules/trade-feedback/hooks/useTradeFeedbackStats';
 import { useTradeFeedback } from '@/modules/trade-feedback/hooks/useTradeFeedback';
+import { useCommunities } from '@/modules/dashboard/hooks/useCommunities';
+import { useAppSelector } from '@/store/hooks';
 import FilterDropdown from '@/modules/trade-journal/components/FilterDropdown';
 import {
   mapFeedbackToRow,
@@ -43,25 +45,45 @@ export default function TradeFeedbackPage() {
     [feedbackQuery.data]
   );
 
-  // Community filter options built from the data that actually came back.
+  // Restrict to communities the RA is assigned to (the same access list that
+  // makes a community "sendable" on the dashboard). Feedback rows only carry the
+  // community *name*, so resolve the assigned community ids to names first, then
+  // keep only rows whose community is in that set — feedback for communities the
+  // RA has no access to never appears (and isn't even filterable) here.
+  const communitiesQuery = useCommunities();
+  const assignedCommunities = useAppSelector((state) => state.auth.user?.assignedCommunities);
+  const accessibleCommunityNames = useMemo(() => {
+    const assigned = assignedCommunities ?? [];
+    return new Set(
+      (communitiesQuery.data ?? [])
+        .filter((c) => assigned.includes(c.community_id))
+        .map((c) => c.name)
+    );
+  }, [communitiesQuery.data, assignedCommunities]);
+  const accessibleRows = useMemo(
+    () => allRows.filter((r) => accessibleCommunityNames.has(r.community)),
+    [allRows, accessibleCommunityNames]
+  );
+
+  // Community filter options built from the accessible data that came back.
   const communityOptions = useMemo(() => {
-    const names = Array.from(new Set(allRows.map((r) => r.community).filter(Boolean)));
+    const names = Array.from(new Set(accessibleRows.map((r) => r.community).filter(Boolean)));
     return ['All Communities', ...names];
-  }, [allRows]);
+  }, [accessibleRows]);
 
   // Sub-community options, scoped to the selected community when one is chosen.
   const subCommunityOptions = useMemo(() => {
-    const inScope = allRows.filter(
+    const inScope = accessibleRows.filter(
       (r) => community === 'All Communities' || r.community === community
     );
     const names = Array.from(new Set(inScope.map((r) => r.subCommunity).filter(Boolean)));
     return ['All Sub-communities', ...names];
-  }, [allRows, community]);
+  }, [accessibleRows, community]);
 
   // Filter by search (name / user id), community, sub-community and sentiment.
   const filtered = useMemo(() => {
     const q = debouncedQuery.trim().toLowerCase();
-    return allRows.filter((r) => {
+    return accessibleRows.filter((r) => {
       const matchesQuery =
         !q || r.name.toLowerCase().includes(q) || r.userId.toLowerCase().includes(q);
       const matchesCommunity = community === 'All Communities' || r.community === community;
@@ -69,7 +91,7 @@ export default function TradeFeedbackPage() {
       const matchesFeedback = feedback === 'All Feedback' || r.sentiment === feedback;
       return matchesQuery && matchesCommunity && matchesSub && matchesFeedback;
     });
-  }, [allRows, debouncedQuery, community, subCommunity, feedback]);
+  }, [accessibleRows, debouncedQuery, community, subCommunity, feedback]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -154,7 +176,7 @@ export default function TradeFeedbackPage() {
                 </tr>
               </thead>
               <tbody className="text-sm">
-                {feedbackQuery.isLoading ? (
+                {feedbackQuery.isLoading || communitiesQuery.isLoading ? (
                   <TableRowsSkeleton cols={5} />
                 ) : feedbackQuery.isError ? (
                   <tr>

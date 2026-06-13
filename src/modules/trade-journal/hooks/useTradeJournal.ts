@@ -59,18 +59,29 @@ export const useTradeJournal = () => {
   const communitiesQuery = useCommunities();
   const communities = useMemo(() => communitiesQuery.data ?? [], [communitiesQuery.data]);
 
-  // Flat list of every sub-community across all communities, each carrying its
-  // parent community_id (needed to fetch, since the API requires both ids).
+  // The RA may only see/edit journals for communities it is assigned to (the
+  // same access list that makes a community "sendable" on the dashboard).
+  // Communities the RA has no access to are excluded entirely, so their
+  // journals never appear here and can't be edited.
+  const assignedCommunities = useAppSelector((state) => state.auth.user?.assignedCommunities);
+  const accessibleCommunities = useMemo(
+    () => communities.filter((c) => (assignedCommunities ?? []).includes(c.community_id)),
+    [communities, assignedCommunities]
+  );
+
+  // Flat list of every sub-community across the RA's accessible communities,
+  // each carrying its parent community_id (needed to fetch, since the API
+  // requires both ids).
   const allSubs = useMemo(
     () =>
-      communities.flatMap((c) =>
+      accessibleCommunities.flatMap((c) =>
         (c.sub_communities ?? []).map((s) => ({
           name: s.name,
           subCommunityId: s.sub_community_id,
           communityId: c.community_id,
         }))
       ),
-    [communities]
+    [accessibleCommunities]
   );
 
   // Fetch every sub-community's journals in parallel and merge them. The
