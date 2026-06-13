@@ -74,6 +74,9 @@ interface MessageComposerProps {
   bundles: BundleVM[];
   creatingBundle?: boolean;
   onCreateBundle?: (payload: { name: string; communityId: string; subIds: string[] }) => void;
+  // Open a sub-community chat in the feed. Called when the RA picks a bundle so
+  // the feed jumps to the bundle's first sub-community.
+  onSelectSubCommunity?: (subId: string) => void;
   onSend?: (content: string, options?: SendOptions) => void;
   disabled?: boolean;
   // Active follow-up reply (set when the RA picks "Follow up message" on a
@@ -86,7 +89,7 @@ type FilePreview = NonNullable<SendOptions['attachment']> & {
   file: File;
 };
 
-const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, onCreateBundle, onSend, disabled = false, replyTo, onCancelReply }: MessageComposerProps) => {
+const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, onCreateBundle, onSelectSubCommunity, onSend, disabled = false, replyTo, onCancelReply }: MessageComposerProps) => {
   const [isEditorEmpty, setIsEditorEmpty] = React.useState(true);
   const [selectedBundleId, setSelectedBundleId] = React.useState<string | null>(null);
   const [selectedType, setSelectedType] = React.useState<MessageTypeOption | null>(null);
@@ -664,7 +667,12 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
                     {bundles.map((bundle) => (
                       <button
                         key={bundle.id}
-                        onClick={() => { setSelectedBundleId(bundle.id); setGroupOpen(false); }}
+                        onClick={() => {
+                          setSelectedBundleId(bundle.id);
+                          setGroupOpen(false);
+                          // Open the bundle's first sub-community in the feed.
+                          if (bundle.subIds.length > 0) onSelectSubCommunity?.(bundle.subIds[0]);
+                        }}
                         className={cn(
                           "w-full text-left mx-1 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors hover:bg-slate-50 flex items-center gap-2 cursor-pointer",
                           selectedBundleId === bundle.id ? "bg-emerald-50 text-emerald-700" : "text-slate-700"

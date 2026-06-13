@@ -144,6 +144,7 @@ export default function DashboardPage() {
                 bundles={bundles}
                 creatingBundle={creatingBundle}
                 onCreateBundle={handleCreateBundle}
+                onSelectSubCommunity={selectSubCommunity}
                 onSend={handleSendMessage}
                 replyTo={replyTo}
                 onCancelReply={() => setReplyTo(null)}
