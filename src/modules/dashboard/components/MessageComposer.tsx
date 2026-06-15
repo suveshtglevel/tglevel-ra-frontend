@@ -675,7 +675,6 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
                           )}
                         >
                           <span className="flex-1 truncate">{bundle.name}</span>
-                          {selectedBundleId === bundle.id && <Check className="w-4 h-4 text-emerald-600 shrink-0" />}
                         </button>
                         <button
                           type="button"
