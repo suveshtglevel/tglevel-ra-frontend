@@ -4,6 +4,7 @@ import React from 'react';
 import dynamic from 'next/dynamic';
 import { TrendingUp, MoreVertical, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import type { ChatMessage } from '@/store/slices/messageSlice';
 
 // Opened only from the header menu, so defer its code (incl. the file viewer)
@@ -13,11 +14,13 @@ const MediaDocsPanel = dynamic(() => import('./MediaDocsPanel'), { ssr: false })
 interface ChatHeaderProps {
   title: string;
   members: string;
+  // Icon of the open community/sub-community (`icon_url`); may be absent.
+  iconUrl?: string;
   messages?: ChatMessage[];
   onMenuClick?: () => void;
 }
 
-const ChatHeader = ({ title, members, messages = [], onMenuClick }: ChatHeaderProps) => {
+const ChatHeader = ({ title, members, iconUrl, messages = [], onMenuClick }: ChatHeaderProps) => {
   const [showPanel, setShowPanel] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
@@ -43,8 +46,16 @@ const ChatHeader = ({ title, members, messages = [], onMenuClick }: ChatHeaderPr
         >
           <Menu className="w-5 h-5" />
         </button>
-        <div className="w-9 h-9 sm:w-10 sm:h-10 bg-emerald-500 rounded-full flex items-center justify-center text-white shrink-0">
-          <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6" />
+        <div className={cn(
+          "w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white shrink-0 overflow-hidden",
+          iconUrl ? "bg-white" : "bg-emerald-500"
+        )}>
+          {iconUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={iconUrl} alt={title} className="w-full h-full object-cover" />
+          ) : (
+            <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6" />
+          )}
         </div>
         <div className="min-w-0">
           <h1 className="font-bold text-slate-800 text-sm sm:text-base truncate">{title}</h1>

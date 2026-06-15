@@ -74,6 +74,10 @@ interface MessageComposerProps {
   bundles: BundleVM[];
   creatingBundle?: boolean;
   onCreateBundle?: (payload: { name: string; communityId: string; subIds: string[] }) => void;
+  // Delete a saved bundle (via the small cross on each bundle row).
+  onDeleteBundle?: (bundleId: string) => void;
+  // The bundle currently being deleted, if any — its row shows a pending state.
+  deletingBundleId?: string | null;
   // Open a sub-community chat in the feed. Called when the RA picks a bundle so
   // the feed jumps to the bundle's first sub-community.
   onSelectSubCommunity?: (subId: string) => void;
@@ -89,7 +93,7 @@ type FilePreview = NonNullable<SendOptions['attachment']> & {
   file: File;
 };
 
-const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, onCreateBundle, onSelectSubCommunity, onSend, disabled = false, replyTo, onCancelReply }: MessageComposerProps) => {
+const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, onCreateBundle, onDeleteBundle, deletingBundleId, onSelectSubCommunity, onSend, disabled = false, replyTo, onCancelReply }: MessageComposerProps) => {
   const [isEditorEmpty, setIsEditorEmpty] = React.useState(true);
   const [selectedBundleId, setSelectedBundleId] = React.useState<string | null>(null);
   const [selectedType, setSelectedType] = React.useState<MessageTypeOption | null>(null);
@@ -176,21 +180,6 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
     const community = communities.find((c) => c.id === draftCommunityId);
     const subs = community?.subCommunities?.filter((s) => draftSubIds.includes(s.id)) ?? [];
     const name = draftName.trim() || subs.map((s) => s.name).join(', ');
-
-    // Catch duplicates up front: the backend only returns a generic "API error"
-    // for an existing bundle, so detect it here (same name, or the same set of
-    // sub-communities in the same community) and show a clear message instead.
-    const sameSet = (a: string[], b: string[]) =>
-      a.length === b.length && [...a].sort().join('|') === [...b].sort().join('|');
-    const alreadyExists = bundles.some(
-      (b) =>
-        b.name.trim().toLowerCase() === name.trim().toLowerCase() ||
-        (b.communityId === draftCommunityId && sameSet(b.subIds, draftSubIds))
-    );
-    if (alreadyExists) {
-      toast.error('This bundle already exists');
-      return;
-    }
 
     onCreateBundle?.({ name, communityId: draftCommunityId, subIds: [...draftSubIds] });
     resetDraft();
@@ -665,23 +654,43 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
                       there's more below when the list overflows. */}
                   <div className="dropdown-scroll flex flex-col py-1 max-h-[280px] overflow-y-auto">
                     {bundles.map((bundle) => (
-                      <button
+                      <div
                         key={bundle.id}
-                        onClick={() => {
-                          setSelectedBundleId(bundle.id);
-                          setGroupOpen(false);
-                          // Open the bundle's first sub-community in the feed.
-                          if (bundle.subIds.length > 0) onSelectSubCommunity?.(bundle.subIds[0]);
-                        }}
                         className={cn(
-                          "w-full text-left mx-1 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors hover:bg-slate-50 flex items-center gap-2 cursor-pointer",
-                          selectedBundleId === bundle.id ? "bg-emerald-50 text-emerald-700" : "text-slate-700"
+                          "group/bundle mx-1 rounded-lg transition-colors hover:bg-slate-50 flex items-center cursor-pointer",
+                          selectedBundleId === bundle.id ? "bg-emerald-50" : ""
                         )}
                         style={{ width: 'calc(100% - 0.5rem)' }}
                       >
-                        <span className="flex-1 truncate">{bundle.name}</span>
-                        {selectedBundleId === bundle.id && <Check className="w-4 h-4 text-emerald-600 shrink-0" />}
-                      </button>
+                        <button
+                          onClick={() => {
+                            setSelectedBundleId(bundle.id);
+                            setGroupOpen(false);
+                            // Open the bundle's first sub-community in the feed.
+                            if (bundle.subIds.length > 0) onSelectSubCommunity?.(bundle.subIds[0]);
+                          }}
+                          className={cn(
+                            "flex-1 min-w-0 text-left pl-3 pr-1 py-2.5 text-[13px] font-medium flex items-center gap-2 cursor-pointer",
+                            selectedBundleId === bundle.id ? "text-emerald-700" : "text-slate-700"
+                          )}
+                        >
+                          <span className="flex-1 truncate">{bundle.name}</span>
+                          {selectedBundleId === bundle.id && <Check className="w-4 h-4 text-emerald-600 shrink-0" />}
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Delete ${bundle.name}`}
+                          disabled={deletingBundleId === bundle.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (selectedBundleId === bundle.id) setSelectedBundleId(null);
+                            onDeleteBundle?.(bundle.id);
+                          }}
+                          className="shrink-0 mr-1.5 p-1 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover/bundle:opacity-100 focus:opacity-100 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </>

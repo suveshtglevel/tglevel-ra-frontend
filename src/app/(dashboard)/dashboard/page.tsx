@@ -33,6 +33,8 @@ export default function DashboardPage() {
     bundles,
     handleCreateBundle,
     creatingBundle,
+    handleDeleteBundle,
+    deletingBundleId,
     selectedCommunityId,
     selectedSubCommunityId,
     selectedCommunity,
@@ -64,6 +66,7 @@ export default function DashboardPage() {
   };
 
   const headerTitle = selectedSubCommunity?.name ?? selectedCommunity?.name ?? '';
+  const headerIconUrl = selectedSubCommunity?.iconUrl ?? selectedCommunity?.iconUrl;
   const headerMembers = selectedSubCommunity
     ? `${selectedSubCommunity.members} members`
     : selectedCommunity
@@ -109,6 +112,7 @@ export default function DashboardPage() {
         <ChatHeader
           title={headerTitle}
           members={headerMembers}
+          iconUrl={headerIconUrl}
           messages={currentMessages}
           onMenuClick={() => setMobileSidebarOpen(true)}
         />
@@ -144,6 +148,8 @@ export default function DashboardPage() {
                 bundles={bundles}
                 creatingBundle={creatingBundle}
                 onCreateBundle={handleCreateBundle}
+                onDeleteBundle={handleDeleteBundle}
+                deletingBundleId={deletingBundleId}
                 onSelectSubCommunity={selectSubCommunity}
                 onSend={handleSendMessage}
                 replyTo={replyTo}

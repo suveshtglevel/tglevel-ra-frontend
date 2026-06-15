@@ -57,6 +57,16 @@ export async function createBundle(payload: CreateBundlePayload): Promise<void> 
   }
 }
 
+// delete-bundle returns only { success, message }.
+export async function deleteBundle(bundleId: string): Promise<void> {
+  const { data } = await axiosInstance.delete<MutationResponse>(
+    `${BASE}/delete-bundle/${bundleId}`
+  );
+  if (!data.success) {
+    throw new Error(data.message || 'Failed to delete bundle');
+  }
+}
+
 export async function getBundles(): Promise<Bundle[]> {
   const { data } = await axiosInstance.get<GetBundlesResponse>(`${BASE}/get-bundles`);
   if (!data.success) {

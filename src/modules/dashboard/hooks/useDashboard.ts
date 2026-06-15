@@ -17,6 +17,7 @@ import { useMessages } from '@/modules/dashboard/hooks/useMessages';
 import { useMessageTypes } from '@/modules/dashboard/hooks/useMessageTypes';
 import { useBundles } from '@/modules/dashboard/hooks/useBundles';
 import { useCreateBundle } from '@/modules/dashboard/hooks/useCreateBundle';
+import { useDeleteBundle } from '@/modules/dashboard/hooks/useDeleteBundle';
 import { usePinnedMessages } from '@/modules/dashboard/hooks/usePinnedMessages';
 import { toCommunityVM } from '@/modules/dashboard/services/community.service';
 import { sendMessage as sendMessageApi } from '@/modules/dashboard/services/messages.service';
@@ -108,6 +109,7 @@ export const useDashboard = () => {
   // ----- Bundles (RA-owned sub-community groupings) --------------------------
   const { data: rawBundles } = useBundles();
   const createBundleMutation = useCreateBundle();
+  const deleteBundleMutation = useDeleteBundle();
   const bundles = useMemo<BundleVM[]>(
     () =>
       (rawBundles ?? []).map((b) => ({
@@ -130,6 +132,10 @@ export const useDashboard = () => {
       subCommunities_Ids: payload.subIds,
       community_id: payload.communityId,
     });
+  };
+
+  const handleDeleteBundle = (bundleId: string) => {
+    deleteBundleMutation.mutate(bundleId);
   };
 
   // ----- Message types (for label <-> numeric id mapping) --------------------
@@ -329,6 +335,8 @@ export const useDashboard = () => {
     bundles,
     handleCreateBundle,
     creatingBundle: createBundleMutation.isPending,
+    handleDeleteBundle,
+    deletingBundleId: deleteBundleMutation.isPending ? deleteBundleMutation.variables : null,
     selectedCommunityId,
     selectedSubCommunityId,
     selectedCommunity,
