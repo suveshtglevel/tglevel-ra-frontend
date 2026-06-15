@@ -1,10 +1,10 @@
 'use client';
 
 import React from 'react';
+import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MoreVertical, Pin, Check, CheckCheck, Link as LinkIcon, ChevronLeft, Reply } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import TradeCard from './TradeCard';
 import FileAttachmentView from './FileAttachmentView';
 
@@ -52,7 +52,9 @@ const ChatFeedSkeleton = () => (
 const triggerClass =
   'absolute top-2 right-2 z-10 p-1 text-slate-500 hover:text-slate-700 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity cursor-pointer';
 
-type MessageMenuHandle = { open: () => void };
+type MessageMenuHandle = { open: (at?: { x: number; y: number }) => void };
+
+const MENU_WIDTH = 224; // w-56
 
 const MessageMenu = React.forwardRef<
   MessageMenuHandle,
@@ -60,124 +62,181 @@ const MessageMenu = React.forwardRef<
 >(function MessageMenu({ pinned, onTogglePin, links, onFollowUp }, ref) {
   const [open, setOpen] = React.useState(false);
   const [view, setView] = React.useState<'menu' | 'links'>('menu');
-  // Defer the (heavy) Radix Popover until the menu is first opened. Until then
-  // each row renders just a plain button, so a feed of many messages doesn't pay
-  // for a Popper tree per row — the dominant per-row cost on first render.
-  const [activated, setActivated] = React.useState(false);
+  // Where the menu opens from (viewport coords): the right-click cursor, or the
+  // three-dots button when opened by click. The menu is a fixed-position element
+  // portaled to <body>, so it lands exactly here — WhatsApp-style — regardless of
+  // how the message card is positioned or transformed.
+  const [anchor, setAnchor] = React.useState<{ x: number; y: number } | null>(null);
+  // Final on-screen position, computed after the menu is measured so it can flip
+  // up / left to stay inside the viewport. Hidden until then to avoid a flash.
+  const [coords, setCoords] = React.useState<{ left: number; top: number } | null>(null);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+
+  const close = React.useCallback(() => {
+    setOpen(false);
+    setView('menu');
+    setCoords(null);
+  }, []);
 
   // Let the parent open this menu from a right-click anywhere on the card (see
-  // MessageRow's onContextMenu) — activates + opens the popover, exactly as
-  // clicking the three-dots button does.
+  // MessageRow's onContextMenu). With a cursor position the menu pops up there;
+  // without one (three-dots click) it anchors just under the button.
   React.useImperativeHandle(
     ref,
     () => ({
-      open: () => {
-        setActivated(true);
+      open: (at) => {
+        if (at) {
+          setAnchor(at);
+        } else if (triggerRef.current) {
+          const r = triggerRef.current.getBoundingClientRect();
+          setAnchor({ x: r.right - MENU_WIDTH, y: r.bottom });
+        }
         setOpen(true);
       },
     }),
     []
   );
 
-  // Reset to the main menu as the popover closes (never leave the links tab open
-  // for next time) — done in the event, not an effect.
-  const handleOpenChange = (next: boolean) => {
-    setOpen(next);
-    if (!next) setView('menu');
-  };
+  // Measure the menu once it's open and clamp it inside the viewport: flip left
+  // if it would overflow the right edge, flip above the anchor if it would
+  // overflow the bottom. Re-runs when the view (and thus height) changes.
+  React.useLayoutEffect(() => {
+    if (!open || !anchor || !menuRef.current) return;
+    const pad = 8;
+    const { width, height } = menuRef.current.getBoundingClientRect();
+    let left = anchor.x;
+    let top = anchor.y + 4;
+    if (left + width > window.innerWidth - pad) left = window.innerWidth - width - pad;
+    if (left < pad) left = pad;
+    if (top + height > window.innerHeight - pad) top = anchor.y - height - 4;
+    if (top < pad) top = pad;
+    setCoords({ left, top });
+  }, [open, anchor, view, links.length]);
 
-  if (!activated) {
-    return (
+  // Close on outside click / Escape, like the old popover did for free.
+  React.useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) close();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open, close]);
+
+  return (
+    <>
       <button
+        ref={triggerRef}
         type="button"
         aria-label="Message options"
         className={triggerClass}
+        data-state={open ? 'open' : 'closed'}
         onClick={() => {
-          setActivated(true);
-          setOpen(true);
+          if (open) {
+            close();
+          } else if (triggerRef.current) {
+            const r = triggerRef.current.getBoundingClientRect();
+            setAnchor({ x: r.right - MENU_WIDTH, y: r.bottom });
+            setOpen(true);
+          }
         }}
       >
         <MoreVertical className="w-4 h-4" />
       </button>
-    );
-  }
 
-  return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <button type="button" aria-label="Message options" className={triggerClass}>
-          <MoreVertical className="w-4 h-4" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-56 p-1 rounded-xl border-white bg-white shadow-lg" align="end" side="right" sideOffset={4}>
-        {view === 'menu' ? (
-          <>
-            <button
-              type="button"
-              onClick={() => {
-                onTogglePin();
-                setOpen(false);
-              }}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
-            >
-              <Pin className={cn("w-4 h-4", pinned ? "text-emerald-500 rotate-45" : "text-slate-400")} />
-              {pinned ? 'Unpin message' : 'Pin message'}
-            </button>
-            {onFollowUp && (
-              <button
-                type="button"
-                onClick={() => {
-                  onFollowUp();
-                  setOpen(false);
-                }}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
-              >
-                <Reply className="w-4 h-4 text-slate-400" />
-                Follow up message
-              </button>
-            )}
-            {links.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setView('links')}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
-              >
-                <LinkIcon className="w-4 h-4 text-slate-400" />
-                Links
-                <span className="ml-auto text-[11px] font-semibold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
-                  {links.length}
-                </span>
-              </button>
-            )}
-          </>
-        ) : (
-          <div>
-            <button
-              type="button"
-              onClick={() => setView('menu')}
-              className="w-full flex items-center gap-1.5 px-2 py-2 rounded-lg text-[12px] font-semibold text-slate-500 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              Links ({links.length})
-            </button>
-            <div className="max-h-60 overflow-y-auto mt-0.5">
-              {links.map((link) => (
-                <a
-                  key={link.url}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex flex-col gap-0.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 transition-colors"
+      {open && anchor && typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            className="fixed z-50 w-56 p-1 rounded-xl border border-slate-100 bg-white shadow-lg"
+            style={{
+              left: coords?.left ?? anchor.x,
+              top: coords?.top ?? anchor.y + 4,
+              visibility: coords ? 'visible' : 'hidden',
+            }}
+            // Don't let clicks inside bubble up to the row's handlers.
+            onClick={(e) => e.stopPropagation()}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            {view === 'menu' ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onTogglePin();
+                    close();
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
                 >
-                  <span className="text-[12px] font-medium text-slate-700 truncate">{link.label}</span>
-                  <span className="text-[10px] text-emerald-600 underline truncate">{link.url}</span>
-                </a>
-              ))}
-            </div>
-          </div>
+                  <Pin className={cn("w-4 h-4", pinned ? "text-emerald-500 rotate-45" : "text-slate-400")} />
+                  {pinned ? 'Unpin message' : 'Pin message'}
+                </button>
+                {onFollowUp && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onFollowUp();
+                      close();
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
+                  >
+                    <Reply className="w-4 h-4 text-slate-400" />
+                    Follow up message
+                  </button>
+                )}
+                {links.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setView('links')}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
+                  >
+                    <LinkIcon className="w-4 h-4 text-slate-400" />
+                    Links
+                    <span className="ml-auto text-[11px] font-semibold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
+                      {links.length}
+                    </span>
+                  </button>
+                )}
+              </>
+            ) : (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setView('menu')}
+                  className="w-full flex items-center gap-1.5 px-2 py-2 rounded-lg text-[12px] font-semibold text-slate-500 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Links ({links.length})
+                </button>
+                <div className="max-h-60 overflow-y-auto mt-0.5">
+                  {links.map((link) => (
+                    <a
+                      key={link.url}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex flex-col gap-0.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 transition-colors"
+                    >
+                      <span className="text-[12px] font-medium text-slate-700 truncate">{link.label}</span>
+                      <span className="text-[10px] text-emerald-600 underline truncate">{link.url}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>,
+          document.body
         )}
-      </PopoverContent>
-    </Popover>
+    </>
   );
 });
 MessageMenu.displayName = 'MessageMenu';
@@ -352,7 +411,7 @@ const MessageRow = React.memo(function MessageRow({
         // the browser's native context menu.
         onContextMenu={(e) => {
           e.preventDefault();
-          menuRef.current?.open();
+          menuRef.current?.open({ x: e.clientX, y: e.clientY });
         }}
       >
         {isTrade ? (
