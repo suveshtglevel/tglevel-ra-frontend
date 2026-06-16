@@ -19,8 +19,8 @@ import { useBundles } from '@/modules/dashboard/hooks/useBundles';
 import { useCreateBundle } from '@/modules/dashboard/hooks/useCreateBundle';
 import { useDeleteBundle } from '@/modules/dashboard/hooks/useDeleteBundle';
 import { usePinnedMessages } from '@/modules/dashboard/hooks/usePinnedMessages';
+import { useSendMessage, type SendTarget } from '@/modules/dashboard/hooks/useSendMessage';
 import { toCommunityVM } from '@/modules/dashboard/services/community.service';
-import { sendMessage as sendMessageApi } from '@/modules/dashboard/services/messages.service';
 import { togglePinnedMessage } from '@/modules/dashboard/services/pinnedMessages.service';
 import { getApiErrorMessage } from '@/lib/errors/api-error';
 import { mapBackendMessage } from '@/lib/mappers/message';
@@ -119,6 +119,7 @@ export const useDashboard = () => {
   const { data: rawBundles } = useBundles();
   const createBundleMutation = useCreateBundle();
   const deleteBundleMutation = useDeleteBundle();
+  const sendMessageMutation = useSendMessage();
   const bundles = useMemo<BundleVM[]>(
     () =>
       (rawBundles ?? []).map((b) => ({
@@ -302,37 +303,22 @@ export const useDashboard = () => {
     // (Video handling is undecided, so it currently falls through to `docs`.)
     const isImage = options?.fileType === 'image';
 
-    // Fire one send per target sub-community, then refresh those chats. The feed
-    // is updated only from the server response (no temporary local append).
-    Promise.allSettled(
-      sendable.map((subId) => {
-        const parent = parentCommunityOf(subId)!;
-        return sendMessageApi({
-          community_id: parent.id,
-          sub_community_id: subId,
-          type: options!.messageTypeId!,
-          content: hasContent ? content : '',
-          parent_message_id: options?.parentMessageId,
-          notification_sent: options?.notifyUsers ?? false,
-          imageFile: isImage ? options?.file : undefined,
-          docFile: !isImage ? options?.file : undefined,
-        }).then(() =>
-          queryClient.invalidateQueries({ queryKey: ['messages', parent.id, subId] })
-        );
-      })
-    ).then((results) => {
-      const failed = results.filter((r) => r.status === 'rejected').length;
-      if (failed > 0) {
-        const reason = (results.find((r) => r.status === 'rejected') as PromiseRejectedResult)
-          ?.reason;
-        toast.error(getApiErrorMessage(reason));
-      } else {
-        toast.success(
-          sendable.length > 1
-            ? `Message sent to ${sendable.length} communities!`
-            : 'Message sent successfully!'
-        );
-      }
+    const targets: SendTarget[] = sendable.map((subId) => ({
+      communityId: parentCommunityOf(subId)!.id,
+      subId,
+    }));
+
+    sendMessageMutation.mutate({
+      targets,
+      input: {
+        type: options.messageTypeId,
+        content: hasContent ? content : '',
+        parent_message_id: options?.parentMessageId,
+        notification_sent: options?.notifyUsers ?? false,
+        imageFile: isImage ? options?.file : undefined,
+        docFile: !isImage ? options?.file : undefined,
+      },
+      label: 'Message',
     });
   };
 
@@ -372,37 +358,24 @@ export const useDashboard = () => {
       toast.error(`Skipped ${blocked} community you are not assigned to`);
     }
 
-    Promise.allSettled(
-      sendable.map((subId) => {
-        const parent = parentCommunityOf(subId)!;
-        return sendMessageApi({
-          community_id: parent.id,
-          sub_community_id: subId,
-          type: 6,
-          content: question,
-          notification_sent: false,
-          poll: {
-            options: options.map((text) => ({ text })),
-            allows_multiple: poll.allowsMultiple,
-            ...(poll.expiresAt ? { expires_at: poll.expiresAt } : {}),
-          },
-        }).then(() =>
-          queryClient.invalidateQueries({ queryKey: ['messages', parent.id, subId] })
-        );
-      })
-    ).then((results) => {
-      const failed = results.filter((r) => r.status === 'rejected').length;
-      if (failed > 0) {
-        const reason = (results.find((r) => r.status === 'rejected') as PromiseRejectedResult)
-          ?.reason;
-        toast.error(getApiErrorMessage(reason));
-      } else {
-        toast.success(
-          sendable.length > 1
-            ? `Poll sent to ${sendable.length} communities!`
-            : 'Poll sent successfully!'
-        );
-      }
+    const targets: SendTarget[] = sendable.map((subId) => ({
+      communityId: parentCommunityOf(subId)!.id,
+      subId,
+    }));
+
+    sendMessageMutation.mutate({
+      targets,
+      input: {
+        type: 6,
+        content: question,
+        notification_sent: false,
+        poll: {
+          options: options.map((text) => ({ text })),
+          allows_multiple: poll.allowsMultiple,
+          ...(poll.expiresAt ? { expires_at: poll.expiresAt } : {}),
+        },
+      },
+      label: 'Poll',
     });
   };
 
@@ -430,6 +403,7 @@ export const useDashboard = () => {
     handleSelectCommunity,
     handleSendMessage,
     handleSendPoll,
+    sendingMessage: sendMessageMutation.isPending,
     handleTogglePin,
   };
 };
