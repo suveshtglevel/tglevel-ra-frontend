@@ -131,27 +131,6 @@ const messageSlice = createSlice({
       }
       state.messages[communityId].push(newMsg);
     },
-    // Append a poll message to a chat locally. UI-only: nothing is sent to the
-    // backend — it just demonstrates how a poll renders in the feed.
-    sendPoll: (state, action: PayloadAction<{ communityId: string; poll: PollData }>) => {
-      const { communityId, poll } = action.payload;
-
-      const newMsg: ChatMessage = {
-        id: `poll-${communityId}-${Date.now()}`,
-        communityId,
-        content: '',
-        type: 'sent',
-        timestamp: formatNow(),
-        status: 'sent',
-        sender: 'You',
-        poll,
-      };
-
-      if (!state.messages[communityId]) {
-        state.messages[communityId] = [];
-      }
-      state.messages[communityId].push(newMsg);
-    },
     togglePin: (state, action: PayloadAction<{ communityId: string; messageId: string }>) => {
       const { communityId, messageId } = action.payload;
       const msg = state.messages[communityId]?.find((m) => m.id === messageId);
@@ -181,5 +160,5 @@ const messageSlice = createSlice({
   },
 });
 
-export const { setMessages, sendMessage, sendFileMessage, sendPoll, togglePin, setPinned, updateMessageStatus } = messageSlice.actions;
+export const { setMessages, sendMessage, sendFileMessage, togglePin, setPinned, updateMessageStatus } = messageSlice.actions;
 export default messageSlice.reducer;

@@ -59,8 +59,7 @@ import {
 import { Check } from 'lucide-react';
 import type { CommunityVM, BundleVM } from '@/types/dashboard';
 import type { MessageTypeOption } from '@/modules/dashboard/services/messages.service';
-import type { SendOptions } from '@/modules/dashboard/hooks/useDashboard';
-import type { PollData } from '@/store/slices/messageSlice';
+import type { SendOptions, ComposerPoll } from '@/modules/dashboard/hooks/useDashboard';
 
 // The message being followed-up on (WhatsApp-style reply context).
 export interface ReplyContext {
@@ -85,9 +84,9 @@ interface MessageComposerProps {
   // the feed jumps to the bundle's first sub-community.
   onSelectSubCommunity?: (subId: string) => void;
   onSend?: (content: string, options?: SendOptions) => void;
-  // Send a poll to the open chat. UI-only — the poll is shown in the feed but
-  // not persisted to the backend.
-  onSendPoll?: (poll: PollData) => void;
+  // Send a poll (type-6 message). Targeting mirrors a normal send (sidebar
+  // selection / open chat).
+  onSendPoll?: (poll: ComposerPoll) => void;
   disabled?: boolean;
   // Active follow-up reply (set when the RA picks "Follow up message" on a
   // trade card); null when not replying. onCancelReply dismisses it.
@@ -114,10 +113,13 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
   const [draftSubIds, setDraftSubIds] = React.useState<string[]>([]);
   const [filePreview, setFilePreview] = React.useState<FilePreview | null>(null);
   const [showFullPreview, setShowFullPreview] = React.useState(false);
-  // Poll builder draft (UI-only feature — see onSendPoll).
+  // Poll builder draft.
   const [pollOpen, setPollOpen] = React.useState(false);
   const [pollQuestion, setPollQuestion] = React.useState('');
   const [pollOptions, setPollOptions] = React.useState<string[]>(['', '']);
+  const [pollMultiple, setPollMultiple] = React.useState(false);
+  // Minutes until the poll closes (drives expires_at). 0 = no expiry.
+  const [pollDurationMinutes, setPollDurationMinutes] = React.useState(10080); // 1 week
   // Tracks which reply we've already reacted to, so we pre-select the Followup
   // type exactly once per reply target (see the render-time adjustment below).
   const [reactedReplyId, setReactedReplyId] = React.useState<string | null>(replyTo?.id ?? null);
@@ -146,6 +148,12 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
   );
   const selectedBundle = bundles.find((b) => b.id === selectedBundleId) ?? null;
   const messageTypeRequiredText = 'Select message type before sending';
+
+  // The "Poll" message type (numeric id 6). Selecting it opens the poll builder,
+  // and opening the poll builder selects it — the two stay in sync.
+  const isPollType = (t: MessageTypeOption | null | undefined) =>
+    !!t && (t.id === 6 || /poll/i.test(t.name));
+  const pollType = messageTypes.find((t) => isPollType(t)) ?? null;
 
   // Trade messages must always notify users: the toggle is forced on and the RA
   // can't switch it off. Every other type defaults to off and stays toggleable.
@@ -196,10 +204,12 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
     setBundleOpen(false);
   };
 
-  // ----- Poll builder (UI-only) ---------------------------------------------
+  // ----- Poll builder -------------------------------------------------------
   const resetPoll = () => {
     setPollQuestion('');
     setPollOptions(['', '']);
+    setPollMultiple(false);
+    setPollDurationMinutes(10080);
   };
 
   const setPollOption = (index: number, value: string) => {
@@ -225,13 +235,26 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
       toast.error('Add at least two options');
       return;
     }
+    const expiresAt =
+      pollDurationMinutes > 0
+        ? new Date(Date.now() + pollDurationMinutes * 60 * 1000).toISOString()
+        : undefined;
     onSendPoll?.({
       question,
-      options: options.map((text, i) => ({ id: `opt-${Date.now()}-${i}`, text, votes: 0 })),
+      options,
+      // Multiple answers only make sense with more than two options.
+      allowsMultiple: pollMultiple && options.length > 2,
+      expiresAt,
     });
     resetPoll();
     setPollOpen(false);
+    // Clear the auto-selected Poll type now that it's been sent.
+    setSelectedType(null);
   };
+
+  // Multiple answers are only offered when there are more than two filled
+  // options (a yes/no-style poll is single-choice).
+  const canAllowMultiple = pollOptions.filter((o) => o.trim()).length > 2;
 
   const imageInputRef = React.useRef<HTMLInputElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -452,6 +475,11 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
     if (!editor) return;
     if (!selectedType) {
       toast.error(messageTypeRequiredText);
+      return;
+    }
+    // Poll messages are composed in the poll builder, not the text editor.
+    if (isPollType(selectedType)) {
+      setPollOpen(true);
       return;
     }
     const content = editor.getHTML();
@@ -779,7 +807,17 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
                     {messageTypes.map((type) => (
                       <button
                         key={type._id}
-                        onClick={() => { setSelectedType(type); setTypeOpen(false); }}
+                        onClick={() => {
+                          setSelectedType(type);
+                          setTypeOpen(false);
+                          // Picking the Poll type jumps straight into the poll
+                          // builder. Defer the open so the type dropdown finishes
+                          // closing first — opening both popovers in the same tick
+                          // makes the builder flicker shut from a focus race.
+                          if (isPollType(type)) {
+                            window.setTimeout(() => setPollOpen(true), 120);
+                          }
+                        }}
                         className={cn(
                           "text-left mx-1 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors hover:bg-slate-50 flex items-center gap-2 cursor-pointer",
                           selectedType?._id === type._id ? "bg-emerald-50 text-emerald-700" : "text-slate-700"
@@ -919,7 +957,11 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
               onClick={handleSend}
               disabled={!selectedType}
             >
-              Send <Send className="w-4 h-4 fill-current" />
+              {isPollType(selectedType) ? (
+                <>Send Poll <BarChart2 className="w-4 h-4" /></>
+              ) : (
+                <>Send <Send className="w-4 h-4 fill-current" /></>
+              )}
             </Button>
           </div>
         </div>
@@ -962,7 +1004,19 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
           <div className="h-5 w-[1px] bg-slate-200 mx-2" />
           {/* Poll builder — the bar-chart icon (just left of the quick-trade Zap
               button) opens it. */}
-          <Popover open={pollOpen} onOpenChange={(open) => { setPollOpen(open); if (!open) resetPoll(); }}>
+          <Popover
+            open={pollOpen}
+            onOpenChange={(open) => {
+              setPollOpen(open);
+              if (open) {
+                // Opening the poll builder selects the Poll message type.
+                if (pollType) setSelectedType(pollType);
+              }
+              // Closing keeps both the Poll type and the in-progress draft, so an
+              // accidental click-away doesn't lose what the RA typed. The draft is
+              // cleared only on an explicit Reset or after the poll is sent.
+            }}
+          >
             <PopoverTrigger asChild>
               <ToolbarButton active={pollOpen}><BarChart2 className="h-4 w-4" /></ToolbarButton>
             </PopoverTrigger>
@@ -1016,12 +1070,61 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
                     <Plus className="w-3.5 h-3.5" /> Add option
                   </button>
                 )}
-                <Button
-                  onClick={sendPoll}
-                  className="h-8 mt-1 rounded-lg px-4 font-bold text-[12px] bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer"
-                >
-                  Send poll
-                </Button>
+
+                <div className="mt-1 pt-2 border-t border-slate-100 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <span className={cn("text-[12px] font-medium", canAllowMultiple ? "text-slate-600" : "text-slate-300")}>
+                        Allow multiple answers
+                      </span>
+                      {!canAllowMultiple && (
+                        <span className="text-[10px] text-slate-400">Add 3+ options to enable</span>
+                      )}
+                    </div>
+                    <Switch
+                      checked={pollMultiple && canAllowMultiple}
+                      onCheckedChange={setPollMultiple}
+                      disabled={!canAllowMultiple}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[12px] font-medium text-slate-600">Closes in</span>
+                    <select
+                      value={pollDurationMinutes}
+                      onChange={(e) => setPollDurationMinutes(Number(e.target.value))}
+                      className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-[12px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/10 cursor-pointer"
+                    >
+                      <option value={5}>5 minutes</option>
+                      <option value={15}>15 minutes</option>
+                      <option value={30}>30 minutes</option>
+                      <option value={60}>1 hour</option>
+                      <option value={360}>6 hours</option>
+                      <option value={720}>12 hours</option>
+                      <option value={1440}>1 day</option>
+                      <option value={4320}>3 days</option>
+                      <option value={10080}>1 week</option>
+                      <option value={43200}>1 month</option>
+                      <option value={0}>No expiry</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 mt-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={resetPoll}
+                    className="h-8 rounded-lg px-3 font-bold text-[12px] text-slate-500 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+                  >
+                    Reset
+                  </Button>
+                  <Button
+                    onClick={sendPoll}
+                    className="h-8 flex-1 rounded-lg px-4 font-bold text-[12px] bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer"
+                  >
+                    Send poll
+                  </Button>
+                </div>
               </div>
             </PopoverContent>
           </Popover>

@@ -24,8 +24,18 @@ const getMessageTypesResponseSchema = z
 // Message kind, sent as a numeric code the backend understands.
 export type MessageType = number;
 
+// Poll payload sent with a type-6 (poll) message. Only the option text is sent;
+// the backend assigns ids and zeroes the vote counts.
+export interface SendPollInput {
+  options: { text: string }[];
+  allows_multiple?: boolean;
+  // ISO timestamp; when the poll closes.
+  expires_at?: string;
+}
+
 // send-message is multipart/form-data: text fields plus optional file fields
-// (`images` for an image/video, `docs` for a document).
+// (`images` for an image/video, `docs` for a document). Poll messages are the
+// exception — they carry a nested `poll` object and are sent as JSON.
 export interface SendMessageInput {
   community_id: string;
   sub_community_id: string;
@@ -37,6 +47,8 @@ export interface SendMessageInput {
   notification_sent?: boolean;
   imageFile?: File;
   docFile?: File;
+  // Present only for poll messages (type 6).
+  poll?: SendPollInput;
 }
 
 export interface SentMessage {
@@ -58,6 +70,25 @@ interface SendMessageResponse {
 }
 
 export async function sendMessage(input: SendMessageInput): Promise<SentMessage> {
+  // Poll messages have no files and carry a nested object, so they go as JSON
+  // rather than multipart. Content is the poll question (plain text).
+  if (input.poll) {
+    const { data } = await axiosInstance.post<SendMessageResponse>(`${BASE}/send-message`, {
+      community_id: input.community_id,
+      sub_community_id: input.sub_community_id,
+      type: input.type,
+      content: input.content ?? '',
+      notification_sent: input.notification_sent ?? false,
+      ...(input.parent_message_id ? { parent_message_id: input.parent_message_id } : {}),
+      poll: input.poll,
+    });
+    if (!data.success) {
+      throw new Error(data.message || 'Failed to send message');
+    }
+    parseResponse(sendMessageResponseSchema, data, 'send-message');
+    return data.data;
+  }
+
   const form = new FormData();
   form.append('community_id', input.community_id);
   form.append('sub_community_id', input.sub_community_id);
@@ -96,6 +127,22 @@ export interface BackendAttachment {
   file_name: string;
 }
 
+// Poll as returned on a type-6 message.
+export interface BackendPollOption {
+  option_id: string;
+  text: string;
+  vote_count?: number;
+}
+
+export interface BackendPoll {
+  poll_id?: string;
+  question: string;
+  options: BackendPollOption[];
+  total_votes?: number;
+  allows_multiple?: boolean;
+  expires_at?: string;
+}
+
 export interface BackendMessage {
   // UUID-style message id (e.g. "msg_..."); used as message_id when pinning.
   message_id?: string;
@@ -111,6 +158,7 @@ export interface BackendMessage {
   author_id?: string;
   author_name?: string;
   attachments?: BackendAttachment[];
+  poll?: BackendPoll;
   createdAt?: string;
   updatedAt?: string;
 }

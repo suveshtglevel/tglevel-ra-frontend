@@ -30,6 +30,16 @@ export function mapBackendMessage(m: BackendMessage, typeName?: string): ChatMes
   const attachment: FileAttachment | undefined = first
     ? { name: first.file_name, size: '', fileType: toAttachmentType(first), url: first.file_url }
     : undefined;
+  const poll = m.poll
+    ? {
+        question: m.poll.question,
+        options: m.poll.options.map((o) => ({
+          id: o.option_id,
+          text: o.text,
+          votes: o.vote_count ?? 0,
+        })),
+      }
+    : undefined;
   return {
     // Prefer the UUID message_id so pin/unpin can reference it.
     id: m.message_id ?? m._id ?? '',
@@ -45,6 +55,7 @@ export function mapBackendMessage(m: BackendMessage, typeName?: string): ChatMes
     status: 'delivered',
     sender: m.author_name ?? 'RA',
     attachment,
+    poll,
     parentMessageId: m.parent_message_id || undefined,
   };
 }

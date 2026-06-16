@@ -380,7 +380,9 @@ const MessageBubble = ({ message, status, communityTag, parentMessage, onOpenFil
       )}
 
       {/* Text content */}
-      {message.content && (
+      {/* Poll messages render the question inside PollView, so skip the plain
+          content here to avoid showing it twice. */}
+      {message.content && !message.poll && (
         <SafeHtml
           className="text-[13px] leading-relaxed text-slate-700 break-words whitespace-pre-wrap [&_p:empty]:min-h-[1em] [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1 [&_li]:my-0.5 [&_a]:text-blue-600 [&_a]:underline [&_a]:break-all"
           html={linkifyHtml(message.content)}

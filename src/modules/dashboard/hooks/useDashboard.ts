@@ -10,9 +10,8 @@ import {
 import {
   setMessages,
   setPinned,
-  sendPoll,
 } from '@/store/slices/messageSlice';
-import type { FileAttachment, PollData } from '@/store/slices/messageSlice';
+import type { FileAttachment } from '@/store/slices/messageSlice';
 import { useCommunities } from '@/modules/dashboard/hooks/useCommunities';
 import { useMessages } from '@/modules/dashboard/hooks/useMessages';
 import { useMessageTypes } from '@/modules/dashboard/hooks/useMessageTypes';
@@ -38,6 +37,15 @@ const messagePreview = (content: string, attachmentName?: string) => {
 interface CheckboxTargets {
   communityId: string | null;
   subIds: string[];
+}
+
+// Poll draft handed up from the composer's poll builder.
+export interface ComposerPoll {
+  question: string;
+  options: string[];
+  allowsMultiple: boolean;
+  // ISO timestamp; when the poll closes (optional).
+  expiresAt?: string;
 }
 
 export interface SendOptions {
@@ -328,14 +336,74 @@ export const useDashboard = () => {
     });
   };
 
-  // Send a poll to the open chat. UI-only for now: it's appended to the local
-  // message list and never reaches the backend.
-  const handleSendPoll = (poll: PollData) => {
-    if (!activeChatId) {
-      toast.error('Select a sub-community first');
+  // Send a poll (type-6 message) to the targeted sub-communities, mirroring the
+  // targeting used for regular messages (sidebar checkbox selection, else the
+  // open chat). The feed is refreshed from the server response.
+  const handleSendPoll = (poll: ComposerPoll) => {
+    const question = poll.question.trim();
+    const options = poll.options.map((o) => o.trim()).filter(Boolean);
+    if (!question) {
+      toast.error('Add a poll question');
       return;
     }
-    dispatch(sendPoll({ communityId: activeChatId, poll }));
+    if (options.length < 2) {
+      toast.error('Add at least two options');
+      return;
+    }
+
+    const rawTargets =
+      checkboxTargets.subIds.length > 0
+        ? checkboxTargets.subIds
+        : selectedSubCommunityId
+          ? [selectedSubCommunityId]
+          : [];
+    if (rawTargets.length === 0) {
+      toast.error('Select a sub-community to send to');
+      return;
+    }
+
+    const sendable = rawTargets.filter((subId) => parentCommunityOf(subId)?.sendable);
+    if (sendable.length === 0) {
+      toast.error('You are not assigned to message this community');
+      return;
+    }
+    const blocked = rawTargets.length - sendable.length;
+    if (blocked > 0) {
+      toast.error(`Skipped ${blocked} community you are not assigned to`);
+    }
+
+    Promise.allSettled(
+      sendable.map((subId) => {
+        const parent = parentCommunityOf(subId)!;
+        return sendMessageApi({
+          community_id: parent.id,
+          sub_community_id: subId,
+          type: 6,
+          content: question,
+          notification_sent: false,
+          poll: {
+            options: options.map((text) => ({ text })),
+            allows_multiple: poll.allowsMultiple,
+            ...(poll.expiresAt ? { expires_at: poll.expiresAt } : {}),
+          },
+        }).then(() =>
+          queryClient.invalidateQueries({ queryKey: ['messages', parent.id, subId] })
+        );
+      })
+    ).then((results) => {
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      if (failed > 0) {
+        const reason = (results.find((r) => r.status === 'rejected') as PromiseRejectedResult)
+          ?.reason;
+        toast.error(getApiErrorMessage(reason));
+      } else {
+        toast.success(
+          sendable.length > 1
+            ? `Poll sent to ${sendable.length} communities!`
+            : 'Poll sent successfully!'
+        );
+      }
+    });
   };
 
   return {
