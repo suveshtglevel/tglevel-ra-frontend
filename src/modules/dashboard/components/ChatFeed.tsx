@@ -4,7 +4,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MoreVertical, Pin, Check, CheckCheck, Link as LinkIcon, ChevronLeft, Reply } from 'lucide-react';
+import { MoreVertical, Pin, Check, CheckCheck, Link as LinkIcon, ChevronLeft, Reply, BarChart2 } from 'lucide-react';
 import TradeCard from './TradeCard';
 import FileAttachmentView from './FileAttachmentView';
 
@@ -16,7 +16,63 @@ import { cn } from '@/lib/utils';
 import { extractLinks, linkifyHtml, type DetectedLink } from '@/lib/extractLinks';
 import { SafeHtml } from '@/components/ui/safe-html';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { ChatMessage, FileAttachment } from '@/store/slices/messageSlice';
+import type { ChatMessage, FileAttachment, PollData } from '@/store/slices/messageSlice';
+
+// Renders a sent poll inside a message bubble (RA side: the RA sends polls, it
+// never votes). Read-only: shows the question, each option, and its vote count
+// with a subtle bar scaled by share — no voting interaction.
+const PollView = ({ poll }: { poll: PollData }) => {
+  const total = poll.options.reduce((sum, o) => sum + o.votes, 0);
+  const maxVotes = Math.max(0, ...poll.options.map((o) => o.votes));
+
+  return (
+    <div className="mt-0.5 min-w-[260px]">
+      {/* Header: icon + label, with the running total on the right. */}
+      <div className="flex items-center justify-between mb-2.5">
+        <div className="flex items-center gap-1.5">
+          <span className="w-6 h-6 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+            <BarChart2 className="w-3.5 h-3.5 text-emerald-600" />
+          </span>
+          <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Poll</span>
+        </div>
+        <span className="text-[11px] font-semibold text-slate-400 tabular-nums">
+          {total} {total === 1 ? 'vote' : 'votes'}
+        </span>
+      </div>
+
+      <p className="text-[14px] font-bold text-slate-800 mb-3 leading-snug break-words">
+        {poll.question}
+      </p>
+
+      <div className="flex flex-col gap-2">
+        {poll.options.map((opt) => {
+          const pct = total > 0 ? (opt.votes / total) * 100 : 0;
+          const leading = opt.votes > 0 && opt.votes === maxVotes;
+
+          return (
+            <div
+              key={opt.id}
+              className="relative overflow-hidden rounded-lg border border-slate-200 bg-white px-3 py-2"
+            >
+              <span
+                className="absolute inset-y-0 left-0 bg-slate-100 transition-all duration-500 ease-out"
+                style={{ width: `${pct}%` }}
+              />
+              <span className="relative flex items-center justify-between gap-2">
+                <span className={cn("text-[13px] truncate", leading ? "font-bold text-slate-800" : "font-medium text-slate-600")}>
+                  {opt.text}
+                </span>
+                <span className="text-[12px] font-bold text-slate-500 shrink-0 tabular-nums">
+                  {opt.votes}
+                </span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 interface ChatFeedProps {
   communityTag?: string; // shown on trade cards instead of the message type
@@ -314,6 +370,9 @@ const MessageBubble = ({ message, status, communityTag, parentMessage, onOpenFil
       {message.parentMessageId && (
         <QuotedReply parent={parentMessage} parentId={message.parentMessageId} />
       )}
+
+      {/* Poll (UI-only feature) */}
+      {message.poll && <PollView poll={message.poll} />}
 
       {/* File attachment */}
       {message.attachment && (

@@ -10,8 +10,9 @@ import {
 import {
   setMessages,
   setPinned,
+  sendPoll,
 } from '@/store/slices/messageSlice';
-import type { FileAttachment } from '@/store/slices/messageSlice';
+import type { FileAttachment, PollData } from '@/store/slices/messageSlice';
 import { useCommunities } from '@/modules/dashboard/hooks/useCommunities';
 import { useMessages } from '@/modules/dashboard/hooks/useMessages';
 import { useMessageTypes } from '@/modules/dashboard/hooks/useMessageTypes';
@@ -327,6 +328,16 @@ export const useDashboard = () => {
     });
   };
 
+  // Send a poll to the open chat. UI-only for now: it's appended to the local
+  // message list and never reaches the backend.
+  const handleSendPoll = (poll: PollData) => {
+    if (!activeChatId) {
+      toast.error('Select a sub-community first');
+      return;
+    }
+    dispatch(sendPoll({ communityId: activeChatId, poll }));
+  };
+
   return {
     communities,
     communitiesLoading,
@@ -350,6 +361,7 @@ export const useDashboard = () => {
     handleSelectSubCommunity,
     handleSelectCommunity,
     handleSendMessage,
+    handleSendPoll,
     handleTogglePin,
   };
 };

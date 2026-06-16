@@ -48,6 +48,7 @@ export default function DashboardPage() {
     handleSelectSubCommunity,
     handleSelectCommunity,
     handleSendMessage,
+    handleSendPoll,
     handleTogglePin,
   } = useDashboard();
 
@@ -152,6 +153,7 @@ export default function DashboardPage() {
                 deletingBundleId={deletingBundleId}
                 onSelectSubCommunity={selectSubCommunity}
                 onSend={handleSendMessage}
+                onSendPoll={handleSendPoll}
                 replyTo={replyTo}
                 onCancelReply={() => setReplyTo(null)}
               />

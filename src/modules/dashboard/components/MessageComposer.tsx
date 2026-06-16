@@ -29,6 +29,8 @@ import {
   Video,
   BarChart2,
   Zap,
+  Plus,
+  Trash2,
   Undo2,
   Redo2,
   ChevronDown,
@@ -58,6 +60,7 @@ import { Check } from 'lucide-react';
 import type { CommunityVM, BundleVM } from '@/types/dashboard';
 import type { MessageTypeOption } from '@/modules/dashboard/services/messages.service';
 import type { SendOptions } from '@/modules/dashboard/hooks/useDashboard';
+import type { PollData } from '@/store/slices/messageSlice';
 
 // The message being followed-up on (WhatsApp-style reply context).
 export interface ReplyContext {
@@ -82,6 +85,9 @@ interface MessageComposerProps {
   // the feed jumps to the bundle's first sub-community.
   onSelectSubCommunity?: (subId: string) => void;
   onSend?: (content: string, options?: SendOptions) => void;
+  // Send a poll to the open chat. UI-only — the poll is shown in the feed but
+  // not persisted to the backend.
+  onSendPoll?: (poll: PollData) => void;
   disabled?: boolean;
   // Active follow-up reply (set when the RA picks "Follow up message" on a
   // trade card); null when not replying. onCancelReply dismisses it.
@@ -93,7 +99,7 @@ type FilePreview = NonNullable<SendOptions['attachment']> & {
   file: File;
 };
 
-const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, onCreateBundle, onDeleteBundle, deletingBundleId, onSelectSubCommunity, onSend, disabled = false, replyTo, onCancelReply }: MessageComposerProps) => {
+const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, onCreateBundle, onDeleteBundle, deletingBundleId, onSelectSubCommunity, onSend, onSendPoll, disabled = false, replyTo, onCancelReply }: MessageComposerProps) => {
   const [isEditorEmpty, setIsEditorEmpty] = React.useState(true);
   const [selectedBundleId, setSelectedBundleId] = React.useState<string | null>(null);
   const [selectedType, setSelectedType] = React.useState<MessageTypeOption | null>(null);
@@ -108,6 +114,10 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
   const [draftSubIds, setDraftSubIds] = React.useState<string[]>([]);
   const [filePreview, setFilePreview] = React.useState<FilePreview | null>(null);
   const [showFullPreview, setShowFullPreview] = React.useState(false);
+  // Poll builder draft (UI-only feature — see onSendPoll).
+  const [pollOpen, setPollOpen] = React.useState(false);
+  const [pollQuestion, setPollQuestion] = React.useState('');
+  const [pollOptions, setPollOptions] = React.useState<string[]>(['', '']);
   // Tracks which reply we've already reacted to, so we pre-select the Followup
   // type exactly once per reply target (see the render-time adjustment below).
   const [reactedReplyId, setReactedReplyId] = React.useState<string | null>(replyTo?.id ?? null);
@@ -184,6 +194,43 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
     onCreateBundle?.({ name, communityId: draftCommunityId, subIds: [...draftSubIds] });
     resetDraft();
     setBundleOpen(false);
+  };
+
+  // ----- Poll builder (UI-only) ---------------------------------------------
+  const resetPoll = () => {
+    setPollQuestion('');
+    setPollOptions(['', '']);
+  };
+
+  const setPollOption = (index: number, value: string) => {
+    setPollOptions((prev) => prev.map((o, i) => (i === index ? value : o)));
+  };
+
+  const addPollOption = () => {
+    setPollOptions((prev) => (prev.length >= 6 ? prev : [...prev, '']));
+  };
+
+  const removePollOption = (index: number) => {
+    setPollOptions((prev) => (prev.length <= 2 ? prev : prev.filter((_, i) => i !== index)));
+  };
+
+  const sendPoll = () => {
+    const question = pollQuestion.trim();
+    const options = pollOptions.map((o) => o.trim()).filter(Boolean);
+    if (!question) {
+      toast.error('Add a poll question');
+      return;
+    }
+    if (options.length < 2) {
+      toast.error('Add at least two options');
+      return;
+    }
+    onSendPoll?.({
+      question,
+      options: options.map((text, i) => ({ id: `opt-${Date.now()}-${i}`, text, votes: 0 })),
+    });
+    resetPoll();
+    setPollOpen(false);
   };
 
   const imageInputRef = React.useRef<HTMLInputElement>(null);
@@ -499,12 +546,6 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
     editor.chain().focus().setTextAlign(align).run();
   const undo = () => editor.chain().focus().undo().run();
   const redo = () => editor.chain().focus().redo().run();
-
-  const insertChart = () => {
-    editor.chain().focus().insertContent(
-      '<p>📊 <strong>Market Analysis Chart</strong></p><p>Nifty: 24,250 (+0.8%) | Bank Nifty: 52,100 (+1.2%)</p>'
-    ).run();
-  };
 
   const insertQuickTrade = () => {
     editor.chain().focus().insertContent(
@@ -919,7 +960,71 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
           <ToolbarButton onClick={() => { fileInputRef.current?.click(); }}><Paperclip className="h-4 w-4" /></ToolbarButton>
           <ToolbarButton onClick={() => { videoInputRef.current?.click(); }}><Video className="h-4 w-4" /></ToolbarButton>
           <div className="h-5 w-[1px] bg-slate-200 mx-2" />
-          <ToolbarButton onClick={insertChart}><BarChart2 className="h-4 w-4" /></ToolbarButton>
+          {/* Poll builder — the bar-chart icon (just left of the quick-trade Zap
+              button) opens it. */}
+          <Popover open={pollOpen} onOpenChange={(open) => { setPollOpen(open); if (!open) resetPoll(); }}>
+            <PopoverTrigger asChild>
+              <ToolbarButton active={pollOpen}><BarChart2 className="h-4 w-4" /></ToolbarButton>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-[300px] p-0 bg-white border-[1.5px] border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden"
+              align="start"
+              side="top"
+              sideOffset={8}
+            >
+              <div className="px-3 py-2.5 border-b border-slate-100 bg-slate-50">
+                <p className="text-[12px] font-bold text-slate-700">Create a poll</p>
+                <p className="text-[10.5px] text-slate-400 font-medium">Ask a question with a few choices.</p>
+              </div>
+              <div className="p-3 flex flex-col gap-2">
+                <input
+                  type="text"
+                  value={pollQuestion}
+                  onChange={(e) => setPollQuestion(e.target.value)}
+                  placeholder="Poll question"
+                  className="w-full h-9 px-2.5 rounded-lg border border-slate-200 bg-white text-[12px] text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/10"
+                />
+                <div className="flex flex-col gap-1.5">
+                  {pollOptions.map((opt, i) => (
+                    <div key={i} className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        value={opt}
+                        onChange={(e) => setPollOption(i, e.target.value)}
+                        placeholder={`Option ${i + 1}`}
+                        className="flex-1 h-8 px-2.5 rounded-lg border border-slate-200 bg-white text-[12px] text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/10"
+                      />
+                      {pollOptions.length > 2 && (
+                        <button
+                          type="button"
+                          aria-label={`Remove option ${i + 1}`}
+                          onClick={() => removePollOption(i)}
+                          className="shrink-0 p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 transition cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {pollOptions.length < 6 && (
+                  <button
+                    type="button"
+                    onClick={addPollOption}
+                    className="flex items-center gap-1.5 text-[11.5px] font-semibold text-emerald-600 hover:text-emerald-700 bg-transparent border-none cursor-pointer self-start"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add option
+                  </button>
+                )}
+                <Button
+                  onClick={sendPoll}
+                  className="h-8 mt-1 rounded-lg px-4 font-bold text-[12px] bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer"
+                >
+                  Send poll
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
           <ToolbarButton onClick={insertQuickTrade}><Zap className="h-4 w-4" /></ToolbarButton>
         </div>
         <div className="flex items-center gap-0.5 shrink-0">

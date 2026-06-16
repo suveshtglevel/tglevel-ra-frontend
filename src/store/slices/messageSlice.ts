@@ -7,6 +7,19 @@ export interface FileAttachment {
   url: string; // base64 data URL or blob URL
 }
 
+// A poll attached to a message. Currently a UI-only feature — polls are shown
+// in the feed but not persisted to the backend.
+export interface PollOption {
+  id: string;
+  text: string;
+  votes: number;
+}
+
+export interface PollData {
+  question: string;
+  options: PollOption[];
+}
+
 export interface ChatMessage {
   id: string;
   // The chat this message belongs to: a sub-community id, or a community id for
@@ -32,6 +45,8 @@ export interface ChatMessage {
   // Trade-card metadata (only present when messageType === 'Trade')
   tradeTag?: string;
   tradeRefId?: string;
+  // Poll payload (only present on poll messages — UI-only, not sent to the DB).
+  poll?: PollData;
 }
 
 interface MessageState {
@@ -116,6 +131,27 @@ const messageSlice = createSlice({
       }
       state.messages[communityId].push(newMsg);
     },
+    // Append a poll message to a chat locally. UI-only: nothing is sent to the
+    // backend — it just demonstrates how a poll renders in the feed.
+    sendPoll: (state, action: PayloadAction<{ communityId: string; poll: PollData }>) => {
+      const { communityId, poll } = action.payload;
+
+      const newMsg: ChatMessage = {
+        id: `poll-${communityId}-${Date.now()}`,
+        communityId,
+        content: '',
+        type: 'sent',
+        timestamp: formatNow(),
+        status: 'sent',
+        sender: 'You',
+        poll,
+      };
+
+      if (!state.messages[communityId]) {
+        state.messages[communityId] = [];
+      }
+      state.messages[communityId].push(newMsg);
+    },
     togglePin: (state, action: PayloadAction<{ communityId: string; messageId: string }>) => {
       const { communityId, messageId } = action.payload;
       const msg = state.messages[communityId]?.find((m) => m.id === messageId);
@@ -145,5 +181,5 @@ const messageSlice = createSlice({
   },
 });
 
-export const { setMessages, sendMessage, sendFileMessage, togglePin, setPinned, updateMessageStatus } = messageSlice.actions;
+export const { setMessages, sendMessage, sendFileMessage, sendPoll, togglePin, setPinned, updateMessageStatus } = messageSlice.actions;
 export default messageSlice.reducer;
