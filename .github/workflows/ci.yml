@@ -2,7 +2,7 @@ name: RA Frontend Docker Deploy
 
 on:
   push:
-    branches: [suvesh]
+    branches: [dev-suvesh]
 
 env:
   IMAGE_NAME: suveshtglevel/ra-frontend
