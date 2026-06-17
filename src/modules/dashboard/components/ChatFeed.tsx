@@ -126,13 +126,24 @@ const MessageMenu = React.forwardRef<
   // Final on-screen position, computed after the menu is measured so it can flip
   // up / left to stay inside the viewport. Hidden until then to avoid a flash.
   const [coords, setCoords] = React.useState<{ left: number; top: number } | null>(null);
+  // How far the feed has scrolled since the menu opened; the menu is translated
+  // by this so it tracks its message instead of staying pinned to the viewport.
+  const [scrollShift, setScrollShift] = React.useState(0);
+  // Hidden while the message has scrolled out of the visible feed area, so the
+  // menu doesn't linger over the composer/header where its message isn't shown.
+  const [hidden, setHidden] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
   const triggerRef = React.useRef<HTMLButtonElement>(null);
+  // The menu's viewport `top` at open (before any scroll shift), so the scroll
+  // handler can tell when the menu would cross the feed's edges.
+  const baseTopRef = React.useRef(0);
 
   const close = React.useCallback(() => {
     setOpen(false);
     setView('menu');
     setCoords(null);
+    setScrollShift(0);
+    setHidden(false);
   }, []);
 
   // Let the parent open this menu from a right-click anywhere on the card (see
@@ -161,12 +172,22 @@ const MessageMenu = React.forwardRef<
     if (!open || !anchor || !menuRef.current) return;
     const pad = 8;
     const { width, height } = menuRef.current.getBoundingClientRect();
+    // Clamp vertically to the feed's scroll area (not the whole window) so the
+    // menu flips up above the composer instead of overlapping the input box.
+    const viewport = triggerRef.current?.closest<HTMLElement>(
+      '[data-radix-scroll-area-viewport]'
+    );
+    const bounds = viewport?.getBoundingClientRect();
+    const minTop = bounds ? Math.max(pad, bounds.top) : pad;
+    const maxBottom = bounds ? Math.min(window.innerHeight - pad, bounds.bottom) : window.innerHeight - pad;
+
     let left = anchor.x;
     let top = anchor.y + 4;
     if (left + width > window.innerWidth - pad) left = window.innerWidth - width - pad;
     if (left < pad) left = pad;
-    if (top + height > window.innerHeight - pad) top = anchor.y - height - 4;
-    if (top < pad) top = pad;
+    if (top + height > maxBottom) top = anchor.y - height - 4;
+    if (top < minTop) top = minTop;
+    baseTopRef.current = top;
     setCoords({ left, top });
   }, [open, anchor, view, links.length]);
 
@@ -186,6 +207,31 @@ const MessageMenu = React.forwardRef<
       document.removeEventListener('keydown', onKey);
     };
   }, [open, close]);
+
+  // Make the menu follow its message while the feed scrolls: track the scroll
+  // container's delta since the menu opened and translate the menu by it (scroll
+  // down ⇒ message moves up ⇒ menu moves up). Without this the fixed-position
+  // menu would stay put as the message scrolled away.
+  React.useEffect(() => {
+    if (!open) return;
+    const viewport = triggerRef.current?.closest<HTMLElement>(
+      '[data-radix-scroll-area-viewport]'
+    );
+    if (!viewport) return;
+    const start = viewport.scrollTop;
+    const onScroll = () => {
+      const delta = viewport.scrollTop - start;
+      setScrollShift(delta);
+      // Hide the menu the moment it would cross out of the feed area (above the
+      // header or down into the composer/input box) rather than overlapping it.
+      const vb = viewport.getBoundingClientRect();
+      const h = menuRef.current?.offsetHeight ?? 0;
+      const top = baseTopRef.current - delta;
+      setHidden(top < vb.top || top + h > vb.bottom);
+    };
+    viewport.addEventListener('scroll', onScroll, { passive: true });
+    return () => viewport.removeEventListener('scroll', onScroll);
+  }, [open]);
 
   return (
     <>
@@ -216,8 +262,8 @@ const MessageMenu = React.forwardRef<
             className="fixed z-50 w-56 p-1 rounded-xl border border-slate-100 bg-white shadow-lg"
             style={{
               left: coords?.left ?? anchor.x,
-              top: coords?.top ?? anchor.y + 4,
-              visibility: coords ? 'visible' : 'hidden',
+              top: (coords?.top ?? anchor.y + 4) - scrollShift,
+              visibility: coords && !hidden ? 'visible' : 'hidden',
             }}
             // Don't let clicks inside bubble up to the row's handlers.
             onClick={(e) => e.stopPropagation()}

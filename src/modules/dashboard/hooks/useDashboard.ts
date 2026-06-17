@@ -19,8 +19,8 @@ import { useBundles } from '@/modules/dashboard/hooks/useBundles';
 import { useCreateBundle } from '@/modules/dashboard/hooks/useCreateBundle';
 import { useDeleteBundle } from '@/modules/dashboard/hooks/useDeleteBundle';
 import { usePinnedMessages } from '@/modules/dashboard/hooks/usePinnedMessages';
+import { useSendMessage, type SendTarget } from '@/modules/dashboard/hooks/useSendMessage';
 import { toCommunityVM } from '@/modules/dashboard/services/community.service';
-import { sendMessage as sendMessageApi } from '@/modules/dashboard/services/messages.service';
 import { togglePinnedMessage } from '@/modules/dashboard/services/pinnedMessages.service';
 import { getApiErrorMessage } from '@/lib/errors/api-error';
 import { mapBackendMessage } from '@/lib/mappers/message';
@@ -39,13 +39,22 @@ interface CheckboxTargets {
   subIds: string[];
 }
 
-// Poll draft handed up from the composer's poll builder.
+// The kind of poll being created. Single/Multiple are backed by the current
+// options API; Slider/Emoji are UI-only until the backend supports them.
+export type PollType = 'single' | 'multiple' | 'slider' | 'emoji';
+
+// Poll draft handed up from the Create Poll screen.
 export interface ComposerPoll {
   question: string;
+  pollType: PollType;
+  // Single/Multiple options.
   options: string[];
-  allowsMultiple: boolean;
   // ISO timestamp; when the poll closes (optional).
   expiresAt?: string;
+  // Slider config (pollType === 'slider').
+  slider?: { min: number; max: number; minLabel?: string; maxLabel?: string };
+  // Emoji scale (pollType === 'emoji').
+  emojis?: string[];
 }
 
 export interface SendOptions {
@@ -119,6 +128,7 @@ export const useDashboard = () => {
   const { data: rawBundles } = useBundles();
   const createBundleMutation = useCreateBundle();
   const deleteBundleMutation = useDeleteBundle();
+  const sendMessageMutation = useSendMessage();
   const bundles = useMemo<BundleVM[]>(
     () =>
       (rawBundles ?? []).map((b) => ({
@@ -313,53 +323,45 @@ export const useDashboard = () => {
     // (Video handling is undecided, so it currently falls through to `docs`.)
     const isImage = options?.fileType === 'image';
 
-    // Fire one send per target sub-community, then refresh those chats. The feed
-    // is updated only from the server response (no temporary local append).
-    Promise.allSettled(
-      sendable.map((subId) => {
-        const parent = parentCommunityOf(subId)!;
-        return sendMessageApi({
-          community_id: parent.id,
-          sub_community_id: subId,
-          type: options!.messageTypeId!,
-          content: hasContent ? content : '',
-          parent_message_id: options?.parentMessageId,
-          notification_sent: options?.notifyUsers ?? false,
-          imageFile: isImage ? options?.file : undefined,
-          docFile: !isImage ? options?.file : undefined,
-        }).then(() =>
-          queryClient.invalidateQueries({ queryKey: ['messages', parent.id, subId] })
-        );
-      })
-    ).then((results) => {
-      const failed = results.filter((r) => r.status === 'rejected').length;
-      if (failed > 0) {
-        const reason = (results.find((r) => r.status === 'rejected') as PromiseRejectedResult)
-          ?.reason;
-        toast.error(getApiErrorMessage(reason));
-      } else {
-        toast.success(
-          sendable.length > 1
-            ? `Message sent to ${sendable.length} communities!`
-            : 'Message sent successfully!'
-        );
-      }
+    const targets: SendTarget[] = sendable.map((subId) => ({
+      communityId: parentCommunityOf(subId)!.id,
+      subId,
+    }));
+
+    sendMessageMutation.mutate({
+      targets,
+      input: {
+        type: options.messageTypeId,
+        content: hasContent ? content : '',
+        parent_message_id: options?.parentMessageId,
+        notification_sent: options?.notifyUsers ?? false,
+        imageFile: isImage ? options?.file : undefined,
+        docFile: !isImage ? options?.file : undefined,
+      },
+      label: 'Message',
     });
   };
 
   // Send a poll (type-6 message) to the targeted sub-communities, mirroring the
   // targeting used for regular messages (sidebar checkbox selection, else the
-  // open chat). The feed is refreshed from the server response.
-  const handleSendPoll = (poll: ComposerPoll) => {
+  // open chat). Returns true when a send was dispatched (so the Create Poll
+  // screen can close), false on a validation/scope error (it stays open).
+  const handleSendPoll = (poll: ComposerPoll): boolean => {
+    // Slider & Emoji polls need backend support that isn't live yet.
+    if (poll.pollType === 'slider' || poll.pollType === 'emoji') {
+      toast.error('Slider and Emoji polls are coming soon');
+      return false;
+    }
+
     const question = poll.question.trim();
     const options = poll.options.map((o) => o.trim()).filter(Boolean);
     if (!question) {
       toast.error('Add a poll question');
-      return;
+      return false;
     }
     if (options.length < 2) {
       toast.error('Add at least two options');
-      return;
+      return false;
     }
 
     const rawTargets =
@@ -370,51 +372,39 @@ export const useDashboard = () => {
           : [];
     if (rawTargets.length === 0) {
       toast.error('Select a sub-community to send to');
-      return;
+      return false;
     }
 
     const sendable = rawTargets.filter((subId) => parentCommunityOf(subId)?.sendable);
     if (sendable.length === 0) {
       toast.error('You are not assigned to message this community');
-      return;
+      return false;
     }
     const blocked = rawTargets.length - sendable.length;
     if (blocked > 0) {
       toast.error(`Skipped ${blocked} community you are not assigned to`);
     }
 
-    Promise.allSettled(
-      sendable.map((subId) => {
-        const parent = parentCommunityOf(subId)!;
-        return sendMessageApi({
-          community_id: parent.id,
-          sub_community_id: subId,
-          type: 6,
-          content: question,
-          notification_sent: false,
-          poll: {
-            options: options.map((text) => ({ text })),
-            allows_multiple: poll.allowsMultiple,
-            ...(poll.expiresAt ? { expires_at: poll.expiresAt } : {}),
-          },
-        }).then(() =>
-          queryClient.invalidateQueries({ queryKey: ['messages', parent.id, subId] })
-        );
-      })
-    ).then((results) => {
-      const failed = results.filter((r) => r.status === 'rejected').length;
-      if (failed > 0) {
-        const reason = (results.find((r) => r.status === 'rejected') as PromiseRejectedResult)
-          ?.reason;
-        toast.error(getApiErrorMessage(reason));
-      } else {
-        toast.success(
-          sendable.length > 1
-            ? `Poll sent to ${sendable.length} communities!`
-            : 'Poll sent successfully!'
-        );
-      }
+    const targets: SendTarget[] = sendable.map((subId) => ({
+      communityId: parentCommunityOf(subId)!.id,
+      subId,
+    }));
+
+    sendMessageMutation.mutate({
+      targets,
+      input: {
+        type: 6,
+        content: question,
+        notification_sent: false,
+        poll: {
+          options: options.map((text) => ({ text })),
+          allows_multiple: poll.pollType === 'multiple',
+          ...(poll.expiresAt ? { expires_at: poll.expiresAt } : {}),
+        },
+      },
+      label: 'Poll',
     });
+    return true;
   };
 
   return {
@@ -441,6 +431,7 @@ export const useDashboard = () => {
     handleSelectCommunity,
     handleSendMessage,
     handleSendPoll,
+    sendingMessage: sendMessageMutation.isPending,
     handleTogglePin,
   };
 };

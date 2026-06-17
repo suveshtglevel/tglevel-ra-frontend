@@ -31,6 +31,18 @@ function unauthorized(config: InternalAxiosRequestConfig): AxiosError {
   });
 }
 
+// A 401 from the refresh endpoint itself (the refresh token is invalid/expired).
+// This is the only refresh failure that should drop the session.
+function refreshUnauthorized(): AxiosError {
+  return new AxiosError('Unauthorized', 'ERR_BAD_REQUEST', undefined, null, {
+    status: 401,
+    statusText: 'Unauthorized',
+    data: {},
+    headers: {},
+    config: {} as InternalAxiosRequestConfig,
+  });
+}
+
 // jsdom's `window.location` is non-configurable, but `history.pushState` is
 // supported and updates `location.pathname` — which is what the interceptor's
 // auth-page guard reads.
@@ -114,13 +126,13 @@ describe('response interceptor — refresh on 401', () => {
     expect(postSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('clears the session and rejects when refresh fails (bounce path)', async () => {
+  it('clears the session and rejects when the refresh token is unauthorized (bounce path)', async () => {
     mockedGetToken.mockReturnValue('old');
     setPath('/dashboard');
     // Setting location.href makes jsdom log "Not implemented: navigation"; that
     // log is expected here, so suppress it to keep the run output clean.
     jest.spyOn(console, 'error').mockImplementation(() => {});
-    jest.spyOn(axios, 'post').mockRejectedValue(new Error('refresh failed'));
+    jest.spyOn(axios, 'post').mockRejectedValue(refreshUnauthorized());
 
     axiosInstance.defaults.adapter = async (config) => {
       throw unauthorized(config);
@@ -134,7 +146,7 @@ describe('response interceptor — refresh on 401', () => {
   it('still clears the session on the auth-page guard branch without throwing', async () => {
     mockedGetToken.mockReturnValue('old');
     setPath('/login');
-    jest.spyOn(axios, 'post').mockRejectedValue(new Error('refresh failed'));
+    jest.spyOn(axios, 'post').mockRejectedValue(refreshUnauthorized());
 
     axiosInstance.defaults.adapter = async (config) => {
       throw unauthorized(config);
@@ -143,5 +155,21 @@ describe('response interceptor — refresh on 401', () => {
     await expect(axiosInstance.get('/protected')).rejects.toBeDefined();
 
     expect(mockedClearSession).toHaveBeenCalled();
+  });
+
+  it('keeps the session on a transient refresh failure (network/5xx — no logout)', async () => {
+    mockedGetToken.mockReturnValue('old');
+    setPath('/dashboard');
+    // A refresh that fails without an unauthorized status is transient; the
+    // session must survive so the next request can retry the refresh cycle.
+    jest.spyOn(axios, 'post').mockRejectedValue(new Error('network blip'));
+
+    axiosInstance.defaults.adapter = async (config) => {
+      throw unauthorized(config);
+    };
+
+    await expect(axiosInstance.get('/protected')).rejects.toBeDefined();
+
+    expect(mockedClearSession).not.toHaveBeenCalled();
   });
 });

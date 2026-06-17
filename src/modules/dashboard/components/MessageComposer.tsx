@@ -29,8 +29,6 @@ import {
   Video,
   BarChart2,
   Zap,
-  Plus,
-  Trash2,
   Undo2,
   Redo2,
   ChevronDown,
@@ -57,6 +55,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Check } from 'lucide-react';
+import CreatePollModal from '@/modules/dashboard/components/CreatePollModal';
 import type { CommunityVM, BundleVM } from '@/types/dashboard';
 import type { MessageTypeOption } from '@/modules/dashboard/services/messages.service';
 import type { SendOptions, ComposerPoll } from '@/modules/dashboard/hooks/useDashboard';
@@ -84,9 +83,9 @@ interface MessageComposerProps {
   // the feed jumps to the bundle's first sub-community.
   onSelectSubCommunity?: (subId: string) => void;
   onSend?: (content: string, options?: SendOptions) => void;
-  // Send a poll (type-6 message). Targeting mirrors a normal send (sidebar
-  // selection / open chat).
-  onSendPoll?: (poll: ComposerPoll) => void;
+  // Publish a poll (type-6 message). Targeting mirrors a normal send (sidebar
+  // selection / open chat). Returns true when a send was dispatched.
+  onSendPoll?: (poll: ComposerPoll) => boolean;
   disabled?: boolean;
   // Active follow-up reply (set when the RA picks "Follow up message" on a
   // trade card); null when not replying. onCancelReply dismisses it.
@@ -97,6 +96,12 @@ interface MessageComposerProps {
 type FilePreview = NonNullable<SendOptions['attachment']> & {
   file: File;
 };
+
+// The "Poll" message type (numeric id 6). Pure helper — no component state, so
+// it lives at module scope. Selecting it opens the Create Poll screen, and
+// opening that screen selects it — the two stay in sync.
+const isPollType = (t: MessageTypeOption | null | undefined) =>
+  !!t && (t.id === 6 || /poll/i.test(t.name));
 
 const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, onCreateBundle, onDeleteBundle, deletingBundleId, onSelectSubCommunity, onSend, onSendPoll, disabled = false, replyTo, onCancelReply }: MessageComposerProps) => {
   const [isEditorEmpty, setIsEditorEmpty] = React.useState(true);
@@ -113,13 +118,8 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
   const [draftSubIds, setDraftSubIds] = React.useState<string[]>([]);
   const [filePreview, setFilePreview] = React.useState<FilePreview | null>(null);
   const [showFullPreview, setShowFullPreview] = React.useState(false);
-  // Poll builder draft.
+  // Whether the full-screen Create Poll screen is open (its draft lives there).
   const [pollOpen, setPollOpen] = React.useState(false);
-  const [pollQuestion, setPollQuestion] = React.useState('');
-  const [pollOptions, setPollOptions] = React.useState<string[]>(['', '']);
-  const [pollMultiple, setPollMultiple] = React.useState(false);
-  // Minutes until the poll closes (drives expires_at). 0 = no expiry.
-  const [pollDurationMinutes, setPollDurationMinutes] = React.useState(10080); // 1 week
   // Tracks which reply we've already reacted to, so we pre-select the Followup
   // type exactly once per reply target (see the render-time adjustment below).
   const [reactedReplyId, setReactedReplyId] = React.useState<string | null>(replyTo?.id ?? null);
@@ -149,10 +149,6 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
   const selectedBundle = bundles.find((b) => b.id === selectedBundleId) ?? null;
   const messageTypeRequiredText = 'Select message type before sending';
 
-  // The "Poll" message type (numeric id 6). Selecting it opens the poll builder,
-  // and opening the poll builder selects it — the two stay in sync.
-  const isPollType = (t: MessageTypeOption | null | undefined) =>
-    !!t && (t.id === 6 || /poll/i.test(t.name));
   const pollType = messageTypes.find((t) => isPollType(t)) ?? null;
 
   // Trade messages must always notify users: the toggle is forced on and the RA
@@ -204,57 +200,23 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
     setBundleOpen(false);
   };
 
-  // ----- Poll builder -------------------------------------------------------
-  const resetPoll = () => {
-    setPollQuestion('');
-    setPollOptions(['', '']);
-    setPollMultiple(false);
-    setPollDurationMinutes(10080);
+  // ----- Poll (Create Poll screen) ------------------------------------------
+  // Opening the builder also selects the Poll message type, keeping the two in
+  // sync (and vice-versa from the type dropdown / Send button).
+  const openPoll = () => {
+    if (pollType) setSelectedType(pollType);
+    setPollOpen(true);
   };
 
-  const setPollOption = (index: number, value: string) => {
-    setPollOptions((prev) => prev.map((o, i) => (i === index ? value : o)));
-  };
-
-  const addPollOption = () => {
-    setPollOptions((prev) => (prev.length >= 6 ? prev : [...prev, '']));
-  };
-
-  const removePollOption = (index: number) => {
-    setPollOptions((prev) => (prev.length <= 2 ? prev : prev.filter((_, i) => i !== index)));
-  };
-
-  const sendPoll = () => {
-    const question = pollQuestion.trim();
-    const options = pollOptions.map((o) => o.trim()).filter(Boolean);
-    if (!question) {
-      toast.error('Add a poll question');
-      return;
+  // Publish from the Create Poll screen. Single/Multiple polls send via the
+  // backend; on a successful dispatch we close the screen and clear the type.
+  const handlePublishPoll = (poll: ComposerPoll) => {
+    const sent = onSendPoll?.(poll) ?? false;
+    if (sent) {
+      setPollOpen(false);
+      setSelectedType(null);
     }
-    if (options.length < 2) {
-      toast.error('Add at least two options');
-      return;
-    }
-    const expiresAt =
-      pollDurationMinutes > 0
-        ? new Date(Date.now() + pollDurationMinutes * 60 * 1000).toISOString()
-        : undefined;
-    onSendPoll?.({
-      question,
-      options,
-      // Multiple answers only make sense with more than two options.
-      allowsMultiple: pollMultiple && options.length > 2,
-      expiresAt,
-    });
-    resetPoll();
-    setPollOpen(false);
-    // Clear the auto-selected Poll type now that it's been sent.
-    setSelectedType(null);
   };
-
-  // Multiple answers are only offered when there are more than two filled
-  // options (a yes/no-style poll is single-choice).
-  const canAllowMultiple = pollOptions.filter((o) => o.trim()).length > 2;
 
   const imageInputRef = React.useRef<HTMLInputElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -477,9 +439,9 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
       toast.error(messageTypeRequiredText);
       return;
     }
-    // Poll messages are composed in the poll builder, not the text editor.
+    // Poll messages are composed in the Create Poll screen, not the text editor.
     if (isPollType(selectedType)) {
-      setPollOpen(true);
+      openPoll();
       return;
     }
     const content = editor.getHTML();
@@ -810,13 +772,8 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
                         onClick={() => {
                           setSelectedType(type);
                           setTypeOpen(false);
-                          // Picking the Poll type jumps straight into the poll
-                          // builder. Defer the open so the type dropdown finishes
-                          // closing first — opening both popovers in the same tick
-                          // makes the builder flicker shut from a focus race.
-                          if (isPollType(type)) {
-                            window.setTimeout(() => setPollOpen(true), 120);
-                          }
+                          // Picking the Poll type opens the Create Poll screen.
+                          if (isPollType(type)) setPollOpen(true);
                         }}
                         className={cn(
                           "text-left mx-1 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors hover:bg-slate-50 flex items-center gap-2 cursor-pointer",
@@ -1003,132 +960,8 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
           <ToolbarButton onClick={() => { fileInputRef.current?.click(); }}><Paperclip className="h-4 w-4" /></ToolbarButton>
           <ToolbarButton onClick={() => { videoInputRef.current?.click(); }}><Video className="h-4 w-4" /></ToolbarButton>
           <div className="h-5 w-[1px] bg-slate-200 mx-2" />
-          {/* Poll builder — the bar-chart icon (just left of the quick-trade Zap
-              button) opens it. */}
-          <Popover
-            open={pollOpen}
-            onOpenChange={(open) => {
-              setPollOpen(open);
-              if (open) {
-                // Opening the poll builder selects the Poll message type.
-                if (pollType) setSelectedType(pollType);
-              }
-              // Closing keeps both the Poll type and the in-progress draft, so an
-              // accidental click-away doesn't lose what the RA typed. The draft is
-              // cleared only on an explicit Reset or after the poll is sent.
-            }}
-          >
-            <PopoverTrigger asChild>
-              <ToolbarButton active={pollOpen}><BarChart2 className="h-4 w-4" /></ToolbarButton>
-            </PopoverTrigger>
-            <PopoverContent
-              className="w-[300px] p-0 bg-white border-[1.5px] border-[#E2E8F0] rounded-xl shadow-xl overflow-hidden"
-              align="start"
-              side="top"
-              sideOffset={8}
-            >
-              <div className="px-3 py-2.5 border-b border-slate-100 bg-slate-50">
-                <p className="text-[12px] font-bold text-slate-700">Create a poll</p>
-                <p className="text-[10.5px] text-slate-400 font-medium">Ask a question with a few choices.</p>
-              </div>
-              <div className="p-3 flex flex-col gap-2">
-                <input
-                  type="text"
-                  value={pollQuestion}
-                  onChange={(e) => setPollQuestion(e.target.value)}
-                  placeholder="Poll question"
-                  className="w-full h-9 px-2.5 rounded-lg border border-slate-200 bg-white text-[12px] text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/10"
-                />
-                <div className="flex flex-col gap-1.5">
-                  {pollOptions.map((opt, i) => (
-                    <div key={i} className="flex items-center gap-1.5">
-                      <input
-                        type="text"
-                        value={opt}
-                        onChange={(e) => setPollOption(i, e.target.value)}
-                        placeholder={`Option ${i + 1}`}
-                        className="flex-1 h-8 px-2.5 rounded-lg border border-slate-200 bg-white text-[12px] text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/10"
-                      />
-                      {pollOptions.length > 2 && (
-                        <button
-                          type="button"
-                          aria-label={`Remove option ${i + 1}`}
-                          onClick={() => removePollOption(i)}
-                          className="shrink-0 p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 transition cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                {pollOptions.length < 6 && (
-                  <button
-                    type="button"
-                    onClick={addPollOption}
-                    className="flex items-center gap-1.5 text-[11.5px] font-semibold text-emerald-600 hover:text-emerald-700 bg-transparent border-none cursor-pointer self-start"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add option
-                  </button>
-                )}
-
-                <div className="mt-1 pt-2 border-t border-slate-100 flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-col">
-                      <span className={cn("text-[12px] font-medium", canAllowMultiple ? "text-slate-600" : "text-slate-300")}>
-                        Allow multiple answers
-                      </span>
-                      {!canAllowMultiple && (
-                        <span className="text-[10px] text-slate-400">Add 3+ options to enable</span>
-                      )}
-                    </div>
-                    <Switch
-                      checked={pollMultiple && canAllowMultiple}
-                      onCheckedChange={setPollMultiple}
-                      disabled={!canAllowMultiple}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[12px] font-medium text-slate-600">Closes in</span>
-                    <select
-                      value={pollDurationMinutes}
-                      onChange={(e) => setPollDurationMinutes(Number(e.target.value))}
-                      className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-[12px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/10 cursor-pointer"
-                    >
-                      <option value={5}>5 minutes</option>
-                      <option value={15}>15 minutes</option>
-                      <option value={30}>30 minutes</option>
-                      <option value={60}>1 hour</option>
-                      <option value={360}>6 hours</option>
-                      <option value={720}>12 hours</option>
-                      <option value={1440}>1 day</option>
-                      <option value={4320}>3 days</option>
-                      <option value={10080}>1 week</option>
-                      <option value={43200}>1 month</option>
-                      <option value={0}>No expiry</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 mt-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={resetPoll}
-                    className="h-8 rounded-lg px-3 font-bold text-[12px] text-slate-500 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
-                  >
-                    Reset
-                  </Button>
-                  <Button
-                    onClick={sendPoll}
-                    className="h-8 flex-1 rounded-lg px-4 font-bold text-[12px] bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer"
-                  >
-                    Send poll
-                  </Button>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
+          {/* Poll — the bar-chart icon opens the full Create Poll screen. */}
+          <ToolbarButton active={pollOpen} onClick={openPoll}><BarChart2 className="h-4 w-4" /></ToolbarButton>
           <ToolbarButton onClick={insertQuickTrade}><Zap className="h-4 w-4" /></ToolbarButton>
         </div>
         <div className="flex items-center gap-0.5 shrink-0">
@@ -1138,6 +971,12 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
       </div>
 
       {renderPreviewModal()}
+
+      <CreatePollModal
+        open={pollOpen}
+        onClose={() => setPollOpen(false)}
+        onPublish={handlePublishPoll}
+      />
 
       {/* Follow-up reply context — WhatsApp-style preview of the message being
           replied to, shown just above the input. The send threads under it. */}
@@ -1187,12 +1026,13 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
             >
               <X className="w-4 h-4" />
             </button>
-            <div
+            <button
+              type="button"
               onClick={(event) => {
                 event.stopPropagation();
                 setShowFullPreview(true);
               }}
-              className="flex items-center gap-3 cursor-pointer"
+              className="flex w-full items-center gap-3 text-left cursor-pointer"
             >
               {filePreview.fileType === 'image' ? (
                 <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-slate-200 bg-white shrink-0">
@@ -1226,7 +1066,7 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
                 <p className="text-xs font-medium text-slate-500 mt-1">{filePreview.size}</p>
                 <p className="text-[11px] font-semibold text-emerald-600 mt-3">Click to preview</p>
               </div>
-            </div>
+            </button>
           </div>
         )}
 
@@ -1372,16 +1212,23 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
   );
 };
 
-const ToolbarButton = React.forwardRef<
-  HTMLButtonElement,
-  {
-    children: React.ReactNode;
-    onClick?: () => void;
-    active?: boolean;
-    disabled?: boolean;
-    className?: string;
-  }
->(({ children, onClick, active = false, disabled = false, className }, ref) => (
+// React 19: `ref` is a normal prop. The emoji popover uses this as a
+// `PopoverTrigger asChild`, so the ref must still flow to the underlying button.
+const ToolbarButton = ({
+  children,
+  onClick,
+  active = false,
+  disabled = false,
+  className,
+  ref,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  active?: boolean;
+  disabled?: boolean;
+  className?: string;
+  ref?: React.Ref<HTMLButtonElement>;
+}) => (
   <Button
     ref={ref}
     variant="ghost"
@@ -1396,7 +1243,6 @@ const ToolbarButton = React.forwardRef<
   >
     {children}
   </Button>
-));
-ToolbarButton.displayName = "ToolbarButton";
+);
 
 export default MessageComposer;
