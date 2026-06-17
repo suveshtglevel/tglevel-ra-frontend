@@ -58,15 +58,6 @@ const initialState: MessageState = {
   messages: {},
 };
 
-const formatNow = () => {
-  const now = new Date();
-  const h = now.getHours();
-  const m = now.getMinutes();
-  const period = h >= 12 ? 'PM' : 'AM';
-  const hr = h > 12 ? h - 12 : h === 0 ? 12 : h;
-  return `${hr}:${m.toString().padStart(2, '0')} ${period}`;
-};
-
 const messageSlice = createSlice({
   name: 'messages',
   initialState,
@@ -78,66 +69,6 @@ const messageSlice = createSlice({
     ) => {
       state.messages[action.payload.chatId] = action.payload.messages;
     },
-    sendMessage: (state, action: PayloadAction<{
-      communityId: string;
-      content: string;
-      messageType?: string;
-      group?: string;
-      notifyUsers?: boolean;
-    }>) => {
-      const { communityId, content, messageType, group, notifyUsers } = action.payload;
-      const isTrade = messageType === 'Trade';
-
-      const newMsg: ChatMessage = {
-        id: `msg-${communityId}-${Date.now()}`,
-        communityId,
-        content,
-        type: 'sent',
-        messageType,
-        group,
-        notifyUsers,
-        timestamp: formatNow(),
-        status: 'sent',
-        sender: 'You',
-        tradeTag: isTrade ? 'Trade' : undefined,
-        tradeRefId: isTrade ? String(Date.now()).slice(-4) : undefined,
-      };
-
-      if (!state.messages[communityId]) {
-        state.messages[communityId] = [];
-      }
-      state.messages[communityId].push(newMsg);
-    },
-    sendFileMessage: (state, action: PayloadAction<{
-      communityId: string;
-      attachment: FileAttachment;
-      caption?: string;
-    }>) => {
-      const { communityId, attachment, caption } = action.payload;
-
-      const newMsg: ChatMessage = {
-        id: `msg-${communityId}-${Date.now()}`,
-        communityId,
-        content: caption || '',
-        type: 'sent',
-        timestamp: formatNow(),
-        status: 'sent',
-        sender: 'You',
-        attachment,
-      };
-
-      if (!state.messages[communityId]) {
-        state.messages[communityId] = [];
-      }
-      state.messages[communityId].push(newMsg);
-    },
-    togglePin: (state, action: PayloadAction<{ communityId: string; messageId: string }>) => {
-      const { communityId, messageId } = action.payload;
-      const msg = state.messages[communityId]?.find((m) => m.id === messageId);
-      if (msg) {
-        msg.pinned = !msg.pinned;
-      }
-    },
     // Set a message's pinned flag explicitly (used to reconcile with the
     // server's reported pin/unpin status).
     setPinned: (state, action: PayloadAction<{ communityId: string; messageId: string; pinned: boolean }>) => {
@@ -147,18 +78,8 @@ const messageSlice = createSlice({
         msg.pinned = pinned;
       }
     },
-    updateMessageStatus: (state, action: PayloadAction<{ messageId: string; communityId: string; status: 'sent' | 'delivered' | 'read' }>) => {
-      const { messageId, communityId, status } = action.payload;
-      const msgs = state.messages[communityId];
-      if (msgs) {
-        const msg = msgs.find((m) => m.id === messageId);
-        if (msg) {
-          msg.status = status;
-        }
-      }
-    },
   },
 });
 
-export const { setMessages, sendMessage, sendFileMessage, togglePin, setPinned, updateMessageStatus } = messageSlice.actions;
+export const { setMessages, setPinned } = messageSlice.actions;
 export default messageSlice.reducer;

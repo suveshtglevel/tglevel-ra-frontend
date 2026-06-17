@@ -11,10 +11,10 @@ export const store = configureStore({
     messages: messageReducer,
     tradeJournal: tradeJournalReducer,
   },
-  middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware({
-      serializableCheck: false,
-    }),
+  // All slices hold only serializable data (strings / numbers / plain objects),
+  // so the default middleware — including the serializability dev check — is
+  // kept rather than disabled, restoring the guard against accidentally storing
+  // non-serializable values.
 });
 
 export type RootState = ReturnType<typeof store.getState>;

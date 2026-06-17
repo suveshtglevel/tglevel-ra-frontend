@@ -169,11 +169,17 @@ export const useDashboard = () => {
     [pinnedData]
   );
 
+  // Mirror the fetched messages into the store under the SAME key the feed reads
+  // from (`activeChatId`), so the write key and read key can never diverge.
+  // `useMessages` only fires when both ids exist, so in practice this is the open
+  // sub-community; keying on activeChatId just removes the redundant guard.
+  // NB: communities with no sub-communities don't load messages today — that path
+  // needs the backend's community-only get-messages contract confirmed first.
   useEffect(() => {
-    if (fetchedMessages && selectedSubCommunityId) {
+    if (fetchedMessages && activeChatId) {
       dispatch(
         setMessages({
-          chatId: selectedSubCommunityId,
+          chatId: activeChatId,
           messages: fetchedMessages.map((m) => {
             const cm = mapBackendMessage(m, m.type != null ? typeNameById.get(m.type) : undefined);
             cm.pinned = pinnedIdSet.has(cm.id);
@@ -182,14 +188,19 @@ export const useDashboard = () => {
         })
       );
     }
-  }, [fetchedMessages, selectedSubCommunityId, typeNameById, pinnedIdSet, dispatch]);
+  }, [fetchedMessages, activeChatId, typeNameById, pinnedIdSet, dispatch]);
 
   // The pinned bar is driven by the server's pinned list (so it persists across
-  // reloads), with previews taken from each pin's message content.
-  const pinnedItems = (pinnedData ?? []).map((p) => ({
-    id: p.message_id,
-    preview: messagePreview(p.message ?? ''),
-  }));
+  // reloads), with previews taken from each pin's message content. Memoized so a
+  // stable array reference is passed down (no needless PinnedAlert re-renders).
+  const pinnedItems = useMemo(
+    () =>
+      (pinnedData ?? []).map((p) => ({
+        id: p.message_id,
+        preview: messagePreview(p.message ?? ''),
+      })),
+    [pinnedData]
+  );
 
   // Pin/unpin a message via the pinned-messages API (a single toggle endpoint).
   // Optimistically flip the feed, reconcile with the server's reported status,

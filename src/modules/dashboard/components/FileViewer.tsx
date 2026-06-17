@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { createPortal } from 'react-dom';
+import { toast } from 'react-hot-toast';
 import { X, FileText, FileSpreadsheet } from 'lucide-react';
 import type { FileAttachment } from '@/store/slices/messageSlice';
 
@@ -58,21 +59,32 @@ const FileViewer = ({ attachment, onClose }: { attachment: FileAttachment; onClo
     e.preventDefault();
     e.stopPropagation();
 
-    const blob = await (await fetch(attachment.url)).blob();
-    const objectUrl = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = objectUrl;
-    link.download = attachment.name;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(objectUrl);
+    // A network/CORS failure here would otherwise surface as an unhandled
+    // promise rejection (async click handler) and the download would silently
+    // do nothing. Catch it and tell the user instead.
+    let objectUrl: string | null = null;
+    try {
+      const blob = await (await fetch(attachment.url)).blob();
+      objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = attachment.name;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      toast.error('Could not download the file. Please try again.');
+    } finally {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    }
   };
 
   if (!mounted) return null;
 
   const content = (
+    // Backdrop click is a supplementary mouse affordance; keyboard users close
+    // via Escape (handled above) or the labelled X button.
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80" onClick={onClose}>
       <div className="absolute top-4 right-4 flex items-center gap-3 z-10">
         <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer transition-colors">

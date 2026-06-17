@@ -874,7 +874,8 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
                   value={draftName}
                   onChange={(e) => setDraftName(e.target.value)}
                   placeholder="Bundle name (optional)"
-                  className="mt-2 w-full h-8 px-2.5 rounded-lg border border-slate-200 bg-white text-[12px] text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/10"
+                  aria-label="Bundle name"
+                  className="mt-2 w-full h-8 px-2.5 rounded-lg border border-slate-200 bg-white text-[12px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/10"
                 />
               </div>
               <div className="max-h-[280px] overflow-y-auto py-1">

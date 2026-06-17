@@ -34,6 +34,24 @@ const initialsOf = (name?: string | null) =>
     .map((w) => w[0]?.toUpperCase())
     .join('') || '?';
 
+// Escape a value for safe inclusion in a CSV cell. Names/emails are
+// subscriber-controlled, so without this an export is open to two problems:
+//   1. CSV/formula injection — a value starting with = + - @ (or tab/CR) is
+//      executed as a formula when the file is opened in Excel/Sheets. We prefix
+//      it with a single quote so the spreadsheet treats it as text.
+//   2. Field/row corruption — values containing , " or newlines break the
+//      column layout. We wrap every field in quotes and double internal quotes.
+const csvCell = (value: string | null | undefined): string => {
+  const s = String(value ?? '');
+  const guarded = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+  return `"${guarded.replace(/"/g, '""')}"`;
+};
+
+// UTF-8 byte-order mark, prepended to the CSV so Excel detects the encoding and
+// renders non-ASCII names correctly. Built from its code point to keep the
+// source ASCII-only (a literal BOM character is invisible/error-prone in source).
+const BOM = String.fromCharCode(0xfeff);
+
 // "1 Jun 2025, 12:00 AM" style label for a seen-at timestamp.
 const formatSeenAt = (iso: string) => {
   const d = new Date(iso);
@@ -101,9 +119,12 @@ const ViewedByPanel = ({ messageId, onClose }: ViewedByPanelProps) => {
           onClick={() => {
             const csv = [
               'Name,Email,Seen At',
-              ...filteredViewers.map((v) => `${v.name},${v.email},${formatSeenAt(v.seen_at)}`),
-            ].join('\n');
-            const blob = new Blob([csv], { type: 'text/csv' });
+              ...filteredViewers.map((v) =>
+                [csvCell(v.name), csvCell(v.email), csvCell(formatSeenAt(v.seen_at))].join(',')
+              ),
+            ].join('\r\n');
+            // Prepend a UTF-8 BOM so Excel reads non-ASCII names correctly.
+            const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
