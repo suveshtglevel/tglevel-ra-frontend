@@ -4,7 +4,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MoreVertical, Pin, Check, CheckCheck, Link as LinkIcon, ChevronLeft, Reply, BarChart2 } from 'lucide-react';
+import { MoreVertical, Pin, Check, CheckCheck, Link as LinkIcon, ChevronLeft, Reply, BarChart2, Users, Clock } from 'lucide-react';
 import TradeCard from './TradeCard';
 import FileAttachmentView from './FileAttachmentView';
 
@@ -22,54 +22,130 @@ import type { ChatMessage, FileAttachment, PollData } from '@/store/slices/messa
 // never votes). Read-only: shows the question, each option, and its vote count
 // with a subtle bar scaled by share — no voting interaction.
 const PollView = ({ poll }: { poll: PollData }) => {
-  const total = poll.options.reduce((sum, o) => sum + o.votes, 0);
-  const maxVotes = Math.max(0, ...poll.options.map((o) => o.votes));
+  const total = poll.options?.reduce((sum, o) => sum + o.votes, 0) ?? 0;
+  const maxVotes = Math.max(0, ...(poll.options?.map((o) => o.votes) ?? [0]));
+  const isSlider = poll.poll_type === 'slider';
+  const isEmoji = poll.poll_type === 'emoji';
+  const sliderMin = poll.slider?.minimum ?? 0;
+  const sliderMax = poll.slider?.maximum ?? 10;
+  const sliderValue = poll.slider?.selectedValue ?? Math.round((sliderMin + sliderMax) / 2);
+  const leftLabel = poll.slider?.leftLabel ?? `Poor ${sliderMin}`;
+  const rightLabel = poll.slider?.rightLabel ?? `${sliderMax} Excellent`;
+  const emojis = poll.emojis?.length
+    ? poll.emojis
+    : poll.options?.map((opt) => opt.text) ?? [];
+  const expiresLabel = poll.expires_at ? `Ends ${new Date(poll.expires_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : '';
 
   return (
-    <div className="mt-0.5 min-w-[260px]">
-      {/* Header: icon + label, with the running total on the right. */}
-      <div className="flex items-center justify-between mb-2.5">
+    <div className="mt-0.5 min-w-[260px] rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1.5">
           <span className="w-6 h-6 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
             <BarChart2 className="w-3.5 h-3.5 text-emerald-600" />
           </span>
           <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Poll</span>
         </div>
-        <span className="text-[11px] font-semibold text-slate-400 tabular-nums">
-          {total} {total === 1 ? 'vote' : 'votes'}
-        </span>
+        {total > 0 && (
+          <span className="text-[11px] font-semibold text-slate-400 tabular-nums">
+            {total} {total === 1 ? 'vote' : 'votes'}
+          </span>
+        )}
       </div>
 
-      <p className="text-[14px] font-bold text-slate-800 mb-3 leading-snug break-words">
+      <p className="text-[16px] font-bold text-slate-900 mb-5 leading-snug break-words">
         {poll.question}
       </p>
 
-      <div className="flex flex-col gap-2">
-        {poll.options.map((opt) => {
-          const pct = total > 0 ? (opt.votes / total) * 100 : 0;
-          const leading = opt.votes > 0 && opt.votes === maxVotes;
+      {isSlider ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between text-sm font-medium text-slate-600">
+            <span>{leftLabel}</span>
+            <span className="rounded-full bg-slate-900 px-3 py-1 text-white text-xs font-semibold">{sliderValue}/{sliderMax}</span>
+            <span>{rightLabel}</span>
+          </div>
 
-          return (
+          <div className="relative h-3 rounded-full bg-slate-200">
+            <div className="absolute inset-y-0 left-0 rounded-full bg-slate-300" style={{ width: '100%' }} />
             <div
-              key={opt.id}
-              className="relative overflow-hidden rounded-lg border border-slate-200 bg-white px-3 py-2"
-            >
-              <span
-                className="absolute inset-y-0 left-0 bg-slate-100 transition-all duration-500 ease-out"
-                style={{ width: `${pct}%` }}
-              />
-              <span className="relative flex items-center justify-between gap-2">
-                <span className={cn("text-[13px] truncate", leading ? "font-bold text-slate-800" : "font-medium text-slate-600")}>
-                  {opt.text}
+              className="absolute -top-2.5 h-9 w-9 rounded-full bg-slate-900 shadow-lg border-4 border-white"
+              style={{ left: `calc(${((sliderValue - sliderMin) / Math.max(1, sliderMax - sliderMin)) * 100}% - 1.125rem)` }}
+            />
+          </div>
+
+          <button className="w-full rounded-full bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm">
+            Submit Rating
+          </button>
+
+          <div className="grid grid-cols-2 gap-2 text-[12px] text-slate-500">
+            <span className="inline-flex items-center gap-1 font-medium">
+              <Users className="w-4 h-4" />
+              2,000 responses
+            </span>
+            <span className="inline-flex items-center gap-1 font-medium">
+              <Clock className="w-4 h-4" />
+              Poll ends in 1 hour
+            </span>
+          </div>
+        </div>
+      ) : isEmoji ? (
+        <div className="space-y-4">
+          <div className="grid grid-cols-4 gap-3">
+            {emojis.map((emoji, index) => (
+              <div
+                key={`${emoji}-${index}`}
+                className={cn(
+                  'h-12 rounded-3xl border border-slate-200 bg-slate-50 flex items-center justify-center text-2xl',
+                  index === 0 ? 'shadow-[0_8px_20px_rgba(15,23,42,0.12)] bg-white' : ''
+                )}
+              >
+                {emoji}
+              </div>
+            ))}
+          </div>
+
+          <div className="relative h-3 rounded-full bg-slate-200">
+            <div className="absolute left-0 top-0 h-full w-full rounded-full bg-slate-300" />
+            <div className="absolute -top-3 h-6 w-6 rounded-full bg-slate-900 shadow-lg border-4 border-white" />
+          </div>
+
+          <button className="w-full rounded-full bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm">
+            <span className="inline-flex items-center gap-2">
+              <span>😍</span>
+              Very Useful
+            </span>
+          </button>
+
+          <button className="w-full rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm">
+            Submit Response
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {poll.options?.map((opt) => {
+            const pct = total > 0 ? (opt.votes / total) * 100 : 0;
+            const leading = opt.votes > 0 && opt.votes === maxVotes;
+            return (
+              <div
+                key={opt.id}
+                className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2"
+              >
+                <span
+                  className="absolute inset-y-0 left-0 bg-slate-100"
+                  style={{ width: `${pct}%` }}
+                />
+                <span className="relative flex items-center justify-between gap-2">
+                  <span className={cn('text-[13px] truncate', leading ? 'font-bold text-slate-800' : 'font-medium text-slate-600')}>
+                    {opt.text}
+                  </span>
+                  <span className="text-[12px] font-bold text-slate-500 shrink-0 tabular-nums">
+                    {opt.votes}
+                  </span>
                 </span>
-                <span className="text-[12px] font-bold text-slate-500 shrink-0 tabular-nums">
-                  {opt.votes}
-                </span>
-              </span>
-            </div>
-          );
-        })}
-      </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

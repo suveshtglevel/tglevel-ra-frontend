@@ -33,11 +33,24 @@ export function mapBackendMessage(m: BackendMessage, typeName?: string): ChatMes
   const poll = m.poll
     ? {
         question: m.poll.question,
-        options: m.poll.options.map((o) => ({
+        poll_type: m.poll.poll_type,
+        options: m.poll.options?.map((o) => ({
           id: o.option_id,
           text: o.text,
           votes: o.vote_count ?? 0,
         })),
+        slider: m.poll.slider
+          ? {
+              minimum: m.poll.slider.minimum,
+              maximum: m.poll.slider.maximum,
+              leftLabel: m.poll.slider.leftLabel,
+              rightLabel: m.poll.slider.rightLabel,
+              selectedValue: m.poll.slider.selectedValue,
+            }
+          : undefined,
+        emojis: m.poll.emojis?.emojis,
+        total_votes: m.poll.total_votes,
+        expires_at: m.poll.expires_at,
       }
     : undefined;
   return {

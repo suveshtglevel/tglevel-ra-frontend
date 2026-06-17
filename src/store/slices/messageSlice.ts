@@ -17,7 +17,18 @@ export interface PollOption {
 
 export interface PollData {
   question: string;
-  options: PollOption[];
+  poll_type?: 'poll' | 'slider' | 'emoji';
+  options?: PollOption[];
+  slider?: {
+    minimum: number;
+    maximum: number;
+    leftLabel?: string;
+    rightLabel?: string;
+    selectedValue?: number;
+  };
+  emojis?: string[];
+  total_votes?: number;
+  expires_at?: string;
 }
 
 export interface ChatMessage {

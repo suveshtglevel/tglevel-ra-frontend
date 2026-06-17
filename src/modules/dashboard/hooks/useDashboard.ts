@@ -25,6 +25,7 @@ import { togglePinnedMessage } from '@/modules/dashboard/services/pinnedMessages
 import { getApiErrorMessage } from '@/lib/errors/api-error';
 import { mapBackendMessage } from '@/lib/mappers/message';
 import type { CommunityVM, BundleVM } from '@/types/dashboard';
+import type { SendMessageInput } from '@/modules/dashboard/services/messages.service';
 
 // Plain-text preview from a message's HTML content / attachment.
 const messagePreview = (content: string, attachmentName?: string) => {
@@ -39,8 +40,8 @@ interface CheckboxTargets {
   subIds: string[];
 }
 
-// The kind of poll being created. Single/Multiple are backed by the current
-// options API; Slider/Emoji are UI-only until the backend supports them.
+// The kind of poll being created. Maps to the backend's poll_type:
+// single/multiple → "poll", slider → "slider", emoji → "emoji".
 export type PollType = 'single' | 'multiple' | 'slider' | 'emoji';
 
 // Poll draft handed up from the Create Poll screen.
@@ -342,26 +343,36 @@ export const useDashboard = () => {
     });
   };
 
-  // Send a poll (type-6 message) to the targeted sub-communities, mirroring the
-  // targeting used for regular messages (sidebar checkbox selection, else the
-  // open chat). Returns true when a send was dispatched (so the Create Poll
-  // screen can close), false on a validation/scope error (it stays open).
+  // Send a poll (type-6 message) to the targeted sub-communities. Supports all
+  // three backend poll variants: options-based (single/multiple), slider, and
+  // emoji. Returns true when a send was dispatched (so the Create Poll screen
+  // can close), false on a validation/scope error (it stays open).
   const handleSendPoll = (poll: ComposerPoll): boolean => {
-    // Slider & Emoji polls need backend support that isn't live yet.
-    if (poll.pollType === 'slider' || poll.pollType === 'emoji') {
-      toast.error('Slider and Emoji polls are coming soon');
-      return false;
-    }
-
     const question = poll.question.trim();
-    const options = poll.options.map((o) => o.trim()).filter(Boolean);
     if (!question) {
       toast.error('Add a poll question');
       return false;
     }
-    if (options.length < 2) {
-      toast.error('Add at least two options');
-      return false;
+
+    // Validate per poll-type.
+    if (poll.pollType === 'single' || poll.pollType === 'multiple') {
+      const options = poll.options.map((o) => o.trim()).filter(Boolean);
+      if (options.length < 2) {
+        toast.error('Add at least two options');
+        return false;
+      }
+    }
+    if (poll.pollType === 'slider') {
+      if (!poll.slider || poll.slider.min >= poll.slider.max) {
+        toast.error('Maximum value must be greater than minimum');
+        return false;
+      }
+    }
+    if (poll.pollType === 'emoji') {
+      if (!poll.emojis || poll.emojis.length < 2) {
+        toast.error('Add at least two emojis');
+        return false;
+      }
     }
 
     const rawTargets =
@@ -390,17 +401,49 @@ export const useDashboard = () => {
       subId,
     }));
 
+    // Build the poll payload depending on the variant.
+    const expiresAt =
+      poll.expiresAt ? { expires_at: poll.expiresAt } : {};
+
+    let pollPayload: SendMessageInput['poll'];
+
+    if (poll.pollType === 'single' || poll.pollType === 'multiple') {
+      const options = poll.options.map((o) => o.trim()).filter(Boolean);
+      pollPayload = {
+        poll_type: 'poll',
+        options: options.map((text) => ({ text })),
+        allows_multiple: poll.pollType === 'multiple',
+        ...expiresAt,
+      };
+    } else if (poll.pollType === 'slider') {
+      pollPayload = {
+        poll_type: 'slider',
+        slider: {
+          minimum: poll.slider!.min,
+          maximum: poll.slider!.max,
+          leftLabel: poll.slider!.minLabel || '',
+          rightLabel: poll.slider!.maxLabel || '',
+        },
+        ...expiresAt,
+      };
+    } else {
+      // emoji
+      pollPayload = {
+        poll_type: 'emoji',
+        emojis: {
+          emojis: poll.emojis!,
+        },
+        ...expiresAt,
+      };
+    }
+
     sendMessageMutation.mutate({
       targets,
       input: {
         type: 6,
         content: question,
         notification_sent: false,
-        poll: {
-          options: options.map((text) => ({ text })),
-          allows_multiple: poll.pollType === 'multiple',
-          ...(poll.expiresAt ? { expires_at: poll.expiresAt } : {}),
-        },
+        poll: pollPayload,
       },
       label: 'Poll',
     });

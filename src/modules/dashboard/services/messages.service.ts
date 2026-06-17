@@ -24,11 +24,27 @@ const getMessageTypesResponseSchema = z
 // Message kind, sent as a numeric code the backend understands.
 export type MessageType = number;
 
-// Poll payload sent with a type-6 (poll) message. Only the option text is sent;
-// the backend assigns ids and zeroes the vote counts.
+// Poll payload sent with a type-6 (poll) message. The backend supports three
+// poll variants distinguished by `poll_type`:
+//   "poll"   – classic options-based poll (single/multiple choice)
+//   "slider" – numeric scale with labels
+//   "emoji"  – emoji reaction scale
 export interface SendPollInput {
-  options: { text: string }[];
+  poll_type: 'poll' | 'slider' | 'emoji';
+  // Options-based poll (poll_type === 'poll')
+  options?: { text: string }[];
   allows_multiple?: boolean;
+  // Slider poll (poll_type === 'slider')
+  slider?: {
+    minimum: number;
+    maximum: number;
+    leftLabel: string;
+    rightLabel: string;
+  };
+  // Emoji poll (poll_type === 'emoji')
+  emojis?: {
+    emojis: string[];
+  };
   // ISO timestamp; when the poll closes.
   expires_at?: string;
 }
@@ -137,7 +153,18 @@ export interface BackendPollOption {
 export interface BackendPoll {
   poll_id?: string;
   question: string;
-  options: BackendPollOption[];
+  poll_type?: 'poll' | 'slider' | 'emoji';
+  options?: BackendPollOption[];
+  slider?: {
+    minimum: number;
+    maximum: number;
+    leftLabel?: string;
+    rightLabel?: string;
+    selectedValue?: number;
+  };
+  emojis?: {
+    emojis: string[];
+  };
   total_votes?: number;
   allows_multiple?: boolean;
   expires_at?: string;
