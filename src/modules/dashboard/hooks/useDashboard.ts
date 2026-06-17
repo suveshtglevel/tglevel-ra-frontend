@@ -39,13 +39,22 @@ interface CheckboxTargets {
   subIds: string[];
 }
 
-// Poll draft handed up from the composer's poll builder.
+// The kind of poll being created. Single/Multiple are backed by the current
+// options API; Slider/Emoji are UI-only until the backend supports them.
+export type PollType = 'single' | 'multiple' | 'slider' | 'emoji';
+
+// Poll draft handed up from the Create Poll screen.
 export interface ComposerPoll {
   question: string;
+  pollType: PollType;
+  // Single/Multiple options.
   options: string[];
-  allowsMultiple: boolean;
   // ISO timestamp; when the poll closes (optional).
   expiresAt?: string;
+  // Slider config (pollType === 'slider').
+  slider?: { min: number; max: number; minLabel?: string; maxLabel?: string };
+  // Emoji scale (pollType === 'emoji').
+  emojis?: string[];
 }
 
 export interface SendOptions {
@@ -324,17 +333,24 @@ export const useDashboard = () => {
 
   // Send a poll (type-6 message) to the targeted sub-communities, mirroring the
   // targeting used for regular messages (sidebar checkbox selection, else the
-  // open chat). The feed is refreshed from the server response.
-  const handleSendPoll = (poll: ComposerPoll) => {
+  // open chat). Returns true when a send was dispatched (so the Create Poll
+  // screen can close), false on a validation/scope error (it stays open).
+  const handleSendPoll = (poll: ComposerPoll): boolean => {
+    // Slider & Emoji polls need backend support that isn't live yet.
+    if (poll.pollType === 'slider' || poll.pollType === 'emoji') {
+      toast.error('Slider and Emoji polls are coming soon');
+      return false;
+    }
+
     const question = poll.question.trim();
     const options = poll.options.map((o) => o.trim()).filter(Boolean);
     if (!question) {
       toast.error('Add a poll question');
-      return;
+      return false;
     }
     if (options.length < 2) {
       toast.error('Add at least two options');
-      return;
+      return false;
     }
 
     const rawTargets =
@@ -345,13 +361,13 @@ export const useDashboard = () => {
           : [];
     if (rawTargets.length === 0) {
       toast.error('Select a sub-community to send to');
-      return;
+      return false;
     }
 
     const sendable = rawTargets.filter((subId) => parentCommunityOf(subId)?.sendable);
     if (sendable.length === 0) {
       toast.error('You are not assigned to message this community');
-      return;
+      return false;
     }
     const blocked = rawTargets.length - sendable.length;
     if (blocked > 0) {
@@ -371,12 +387,13 @@ export const useDashboard = () => {
         notification_sent: false,
         poll: {
           options: options.map((text) => ({ text })),
-          allows_multiple: poll.allowsMultiple,
+          allows_multiple: poll.pollType === 'multiple',
           ...(poll.expiresAt ? { expires_at: poll.expiresAt } : {}),
         },
       },
       label: 'Poll',
     });
+    return true;
   };
 
   return {
