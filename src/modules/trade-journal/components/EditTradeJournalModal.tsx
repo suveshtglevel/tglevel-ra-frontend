@@ -18,6 +18,8 @@ const initial = (n: number | null) => (n === null ? '' : String(n));
 
 // The fields RA can fill via update-trade-journal.
 const FIELDS = [
+  { key: 'target1', label: 'Target 1' },
+  { key: 'target2', label: 'Target 2' },
   { key: 'points', label: 'Points' },
   { key: 'quantity', label: 'Quantity' },
   { key: 'exit_price', label: 'Exit Price' },
@@ -29,6 +31,8 @@ type FieldKey = (typeof FIELDS)[number]['key'];
 const EditTradeJournalModal = ({ row, onClose }: EditTradeJournalModalProps) => {
   const updateJournal = useUpdateTradeJournal();
   const [values, setValues] = useState<Record<FieldKey, string>>({
+    target1: initial(row.target1),
+    target2: initial(row.target2),
     points: initial(row.points),
     quantity: initial(row.lotSize),
     exit_price: initial(row.exitPrice),
@@ -53,6 +57,8 @@ const EditTradeJournalModal = ({ row, onClose }: EditTradeJournalModalProps) => 
     // Only send fields the RA actually entered. Quantity goes as a number; the
     // rest as strings, matching the API contract.
     const input: UpdateTradeJournalInput = {};
+    if (values.target1.trim() !== '') input.target1 = values.target1.trim();
+    if (values.target2.trim() !== '') input.target2 = values.target2.trim();
     if (values.points.trim() !== '') input.points = values.points.trim();
     if (values.quantity.trim() !== '') input.quantity = Number(values.quantity);
     if (values.exit_price.trim() !== '') input.exit_price = values.exit_price.trim();
