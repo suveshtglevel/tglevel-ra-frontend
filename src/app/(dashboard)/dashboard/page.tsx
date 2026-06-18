@@ -141,7 +141,9 @@ export default function DashboardPage() {
 
         {/* Message Input Section */}
         <div className="p-3 sm:p-4 lg:p-6 bg-[#F8FAFC] shrink-0">
-          <div className="max-w-[991px] mx-auto w-full">
+          {/* Composer fills the chat column so its width tracks the available
+              space (i.e. the screen) instead of a fixed cap. */}
+          <div className="w-full">
             {canSend ? (
               <MessageComposer
                 communities={communities}

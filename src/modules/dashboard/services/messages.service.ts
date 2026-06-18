@@ -41,10 +41,8 @@ export interface SendPollInput {
     leftLabel: string;
     rightLabel: string;
   };
-  // Emoji poll (poll_type === 'emoji')
-  emojis?: {
-    emojis: string[];
-  };
+  // Emoji poll (poll_type === 'emoji'): a flat array of emoji glyphs.
+  emojis?: string[];
   // ISO timestamp; when the poll closes.
   expires_at?: string;
 }
@@ -162,9 +160,24 @@ export interface BackendPoll {
     rightLabel?: string;
     selectedValue?: number;
   };
-  emojis?: {
-    emojis: string[];
-  };
+  // Slider results: responses bucketed into bad/neutral/excellent ranges, plus
+  // the average of all responses (null when there are none).
+  slider_res?: {
+    minimum?: number;
+    maximum?: number;
+    leftLabel?: string;
+    rightLabel?: string;
+    results?: {
+      bad?: { range: [number, number]; count: number; percentage: number };
+      neutral?: { range: [number, number]; count: number; percentage: number };
+      excellent?: { range: [number, number]; count: number; percentage: number };
+      average?: number | null;
+    };
+  } | null;
+  // Emoji poll: a flat array of emoji glyphs (e.g. ["😀","🔥","💯"]).
+  emojis?: string[];
+  // Per-emoji results returned by get-messages for an emoji poll.
+  emojis_res?: { emoji: string; count: number; percentage: number }[];
   total_votes?: number;
   allows_multiple?: boolean;
   expires_at?: string;

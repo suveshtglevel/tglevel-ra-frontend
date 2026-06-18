@@ -1,5 +1,27 @@
-import type { BackendMessage, BackendAttachment } from '@/modules/dashboard/services/messages.service';
-import type { ChatMessage, FileAttachment } from '@/store/slices/messageSlice';
+import type { BackendMessage, BackendAttachment, BackendPoll } from '@/modules/dashboard/services/messages.service';
+import type { ChatMessage, FileAttachment, SliderBucket, SliderResults } from '@/store/slices/messageSlice';
+
+// Turn the backend's slider_res (bad/neutral/excellent buckets + average) into
+// the ordered bucket list the poll card renders. Returns undefined when there
+// are no results to show.
+function mapSliderResults(res: BackendPoll['slider_res']): SliderResults | undefined {
+  if (!res || !res.results) return undefined;
+  const r = res.results;
+  const order: { key: 'bad' | 'neutral' | 'excellent'; label: string }[] = [
+    { key: 'bad', label: 'Bad' },
+    { key: 'neutral', label: 'Neutral' },
+    { key: 'excellent', label: 'Excellent' },
+  ];
+  const buckets = order
+    .map(({ key, label }): SliderBucket | null => {
+      const b = r[key];
+      if (!b) return null;
+      return { label, range: b.range, count: b.count ?? 0, percentage: b.percentage ?? 0 };
+    })
+    .filter((b): b is SliderBucket => b !== null);
+  if (buckets.length === 0) return undefined;
+  return { buckets, average: r.average ?? null };
+}
 
 // Format an ISO timestamp as a short "h:mm AM/PM" label for the chat feed.
 export function formatTime(iso?: string): string {
@@ -48,7 +70,13 @@ export function mapBackendMessage(m: BackendMessage, typeName?: string): ChatMes
               selectedValue: m.poll.slider.selectedValue,
             }
           : undefined,
-        emojis: m.poll.emojis?.emojis,
+        emojis: m.poll.emojis,
+        emojiResults: m.poll.emojis_res?.map((e) => ({
+          emoji: e.emoji,
+          count: e.count ?? 0,
+          percentage: e.percentage ?? 0,
+        })),
+        sliderResults: mapSliderResults(m.poll.slider_res),
         total_votes: m.poll.total_votes,
         expires_at: m.poll.expires_at,
       }

@@ -10,6 +10,12 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /* Effective layout size, driven by ViewportScaler. Full-screen layouts size
+     themselves from these (in px) instead of 100vw/100vh, because those units
+     don't divide reliably by the `zoom` factor across browsers — px always does.
+     Defaults cover SSR / pre-JS (scale = 1). */
+  --app-w: 100vw;
+  --app-h: 100vh;
 }
 
 body {

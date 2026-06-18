@@ -7,6 +7,7 @@ import { store } from '@/store';
 import { Toaster } from 'react-hot-toast';
 import { useEffect, useState } from 'react';
 import AuthBootstrap from '@/modules/auth/components/AuthBootstrap';
+import ViewportScaler from '@/components/layout/ViewportScaler';
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({
@@ -54,6 +55,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <Provider store={store}>
       <QueryClientProvider client={queryClient}>
+        <ViewportScaler />
         <AuthBootstrap>{children}</AuthBootstrap>
         <Toaster position="top-right" />
         <ReactQueryDevtools initialIsOpen={false} />

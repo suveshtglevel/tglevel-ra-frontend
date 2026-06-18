@@ -515,7 +515,7 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
     return (
       <div
         aria-hidden
-        className="w-full max-w-[1100px] min-h-[150px] bg-white border border-slate-200 shadow-sm rounded-[14px]"
+        className="w-full min-h-[150px] bg-white border border-slate-200 shadow-sm rounded-[14px]"
       />
     );
   }
@@ -636,8 +636,8 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
   return (
     <Card
       className={cn(
-        "w-full max-w-[1100px] bg-white border-slate-200 shadow-sm rounded-[14px] overflow-hidden flex flex-col transition-all duration-300 focus-within:border-emerald-300/50 focus-within:ring-4 focus-within:ring-emerald-500/5 opacity-100 rotate-0 border-[1px]",
-        filePreview ? "min-h-[360px] h-auto" : isEditorEmpty ? "min-h-[150px] h-auto" : "min-h-[200px] h-auto max-h-[330px]",
+        "w-full bg-white border-slate-200 shadow-sm rounded-[14px] overflow-hidden flex flex-col transition-all duration-300 focus-within:border-emerald-300/50 focus-within:ring-4 focus-within:ring-emerald-500/5 opacity-100 rotate-0 border-[1px]",
+        filePreview ? "min-h-[360px] h-auto" : isEditorEmpty ? "min-h-[150px] h-auto" : "min-h-[200px] h-auto max-h-[calc(var(--app-h)*0.45)]",
         disabled && "opacity-50 pointer-events-none bg-slate-50/50"
       )}
     >

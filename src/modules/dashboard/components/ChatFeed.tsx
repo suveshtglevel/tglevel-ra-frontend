@@ -21,124 +21,156 @@ import type { ChatMessage, FileAttachment, PollData } from '@/store/slices/messa
 // Renders a sent poll inside a message bubble (RA side: the RA sends polls, it
 // never votes). Read-only: shows the question, each option, and its vote count
 // with a subtle bar scaled by share — no voting interaction.
+// Format the poll's close time: a short date when it's days away, otherwise a
+// time. Returns '' when there's no expiry.
+const formatPollEnds = (iso?: string) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const days = Math.ceil((d.getTime() - Date.now()) / 86_400_000);
+  if (days <= 0) return 'Ended';
+  if (days === 1) return 'Ends tomorrow';
+  if (days <= 14) return `Ends in ${days} days`;
+  return `Ends ${d.toLocaleDateString([], { day: 'numeric', month: 'short' })}`;
+};
+
+// Poll results as the RA sees them. The RA sends polls and never votes, so this
+// is read-only: it shows the live tally for each option / emoji with a bar
+// scaled by share, plus the total vote count and close time.
 const PollView = ({ poll }: { poll: PollData }) => {
-  const total = poll.options?.reduce((sum, o) => sum + o.votes, 0) ?? 0;
-  const maxVotes = Math.max(0, ...(poll.options?.map((o) => o.votes) ?? [0]));
   const isSlider = poll.poll_type === 'slider';
   const isEmoji = poll.poll_type === 'emoji';
+
+  // Emoji results: prefer the server tally; fall back to the raw emoji list
+  // (all zero) so a brand-new poll still renders its choices.
+  const emojiResults =
+    poll.emojiResults && poll.emojiResults.length > 0
+      ? poll.emojiResults
+      : (poll.emojis ?? []).map((emoji) => ({ emoji, count: 0, percentage: 0 }));
+  const maxEmojiCount = Math.max(0, ...emojiResults.map((e) => e.count));
+
+  const optionTotal = poll.options?.reduce((sum, o) => sum + o.votes, 0) ?? 0;
+  const maxVotes = Math.max(0, ...(poll.options?.map((o) => o.votes) ?? [0]));
+
+  // Total votes shown in the footer, from the server count when available.
+  const totalVotes =
+    poll.total_votes ??
+    (isEmoji ? emojiResults.reduce((s, e) => s + e.count, 0) : optionTotal);
+
   const sliderMin = poll.slider?.minimum ?? 0;
   const sliderMax = poll.slider?.maximum ?? 10;
-  const sliderValue = poll.slider?.selectedValue ?? Math.round((sliderMin + sliderMax) / 2);
-  const leftLabel = poll.slider?.leftLabel ?? `Poor ${sliderMin}`;
-  const rightLabel = poll.slider?.rightLabel ?? `${sliderMax} Excellent`;
-  const emojis = poll.emojis?.length
-    ? poll.emojis
-    : poll.options?.map((opt) => opt.text) ?? [];
-  const expiresLabel = poll.expires_at ? `Ends ${new Date(poll.expires_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : '';
+  const leftLabel = poll.slider?.leftLabel || String(sliderMin);
+  const rightLabel = poll.slider?.rightLabel || String(sliderMax);
+  const sliderBuckets = poll.sliderResults?.buckets ?? [];
+  const sliderAverage = poll.sliderResults?.average ?? null;
+  // The backend splits responses into three bands. We map the two outer bands to
+  // the RA's own end labels (low scores → left label, high scores → right label)
+  // and show the in-between band as a neutral "Middle".
+  const sliderLeft = sliderBuckets[0];
+  const sliderMid = sliderBuckets[1];
+  const sliderRight = sliderBuckets[2];
+
+  const endsLabel = formatPollEnds(poll.expires_at);
 
   return (
-    <div className="mt-0.5 min-w-[260px] rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="mt-0.5 min-w-[340px] rounded-3xl bg-white p-0">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1.5">
           <span className="w-6 h-6 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
             <BarChart2 className="w-3.5 h-3.5 text-emerald-600" />
           </span>
-          <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Poll</span>
+          <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Poll results</span>
         </div>
-        {total > 0 && (
-          <span className="text-[11px] font-semibold text-slate-400 tabular-nums">
-            {total} {total === 1 ? 'vote' : 'votes'}
-          </span>
-        )}
       </div>
 
-      <p className="text-[16px] font-bold text-slate-900 mb-5 leading-snug break-words">
+      <p className="text-[16px] font-bold text-slate-900 mb-4 leading-snug break-words">
         {poll.question}
       </p>
 
       {isSlider ? (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between text-sm font-medium text-slate-600">
-            <span>{leftLabel}</span>
-            <span className="rounded-full bg-slate-900 px-3 py-1 text-white text-xs font-semibold">{sliderValue}/{sliderMax}</span>
-            <span>{rightLabel}</span>
+        <div className="space-y-2.5">
+          {/* The RA's own end labels (left → right). */}
+          <div className="flex items-center justify-between gap-2 text-[13px] font-bold text-slate-700">
+            <span className="truncate max-w-[45%]">{leftLabel}</span>
+            <span className="truncate max-w-[45%] text-right">{rightLabel}</span>
           </div>
 
-          <div className="relative h-3 rounded-full bg-slate-200">
-            <div className="absolute inset-y-0 left-0 rounded-full bg-slate-300" style={{ width: '100%' }} />
-            <div
-              className="absolute -top-2.5 h-9 w-9 rounded-full bg-slate-900 shadow-lg border-4 border-white"
-              style={{ left: `calc(${((sliderValue - sliderMin) / Math.max(1, sliderMax - sliderMin)) * 100}% - 1.125rem)` }}
-            />
+          {/* Diverging bar: low scores fill from the left toward the left label,
+              high scores fill toward the right, the middle band sits between. */}
+          <div className="flex h-3 w-full overflow-hidden rounded-full bg-slate-100">
+            <div className="bg-emerald-500 transition-[width] duration-300" style={{ width: `${sliderLeft?.percentage ?? 0}%` }} />
+            <div className="bg-slate-300 transition-[width] duration-300" style={{ width: `${sliderMid?.percentage ?? 0}%` }} />
+            <div className="bg-emerald-600 transition-[width] duration-300" style={{ width: `${sliderRight?.percentage ?? 0}%` }} />
           </div>
 
-          <button className="w-full rounded-full bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm">
-            Submit Rating
-          </button>
-
-          <div className="grid grid-cols-2 gap-2 text-[12px] text-slate-500">
-            <span className="inline-flex items-center gap-1 font-medium">
-              <Users className="w-4 h-4" />
-              2,000 responses
-            </span>
-            <span className="inline-flex items-center gap-1 font-medium">
-              <Clock className="w-4 h-4" />
-              Poll ends in 1 hour
-            </span>
+          {/* Per-band share (percentage only): left / middle / right. */}
+          <div className="flex items-center justify-between gap-2 text-[11px] font-bold tabular-nums">
+            <span className="text-emerald-700">{sliderLeft?.percentage ?? 0}%</span>
+            <span className="text-slate-400 font-medium">{sliderMid?.percentage ?? 0}% middle</span>
+            <span className="text-emerald-700">{sliderRight?.percentage ?? 0}%</span>
           </div>
+
+          {sliderAverage !== null && (
+            <p className="text-[12px] font-semibold text-slate-500 pt-0.5">
+              Average rating: <span className="text-emerald-700">{sliderAverage.toFixed(1)}/{sliderMax}</span>
+            </p>
+          )}
         </div>
       ) : isEmoji ? (
-        <div className="space-y-4">
-          <div className="grid grid-cols-4 gap-3">
-            {emojis.map((emoji, index) => (
+        // Row per emoji: a rounded bar with a fill scaled by its share and the
+        // percentage on the right (no counts). The leading emoji is highlighted.
+        <div className="flex flex-col gap-2">
+          {emojiResults.map((r, index) => {
+            const leading = r.count > 0 && r.count === maxEmojiCount;
+            return (
               <div
-                key={`${emoji}-${index}`}
-                className={cn(
-                  'h-12 rounded-3xl border border-slate-200 bg-slate-50 flex items-center justify-center text-2xl',
-                  index === 0 ? 'shadow-[0_8px_20px_rgba(15,23,42,0.12)] bg-white' : ''
-                )}
+                key={`${r.emoji}-${index}`}
+                className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3"
               >
-                {emoji}
+                <span
+                  className="absolute inset-y-0 left-0 bg-emerald-100/80 transition-[width] duration-300"
+                  style={{ width: `${r.percentage}%` }}
+                />
+                <span className="relative flex items-center justify-between gap-3">
+                  <span className="text-xl leading-none">{r.emoji}</span>
+                  <span
+                    className={cn(
+                      'text-[13px] font-bold tabular-nums shrink-0',
+                      leading ? 'text-emerald-700' : 'text-slate-500'
+                    )}
+                  >
+                    {r.percentage}%
+                  </span>
+                </span>
               </div>
-            ))}
-          </div>
-
-          <div className="relative h-3 rounded-full bg-slate-200">
-            <div className="absolute left-0 top-0 h-full w-full rounded-full bg-slate-300" />
-            <div className="absolute -top-3 h-6 w-6 rounded-full bg-slate-900 shadow-lg border-4 border-white" />
-          </div>
-
-          <button className="w-full rounded-full bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm">
-            <span className="inline-flex items-center gap-2">
-              <span>😍</span>
-              Very Useful
-            </span>
-          </button>
-
-          <button className="w-full rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm">
-            Submit Response
-          </button>
+            );
+          })}
         </div>
       ) : (
         <div className="flex flex-col gap-2">
           {poll.options?.map((opt) => {
-            const pct = total > 0 ? (opt.votes / total) * 100 : 0;
+            const pct = optionTotal > 0 ? Math.round((opt.votes / optionTotal) * 100) : 0;
             const leading = opt.votes > 0 && opt.votes === maxVotes;
             return (
               <div
                 key={opt.id}
-                className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2"
+                className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5"
               >
                 <span
-                  className="absolute inset-y-0 left-0 bg-slate-100"
+                  className="absolute inset-y-0 left-0 bg-emerald-100/80 transition-[width] duration-300"
                   style={{ width: `${pct}%` }}
                 />
                 <span className="relative flex items-center justify-between gap-2">
                   <span className={cn('text-[13px] truncate', leading ? 'font-bold text-slate-800' : 'font-medium text-slate-600')}>
                     {opt.text}
                   </span>
-                  <span className="text-[12px] font-bold text-slate-500 shrink-0 tabular-nums">
-                    {opt.votes}
+                  <span
+                    className={cn(
+                      'text-[12px] font-bold shrink-0 tabular-nums',
+                      leading ? 'text-emerald-700' : 'text-slate-500'
+                    )}
+                  >
+                    {pct}% · {opt.votes}
                   </span>
                 </span>
               </div>
@@ -146,6 +178,19 @@ const PollView = ({ poll }: { poll: PollData }) => {
           })}
         </div>
       )}
+
+      <div className="mt-4 flex items-center justify-between text-[11px] font-medium text-slate-400">
+        <span className="inline-flex items-center gap-1">
+          <Users className="w-3.5 h-3.5" />
+          {totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}
+        </span>
+        {endsLabel && (
+          <span className="inline-flex items-center gap-1">
+            <Clock className="w-3.5 h-3.5" />
+            {endsLabel}
+          </span>
+        )}
+      </div>
     </div>
   );
 };

@@ -24,7 +24,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    // suppressHydrationWarning: the pre-paint script below sets zoom/--app-* on
+    // <html> before React hydrates, so its style attribute intentionally differs
+    // from the server markup.
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Apply the viewport scale before first paint so large screens don't
+            flash the unscaled (tiny, top-left) layout before ViewportScaler
+            mounts. Must mirror the constants/logic in ViewportScaler.tsx. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){var s=Math.max(1,window.innerWidth/1440);var r=document.documentElement.style;r.setProperty('zoom',String(s));r.setProperty('--app-w',(window.innerWidth/s)+'px');r.setProperty('--app-h',(window.innerHeight/s)+'px');})();",
+          }}
+        />
+      </head>
       <body
         className={`${inter.variable} antialiased`}
       >

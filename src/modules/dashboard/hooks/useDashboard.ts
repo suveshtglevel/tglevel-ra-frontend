@@ -427,12 +427,10 @@ export const useDashboard = () => {
         ...expiresAt,
       };
     } else {
-      // emoji
+      // emoji — sent as a flat array of emoji glyphs.
       pollPayload = {
         poll_type: 'emoji',
-        emojis: {
-          emojis: poll.emojis!,
-        },
+        emojis: poll.emojis!,
         ...expiresAt,
       };
     }

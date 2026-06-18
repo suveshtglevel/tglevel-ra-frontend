@@ -15,6 +15,26 @@ export interface PollOption {
   votes: number;
 }
 
+// One emoji's tally in an emoji poll's results.
+export interface EmojiResult {
+  emoji: string;
+  count: number;
+  percentage: number;
+}
+
+// One bucket (Bad / Neutral / Excellent) of a slider poll's results.
+export interface SliderBucket {
+  label: string;
+  range: [number, number];
+  count: number;
+  percentage: number;
+}
+
+export interface SliderResults {
+  buckets: SliderBucket[];
+  average: number | null;
+}
+
 export interface PollData {
   question: string;
   poll_type?: 'poll' | 'slider' | 'emoji';
@@ -27,6 +47,10 @@ export interface PollData {
     selectedValue?: number;
   };
   emojis?: string[];
+  // Per-emoji results, so the RA sees the live tally (not a vote control).
+  emojiResults?: EmojiResult[];
+  // Bucketed slider results (Bad/Neutral/Excellent) + the average response.
+  sliderResults?: SliderResults;
   total_votes?: number;
   expires_at?: string;
 }
