@@ -10,5 +10,8 @@ export function useBanners(params: ListBannersParams) {
     queryKey: ['banners', params],
     queryFn: () => listBanners(params),
     placeholderData: keepPreviousData,
+    // No sockets: refetch on every navigation to the Webinar/Banner tab so the
+    // list reflects the latest banners (previous page stays visible meanwhile).
+    refetchOnMount: 'always',
   });
 }

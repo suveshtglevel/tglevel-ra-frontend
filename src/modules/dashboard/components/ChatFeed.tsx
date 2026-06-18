@@ -531,6 +531,8 @@ const MessageBubble = ({ message, status, communityTag, parentMessage, onOpenFil
           <span className="text-[10px] font-medium">{message.timestamp}</span>
           <button
             type="button"
+            // No sockets: the seen-by stats are fetched on demand — a single
+            // click of the tick opens the panel and hits the stats endpoint.
             onClick={onTickClick}
             aria-label="View who saw this message"
             className="bg-transparent border-none p-0 cursor-pointer"

@@ -15,5 +15,8 @@ export function useMessageStats(messageId?: string, enabled = true) {
     queryKey: ['message-stats', messageId],
     queryFn: () => getMessageStats(messageId!),
     enabled: isServerId && enabled,
+    // No sockets: the panel only mounts when the tick is clicked, so refetch each
+    // time it opens to show the latest viewers rather than a cached list.
+    refetchOnMount: 'always',
   });
 }

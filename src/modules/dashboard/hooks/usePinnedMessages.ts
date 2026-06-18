@@ -11,5 +11,7 @@ export function usePinnedMessages(communityId?: string, subCommunityId?: string)
     queryKey: ['pinned-messages', communityId, subCommunityId],
     queryFn: () => getPinnedMessages(communityId!, subCommunityId!),
     enabled: Boolean(communityId && subCommunityId),
+    // No sockets: refetch the pinned bar on every navigation back to the dashboard.
+    refetchOnMount: 'always',
   });
 }

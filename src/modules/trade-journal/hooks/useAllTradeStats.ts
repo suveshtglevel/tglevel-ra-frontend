@@ -14,6 +14,8 @@ export function useAllTradeStats(subs: SubScope[]) {
       queryFn: () =>
         getTradeStats({ communityId: s.communityId, subCommunityId: s.subCommunityId }),
       enabled: Boolean(s.communityId && s.subCommunityId),
+      // No sockets: refetch the stat cards on every navigation to the tab.
+      refetchOnMount: 'always' as const,
     })),
   });
 

@@ -164,6 +164,8 @@ const TradeCard = ({ content, sender, timestamp, status = 'read', tag, refId, pi
             {timestamp}
             <button
               type="button"
+              // No sockets: a single click of the tick opens the panel and hits
+              // the seen-by stats endpoint.
               onClick={onTickClick}
               aria-label="View who saw this message"
               className="bg-transparent border-none p-0 cursor-pointer"
