@@ -34,7 +34,9 @@ export function useVerifyOtp() {
         id: result.data.ra_id,
         name: result.data.display_name,
         phone: result.data.phone_number,
-        avatarUrl: result.data.profile || result.data.profile_picture,
+        // Coalesce a possible null to undefined so it never reaches avatarUrl
+        // (typed string | undefined) or the avatar UI's initials fallback.
+        avatarUrl: result.data.profile || result.data.profile_picture || undefined,
         assignedCommunities: result.data.assigned_communities,
       };
       persistUser(user);

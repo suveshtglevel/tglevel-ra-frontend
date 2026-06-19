@@ -1,5 +1,27 @@
-import type { BackendMessage, BackendAttachment } from '@/modules/dashboard/services/messages.service';
-import type { ChatMessage, FileAttachment } from '@/store/slices/messageSlice';
+import type { BackendMessage, BackendAttachment, BackendPoll } from '@/modules/dashboard/services/messages.service';
+import type { ChatMessage, FileAttachment, SliderBucket, SliderResults } from '@/store/slices/messageSlice';
+
+// Turn the backend's slider_res (bad/neutral/excellent buckets + average) into
+// the ordered bucket list the poll card renders. Returns undefined when there
+// are no results to show.
+function mapSliderResults(res: BackendPoll['slider_res']): SliderResults | undefined {
+  if (!res || !res.results) return undefined;
+  const r = res.results;
+  const order: { key: 'bad' | 'neutral' | 'excellent'; label: string }[] = [
+    { key: 'bad', label: 'Bad' },
+    { key: 'neutral', label: 'Neutral' },
+    { key: 'excellent', label: 'Excellent' },
+  ];
+  const buckets = order
+    .map(({ key, label }): SliderBucket | null => {
+      const b = r[key];
+      if (!b) return null;
+      return { label, range: b.range, count: b.count ?? 0, percentage: b.percentage ?? 0 };
+    })
+    .filter((b): b is SliderBucket => b !== null);
+  if (buckets.length === 0) return undefined;
+  return { buckets, average: r.average ?? null };
+}
 
 // Format an ISO timestamp as a short "h:mm AM/PM" label for the chat feed.
 export function formatTime(iso?: string): string {
@@ -30,6 +52,35 @@ export function mapBackendMessage(m: BackendMessage, typeName?: string): ChatMes
   const attachment: FileAttachment | undefined = first
     ? { name: first.file_name, size: '', fileType: toAttachmentType(first), url: first.file_url }
     : undefined;
+  const poll = m.poll
+    ? {
+        question: m.poll.question,
+        poll_type: m.poll.poll_type,
+        options: m.poll.options?.map((o) => ({
+          id: o.option_id,
+          text: o.text,
+          votes: o.vote_count ?? 0,
+        })),
+        slider: m.poll.slider
+          ? {
+              minimum: m.poll.slider.minimum,
+              maximum: m.poll.slider.maximum,
+              leftLabel: m.poll.slider.leftLabel,
+              rightLabel: m.poll.slider.rightLabel,
+              selectedValue: m.poll.slider.selectedValue,
+            }
+          : undefined,
+        emojis: m.poll.emojis,
+        emojiResults: m.poll.emojis_res?.map((e) => ({
+          emoji: e.emoji,
+          count: e.count ?? 0,
+          percentage: e.percentage ?? 0,
+        })),
+        sliderResults: mapSliderResults(m.poll.slider_res),
+        total_votes: m.poll.total_votes,
+        expires_at: m.poll.expires_at,
+      }
+    : undefined;
   return {
     // Prefer the UUID message_id so pin/unpin can reference it.
     id: m.message_id ?? m._id ?? '',
@@ -45,6 +96,7 @@ export function mapBackendMessage(m: BackendMessage, typeName?: string): ChatMes
     status: 'delivered',
     sender: m.author_name ?? 'RA',
     attachment,
+    poll,
     parentMessageId: m.parent_message_id || undefined,
   };
 }

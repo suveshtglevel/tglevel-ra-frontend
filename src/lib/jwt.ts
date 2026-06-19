@@ -5,13 +5,20 @@ export interface RaJwtPayload {
   user?: { id?: string; display_name?: string; role?: string; profile_picture?: string };
   iat?: number;
   exp?: number;
+  
 }
 
 export function decodeJwt(token: string): RaJwtPayload | null {
   try {
-    const payload = token.split('.')[1];
-    if (!payload) return null;
-    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    const part = token.split('.')[1];
+    if (!part) return null;
+    // base64url -> base64, then restore the padding atob needs for some lengths.
+    const b64 = part.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), '=');
+    // atob yields a Latin-1 byte string; decode those bytes as UTF-8 so
+    // multibyte claims (accented / non-Latin display names) aren't corrupted.
+    const bytes = Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
+    const json = new TextDecoder().decode(bytes);
     return JSON.parse(json) as RaJwtPayload;
   } catch {
     return null;

@@ -1,10 +1,10 @@
 'use client';
 
 import React from 'react';
+import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MoreVertical, Pin, Check, CheckCheck, Link as LinkIcon, ChevronLeft, Reply } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { MoreVertical, Pin, Check, CheckCheck, Link as LinkIcon, ChevronLeft, Reply, BarChart2, Users, Clock } from 'lucide-react';
 import TradeCard from './TradeCard';
 import FileAttachmentView from './FileAttachmentView';
 
@@ -16,7 +16,184 @@ import { cn } from '@/lib/utils';
 import { extractLinks, linkifyHtml, type DetectedLink } from '@/lib/extractLinks';
 import { SafeHtml } from '@/components/ui/safe-html';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { ChatMessage, FileAttachment } from '@/store/slices/messageSlice';
+import type { ChatMessage, FileAttachment, PollData } from '@/store/slices/messageSlice';
+
+// Renders a sent poll inside a message bubble (RA side: the RA sends polls, it
+// never votes). Read-only: shows the question, each option, and its vote count
+// with a subtle bar scaled by share — no voting interaction.
+// Format the poll's close time: a short date when it's days away, otherwise a
+// time. Returns '' when there's no expiry.
+const formatPollEnds = (iso?: string) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const days = Math.ceil((d.getTime() - Date.now()) / 86_400_000);
+  if (days <= 0) return 'Ended';
+  if (days === 1) return 'Ends tomorrow';
+  if (days <= 14) return `Ends in ${days} days`;
+  return `Ends ${d.toLocaleDateString([], { day: 'numeric', month: 'short' })}`;
+};
+
+// Poll results as the RA sees them. The RA sends polls and never votes, so this
+// is read-only: it shows the live tally for each option / emoji with a bar
+// scaled by share, plus the total vote count and close time.
+const PollView = ({ poll }: { poll: PollData }) => {
+  const isSlider = poll.poll_type === 'slider';
+  const isEmoji = poll.poll_type === 'emoji';
+
+  // Emoji results: prefer the server tally; fall back to the raw emoji list
+  // (all zero) so a brand-new poll still renders its choices.
+  const emojiResults =
+    poll.emojiResults && poll.emojiResults.length > 0
+      ? poll.emojiResults
+      : (poll.emojis ?? []).map((emoji) => ({ emoji, count: 0, percentage: 0 }));
+  const maxEmojiCount = Math.max(0, ...emojiResults.map((e) => e.count));
+
+  const optionTotal = poll.options?.reduce((sum, o) => sum + o.votes, 0) ?? 0;
+  const maxVotes = Math.max(0, ...(poll.options?.map((o) => o.votes) ?? [0]));
+
+  // Total votes shown in the footer, from the server count when available.
+  const totalVotes =
+    poll.total_votes ??
+    (isEmoji ? emojiResults.reduce((s, e) => s + e.count, 0) : optionTotal);
+
+  const sliderMin = poll.slider?.minimum ?? 0;
+  const sliderMax = poll.slider?.maximum ?? 10;
+  const leftLabel = poll.slider?.leftLabel || String(sliderMin);
+  const rightLabel = poll.slider?.rightLabel || String(sliderMax);
+  const sliderBuckets = poll.sliderResults?.buckets ?? [];
+  const sliderAverage = poll.sliderResults?.average ?? null;
+  // The backend splits responses into three bands. We map the two outer bands to
+  // the RA's own end labels (low scores → left label, high scores → right label)
+  // and show the in-between band as a neutral "Middle".
+  const sliderLeft = sliderBuckets[0];
+  const sliderMid = sliderBuckets[1];
+  const sliderRight = sliderBuckets[2];
+
+  const endsLabel = formatPollEnds(poll.expires_at);
+
+  return (
+    <div className="mt-0.5 min-w-[340px] rounded-3xl bg-white p-0">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-1.5">
+          <span className="w-6 h-6 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+            <BarChart2 className="w-3.5 h-3.5 text-emerald-600" />
+          </span>
+          <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Poll results</span>
+        </div>
+      </div>
+
+      <p className="text-[16px] font-bold text-slate-900 mb-4 leading-snug break-words">
+        {poll.question}
+      </p>
+
+      {isSlider ? (
+        <div className="space-y-2.5">
+          {/* The RA's own end labels (left → right). */}
+          <div className="flex items-center justify-between gap-2 text-[13px] font-bold text-slate-700">
+            <span className="truncate max-w-[45%]">{leftLabel}</span>
+            <span className="truncate max-w-[45%] text-right">{rightLabel}</span>
+          </div>
+
+          {/* Diverging bar: low scores fill from the left toward the left label,
+              high scores fill toward the right, the middle band sits between. */}
+          <div className="flex h-3 w-full overflow-hidden rounded-full bg-slate-100">
+            <div className="bg-emerald-500 transition-[width] duration-300" style={{ width: `${sliderLeft?.percentage ?? 0}%` }} />
+            <div className="bg-slate-300 transition-[width] duration-300" style={{ width: `${sliderMid?.percentage ?? 0}%` }} />
+            <div className="bg-emerald-600 transition-[width] duration-300" style={{ width: `${sliderRight?.percentage ?? 0}%` }} />
+          </div>
+
+          {/* Per-band share (percentage only): left / middle / right. */}
+          <div className="flex items-center justify-between gap-2 text-[11px] font-bold tabular-nums">
+            <span className="text-emerald-700">{sliderLeft?.percentage ?? 0}%</span>
+            <span className="text-slate-400 font-medium">{sliderMid?.percentage ?? 0}% middle</span>
+            <span className="text-emerald-700">{sliderRight?.percentage ?? 0}%</span>
+          </div>
+
+          {sliderAverage !== null && (
+            <p className="text-[12px] font-semibold text-slate-500 pt-0.5">
+              Average rating: <span className="text-emerald-700">{sliderAverage.toFixed(1)}/{sliderMax}</span>
+            </p>
+          )}
+        </div>
+      ) : isEmoji ? (
+        // Row per emoji: a rounded bar with a fill scaled by its share and the
+        // percentage on the right (no counts). The leading emoji is highlighted.
+        <div className="flex flex-col gap-2">
+          {emojiResults.map((r, index) => {
+            const leading = r.count > 0 && r.count === maxEmojiCount;
+            return (
+              <div
+                key={`${r.emoji}-${index}`}
+                className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3"
+              >
+                <span
+                  className="absolute inset-y-0 left-0 bg-emerald-100/80 transition-[width] duration-300"
+                  style={{ width: `${r.percentage}%` }}
+                />
+                <span className="relative flex items-center justify-between gap-3">
+                  <span className="text-xl leading-none">{r.emoji}</span>
+                  <span
+                    className={cn(
+                      'text-[13px] font-bold tabular-nums shrink-0',
+                      leading ? 'text-emerald-700' : 'text-slate-500'
+                    )}
+                  >
+                    {r.percentage}%
+                  </span>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {poll.options?.map((opt) => {
+            const pct = optionTotal > 0 ? Math.round((opt.votes / optionTotal) * 100) : 0;
+            const leading = opt.votes > 0 && opt.votes === maxVotes;
+            return (
+              <div
+                key={opt.id}
+                className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5"
+              >
+                <span
+                  className="absolute inset-y-0 left-0 bg-emerald-100/80 transition-[width] duration-300"
+                  style={{ width: `${pct}%` }}
+                />
+                <span className="relative flex items-center justify-between gap-2">
+                  <span className={cn('text-[13px] truncate', leading ? 'font-bold text-slate-800' : 'font-medium text-slate-600')}>
+                    {opt.text}
+                  </span>
+                  <span
+                    className={cn(
+                      'text-[12px] font-bold shrink-0 tabular-nums',
+                      leading ? 'text-emerald-700' : 'text-slate-500'
+                    )}
+                  >
+                    {pct}% · {opt.votes}
+                  </span>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="mt-4 flex items-center justify-between text-[11px] font-medium text-slate-400">
+        <span className="inline-flex items-center gap-1">
+          <Users className="w-3.5 h-3.5" />
+          {totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}
+        </span>
+        {endsLabel && (
+          <span className="inline-flex items-center gap-1">
+            <Clock className="w-3.5 h-3.5" />
+            {endsLabel}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
 
 interface ChatFeedProps {
   communityTag?: string; // shown on trade cards instead of the message type
@@ -52,115 +229,240 @@ const ChatFeedSkeleton = () => (
 const triggerClass =
   'absolute top-2 right-2 z-10 p-1 text-slate-500 hover:text-slate-700 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity cursor-pointer';
 
-const MessageMenu = ({ pinned, onTogglePin, links, onFollowUp }: { pinned: boolean; onTogglePin: () => void; links: DetectedLink[]; onFollowUp?: () => void }) => {
+type MessageMenuHandle = { open: (at?: { x: number; y: number }) => void };
+
+const MENU_WIDTH = 224; // w-56
+
+const MessageMenu = React.forwardRef<
+  MessageMenuHandle,
+  { pinned: boolean; onTogglePin: () => void; links: DetectedLink[]; onFollowUp?: () => void }
+>(function MessageMenu({ pinned, onTogglePin, links, onFollowUp }, ref) {
   const [open, setOpen] = React.useState(false);
   const [view, setView] = React.useState<'menu' | 'links'>('menu');
-  // Defer the (heavy) Radix Popover until the menu is first opened. Until then
-  // each row renders just a plain button, so a feed of many messages doesn't pay
-  // for a Popper tree per row — the dominant per-row cost on first render.
-  const [activated, setActivated] = React.useState(false);
+  // Where the menu opens from (viewport coords): the right-click cursor, or the
+  // three-dots button when opened by click. The menu is a fixed-position element
+  // portaled to <body>, so it lands exactly here — WhatsApp-style — regardless of
+  // how the message card is positioned or transformed.
+  const [anchor, setAnchor] = React.useState<{ x: number; y: number } | null>(null);
+  // Final on-screen position, computed after the menu is measured so it can flip
+  // up / left to stay inside the viewport. Hidden until then to avoid a flash.
+  const [coords, setCoords] = React.useState<{ left: number; top: number } | null>(null);
+  // How far the feed has scrolled since the menu opened; the menu is translated
+  // by this so it tracks its message instead of staying pinned to the viewport.
+  const [scrollShift, setScrollShift] = React.useState(0);
+  // Hidden while the message has scrolled out of the visible feed area, so the
+  // menu doesn't linger over the composer/header where its message isn't shown.
+  const [hidden, setHidden] = React.useState(false);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+  // The menu's viewport `top` at open (before any scroll shift), so the scroll
+  // handler can tell when the menu would cross the feed's edges.
+  const baseTopRef = React.useRef(0);
 
-  // Reset to the main menu as the popover closes (never leave the links tab open
-  // for next time) — done in the event, not an effect.
-  const handleOpenChange = (next: boolean) => {
-    setOpen(next);
-    if (!next) setView('menu');
-  };
+  const close = React.useCallback(() => {
+    setOpen(false);
+    setView('menu');
+    setCoords(null);
+    setScrollShift(0);
+    setHidden(false);
+  }, []);
 
-  if (!activated) {
-    return (
+  // Let the parent open this menu from a right-click anywhere on the card (see
+  // MessageRow's onContextMenu). With a cursor position the menu pops up there;
+  // without one (three-dots click) it anchors just under the button.
+  React.useImperativeHandle(
+    ref,
+    () => ({
+      open: (at) => {
+        if (at) {
+          setAnchor(at);
+        } else if (triggerRef.current) {
+          const r = triggerRef.current.getBoundingClientRect();
+          setAnchor({ x: r.right - MENU_WIDTH, y: r.bottom });
+        }
+        setOpen(true);
+      },
+    }),
+    []
+  );
+
+  // Measure the menu once it's open and clamp it inside the viewport: flip left
+  // if it would overflow the right edge, flip above the anchor if it would
+  // overflow the bottom. Re-runs when the view (and thus height) changes.
+  React.useLayoutEffect(() => {
+    if (!open || !anchor || !menuRef.current) return;
+    const pad = 8;
+    const { width, height } = menuRef.current.getBoundingClientRect();
+    // Clamp vertically to the feed's scroll area (not the whole window) so the
+    // menu flips up above the composer instead of overlapping the input box.
+    const viewport = triggerRef.current?.closest<HTMLElement>(
+      '[data-radix-scroll-area-viewport]'
+    );
+    const bounds = viewport?.getBoundingClientRect();
+    const minTop = bounds ? Math.max(pad, bounds.top) : pad;
+    const maxBottom = bounds ? Math.min(window.innerHeight - pad, bounds.bottom) : window.innerHeight - pad;
+
+    let left = anchor.x;
+    let top = anchor.y + 4;
+    if (left + width > window.innerWidth - pad) left = window.innerWidth - width - pad;
+    if (left < pad) left = pad;
+    if (top + height > maxBottom) top = anchor.y - height - 4;
+    if (top < minTop) top = minTop;
+    baseTopRef.current = top;
+    setCoords({ left, top });
+  }, [open, anchor, view, links.length]);
+
+  // Close on outside click / Escape, like the old popover did for free.
+  React.useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) close();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open, close]);
+
+  // Make the menu follow its message while the feed scrolls: track the scroll
+  // container's delta since the menu opened and translate the menu by it (scroll
+  // down ⇒ message moves up ⇒ menu moves up). Without this the fixed-position
+  // menu would stay put as the message scrolled away.
+  React.useEffect(() => {
+    if (!open) return;
+    const viewport = triggerRef.current?.closest<HTMLElement>(
+      '[data-radix-scroll-area-viewport]'
+    );
+    if (!viewport) return;
+    const start = viewport.scrollTop;
+    const onScroll = () => {
+      const delta = viewport.scrollTop - start;
+      setScrollShift(delta);
+      // Hide the menu the moment it would cross out of the feed area (above the
+      // header or down into the composer/input box) rather than overlapping it.
+      const vb = viewport.getBoundingClientRect();
+      const h = menuRef.current?.offsetHeight ?? 0;
+      const top = baseTopRef.current - delta;
+      setHidden(top < vb.top || top + h > vb.bottom);
+    };
+    viewport.addEventListener('scroll', onScroll, { passive: true });
+    return () => viewport.removeEventListener('scroll', onScroll);
+  }, [open]);
+
+  return (
+    <>
       <button
+        ref={triggerRef}
         type="button"
         aria-label="Message options"
         className={triggerClass}
+        data-state={open ? 'open' : 'closed'}
         onClick={() => {
-          setActivated(true);
-          setOpen(true);
+          if (open) {
+            close();
+          } else if (triggerRef.current) {
+            const r = triggerRef.current.getBoundingClientRect();
+            setAnchor({ x: r.right - MENU_WIDTH, y: r.bottom });
+            setOpen(true);
+          }
         }}
       >
         <MoreVertical className="w-4 h-4" />
       </button>
-    );
-  }
 
-  return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <button type="button" aria-label="Message options" className={triggerClass}>
-          <MoreVertical className="w-4 h-4" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-56 p-1 rounded-xl border-white bg-white shadow-lg" align="end" side="right" sideOffset={4}>
-        {view === 'menu' ? (
-          <>
-            <button
-              type="button"
-              onClick={() => {
-                onTogglePin();
-                setOpen(false);
-              }}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
-            >
-              <Pin className={cn("w-4 h-4", pinned ? "text-emerald-500 rotate-45" : "text-slate-400")} />
-              {pinned ? 'Unpin message' : 'Pin message'}
-            </button>
-            {onFollowUp && (
-              <button
-                type="button"
-                onClick={() => {
-                  onFollowUp();
-                  setOpen(false);
-                }}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
-              >
-                <Reply className="w-4 h-4 text-slate-400" />
-                Follow up message
-              </button>
-            )}
-            {links.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setView('links')}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
-              >
-                <LinkIcon className="w-4 h-4 text-slate-400" />
-                Links
-                <span className="ml-auto text-[11px] font-semibold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
-                  {links.length}
-                </span>
-              </button>
-            )}
-          </>
-        ) : (
-          <div>
-            <button
-              type="button"
-              onClick={() => setView('menu')}
-              className="w-full flex items-center gap-1.5 px-2 py-2 rounded-lg text-[12px] font-semibold text-slate-500 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              Links ({links.length})
-            </button>
-            <div className="max-h-60 overflow-y-auto mt-0.5">
-              {links.map((link) => (
-                <a
-                  key={link.url}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex flex-col gap-0.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 transition-colors"
+      {open && anchor && typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            className="fixed z-50 w-56 p-1 rounded-xl border border-slate-100 bg-white shadow-lg"
+            style={{
+              left: coords?.left ?? anchor.x,
+              top: (coords?.top ?? anchor.y + 4) - scrollShift,
+              visibility: coords && !hidden ? 'visible' : 'hidden',
+            }}
+            // Don't let clicks inside bubble up to the row's handlers.
+            onClick={(e) => e.stopPropagation()}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            {view === 'menu' ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onTogglePin();
+                    close();
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
                 >
-                  <span className="text-[12px] font-medium text-slate-700 truncate">{link.label}</span>
-                  <span className="text-[10px] text-emerald-600 underline truncate">{link.url}</span>
-                </a>
-              ))}
-            </div>
-          </div>
+                  <Pin className={cn("w-4 h-4", pinned ? "text-emerald-500 rotate-45" : "text-slate-400")} />
+                  {pinned ? 'Unpin message' : 'Pin message'}
+                </button>
+                {onFollowUp && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onFollowUp();
+                      close();
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
+                  >
+                    <Reply className="w-4 h-4 text-slate-400" />
+                    Follow up message
+                  </button>
+                )}
+                {links.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setView('links')}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
+                  >
+                    <LinkIcon className="w-4 h-4 text-slate-400" />
+                    Links
+                    <span className="ml-auto text-[11px] font-semibold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
+                      {links.length}
+                    </span>
+                  </button>
+                )}
+              </>
+            ) : (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setView('menu')}
+                  className="w-full flex items-center gap-1.5 px-2 py-2 rounded-lg text-[12px] font-semibold text-slate-500 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Links ({links.length})
+                </button>
+                <div className="max-h-60 overflow-y-auto mt-0.5">
+                  {links.map((link) => (
+                    <a
+                      key={link.url}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex flex-col gap-0.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 transition-colors"
+                    >
+                      <span className="text-[12px] font-medium text-slate-700 truncate">{link.label}</span>
+                      <span className="text-[10px] text-emerald-600 underline truncate">{link.url}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>,
+          document.body
         )}
-      </PopoverContent>
-    </Popover>
+    </>
   );
-};
+});
+MessageMenu.displayName = 'MessageMenu';
 
 // Numeric backend message type -> display label.
 const MESSAGE_TYPE_LABELS: Record<number, string> = {
@@ -236,15 +538,20 @@ const MessageBubble = ({ message, status, communityTag, parentMessage, onOpenFil
         <QuotedReply parent={parentMessage} parentId={message.parentMessageId} />
       )}
 
+      {/* Poll (UI-only feature) */}
+      {message.poll && <PollView poll={message.poll} />}
+
       {/* File attachment */}
       {message.attachment && (
         <FileAttachmentView attachment={message.attachment} isSent={false} onOpen={() => onOpenFile(message.attachment!)} />
       )}
 
       {/* Text content */}
-      {message.content && (
+      {/* Poll messages render the question inside PollView, so skip the plain
+          content here to avoid showing it twice. */}
+      {message.content && !message.poll && (
         <SafeHtml
-          className="text-[13px] leading-relaxed text-slate-700 break-words [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1 [&_li]:my-0.5 [&_a]:text-blue-600 [&_a]:underline [&_a]:break-all"
+          className="text-[13px] leading-relaxed text-slate-700 break-words whitespace-pre-wrap [&_p:empty]:min-h-[1em] [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1 [&_li]:my-0.5 [&_a]:text-blue-600 [&_a]:underline [&_a]:break-all"
           html={linkifyHtml(message.content)}
         />
       )}
@@ -269,6 +576,8 @@ const MessageBubble = ({ message, status, communityTag, parentMessage, onOpenFil
           <span className="text-[10px] font-medium">{message.timestamp}</span>
           <button
             type="button"
+            // No sockets: the seen-by stats are fetched on demand — a single
+            // click of the tick opens the panel and hits the stats endpoint.
             onClick={onTickClick}
             aria-label="View who saw this message"
             className="bg-transparent border-none p-0 cursor-pointer"
@@ -310,6 +619,8 @@ const MessageRow = React.memo(function MessageRow({
   onFollowUp?: (message: ChatMessage) => void;
 }) {
   const status = msg.status;
+  // Imperative handle so a right-click on the card opens the three-dots menu.
+  const menuRef = React.useRef<MessageMenuHandle>(null);
 
   // Only render the green research/trade card for messages the backend marks as
   // Trade (type label or numeric id 1). A message whose text merely matches the
@@ -324,7 +635,15 @@ const MessageRow = React.memo(function MessageRow({
     // Full-width row carries the scroll/highlight target so the pinned
     // flash spans the whole width; the bubble stays inset & content-width.
     <div id={`feed-msg-${msg.id}`} className="w-full scroll-mt-4 px-3 sm:px-6 py-1">
-      <div className="group relative w-fit max-w-full">
+      <div
+        className="group relative w-fit max-w-full"
+        // Right-click anywhere on the card opens the three-dots menu instead of
+        // the browser's native context menu.
+        onContextMenu={(e) => {
+          e.preventDefault();
+          menuRef.current?.open({ x: e.clientX, y: e.clientY });
+        }}
+      >
         {isTrade ? (
           <TradeCard
             content={msg.content}
@@ -352,6 +671,7 @@ const MessageRow = React.memo(function MessageRow({
           />
         )}
         <MessageMenu
+          ref={menuRef}
           pinned={!!msg.pinned}
           onTogglePin={() => onTogglePin?.(msg.id)}
           links={links}
@@ -460,7 +780,9 @@ const ChatFeed = ({ communityTag, messages = [], loading = false, onTogglePin, o
   }, [visibleCount]);
 
   return (
-    <div className="flex-1 flex min-h-0 relative">
+    // `data-select-all` marks this as the one region where Ctrl/Cmd+A is allowed
+    // to select-all (see the global guard in Providers).
+    <div className="flex-1 flex min-h-0 relative" data-select-all>
       <ScrollArea className="flex-1" ref={scrollRef}>
         <div className="w-full py-4 sm:py-8 flex flex-col items-stretch">
           <div className="mb-6 sm:mb-8 flex items-center gap-4 w-full px-3 sm:px-6">

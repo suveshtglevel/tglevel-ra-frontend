@@ -7,6 +7,54 @@ export interface FileAttachment {
   url: string; // base64 data URL or blob URL
 }
 
+// A poll attached to a message. Currently a UI-only feature — polls are shown
+// in the feed but not persisted to the backend.
+export interface PollOption {
+  id: string;
+  text: string;
+  votes: number;
+}
+
+// One emoji's tally in an emoji poll's results.
+export interface EmojiResult {
+  emoji: string;
+  count: number;
+  percentage: number;
+}
+
+// One bucket (Bad / Neutral / Excellent) of a slider poll's results.
+export interface SliderBucket {
+  label: string;
+  range: [number, number];
+  count: number;
+  percentage: number;
+}
+
+export interface SliderResults {
+  buckets: SliderBucket[];
+  average: number | null;
+}
+
+export interface PollData {
+  question: string;
+  poll_type?: 'poll' | 'slider' | 'emoji';
+  options?: PollOption[];
+  slider?: {
+    minimum: number;
+    maximum: number;
+    leftLabel?: string;
+    rightLabel?: string;
+    selectedValue?: number;
+  };
+  emojis?: string[];
+  // Per-emoji results, so the RA sees the live tally (not a vote control).
+  emojiResults?: EmojiResult[];
+  // Bucketed slider results (Bad/Neutral/Excellent) + the average response.
+  sliderResults?: SliderResults;
+  total_votes?: number;
+  expires_at?: string;
+}
+
 export interface ChatMessage {
   id: string;
   // The chat this message belongs to: a sub-community id, or a community id for
@@ -32,6 +80,8 @@ export interface ChatMessage {
   // Trade-card metadata (only present when messageType === 'Trade')
   tradeTag?: string;
   tradeRefId?: string;
+  // Poll payload (only present on poll messages — UI-only, not sent to the DB).
+  poll?: PollData;
 }
 
 interface MessageState {
@@ -41,15 +91,6 @@ interface MessageState {
 
 const initialState: MessageState = {
   messages: {},
-};
-
-const formatNow = () => {
-  const now = new Date();
-  const h = now.getHours();
-  const m = now.getMinutes();
-  const period = h >= 12 ? 'PM' : 'AM';
-  const hr = h > 12 ? h - 12 : h === 0 ? 12 : h;
-  return `${hr}:${m.toString().padStart(2, '0')} ${period}`;
 };
 
 const messageSlice = createSlice({
@@ -63,66 +104,6 @@ const messageSlice = createSlice({
     ) => {
       state.messages[action.payload.chatId] = action.payload.messages;
     },
-    sendMessage: (state, action: PayloadAction<{
-      communityId: string;
-      content: string;
-      messageType?: string;
-      group?: string;
-      notifyUsers?: boolean;
-    }>) => {
-      const { communityId, content, messageType, group, notifyUsers } = action.payload;
-      const isTrade = messageType === 'Trade';
-
-      const newMsg: ChatMessage = {
-        id: `msg-${communityId}-${Date.now()}`,
-        communityId,
-        content,
-        type: 'sent',
-        messageType,
-        group,
-        notifyUsers,
-        timestamp: formatNow(),
-        status: 'sent',
-        sender: 'You',
-        tradeTag: isTrade ? 'Trade' : undefined,
-        tradeRefId: isTrade ? String(Date.now()).slice(-4) : undefined,
-      };
-
-      if (!state.messages[communityId]) {
-        state.messages[communityId] = [];
-      }
-      state.messages[communityId].push(newMsg);
-    },
-    sendFileMessage: (state, action: PayloadAction<{
-      communityId: string;
-      attachment: FileAttachment;
-      caption?: string;
-    }>) => {
-      const { communityId, attachment, caption } = action.payload;
-
-      const newMsg: ChatMessage = {
-        id: `msg-${communityId}-${Date.now()}`,
-        communityId,
-        content: caption || '',
-        type: 'sent',
-        timestamp: formatNow(),
-        status: 'sent',
-        sender: 'You',
-        attachment,
-      };
-
-      if (!state.messages[communityId]) {
-        state.messages[communityId] = [];
-      }
-      state.messages[communityId].push(newMsg);
-    },
-    togglePin: (state, action: PayloadAction<{ communityId: string; messageId: string }>) => {
-      const { communityId, messageId } = action.payload;
-      const msg = state.messages[communityId]?.find((m) => m.id === messageId);
-      if (msg) {
-        msg.pinned = !msg.pinned;
-      }
-    },
     // Set a message's pinned flag explicitly (used to reconcile with the
     // server's reported pin/unpin status).
     setPinned: (state, action: PayloadAction<{ communityId: string; messageId: string; pinned: boolean }>) => {
@@ -132,18 +113,8 @@ const messageSlice = createSlice({
         msg.pinned = pinned;
       }
     },
-    updateMessageStatus: (state, action: PayloadAction<{ messageId: string; communityId: string; status: 'sent' | 'delivered' | 'read' }>) => {
-      const { messageId, communityId, status } = action.payload;
-      const msgs = state.messages[communityId];
-      if (msgs) {
-        const msg = msgs.find((m) => m.id === messageId);
-        if (msg) {
-          msg.status = status;
-        }
-      }
-    },
   },
 });
 
-export const { setMessages, sendMessage, sendFileMessage, togglePin, setPinned, updateMessageStatus } = messageSlice.actions;
+export const { setMessages, setPinned } = messageSlice.actions;
 export default messageSlice.reducer;

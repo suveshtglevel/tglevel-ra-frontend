@@ -71,8 +71,10 @@ describe('toCommunityVM', () => {
     expect(vm.members).toBe('1.2k');
     // The community is in the assigned list, so it is sendable.
     expect(vm.sendable).toBe(true);
+    // The community icon is mapped through, and sub-communities reuse it.
+    expect(vm.iconUrl).toBe('icon');
     expect(vm.subCommunities).toEqual([
-      { id: 'sub_1', name: 'Intraday', members: '500', type: 'active' },
+      { id: 'sub_1', name: 'Intraday', members: '500', type: 'active', iconUrl: 'icon' },
     ]);
   });
 

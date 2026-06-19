@@ -55,9 +55,10 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Check } from 'lucide-react';
+import CreatePollModal from '@/modules/dashboard/components/CreatePollModal';
 import type { CommunityVM, BundleVM } from '@/types/dashboard';
 import type { MessageTypeOption } from '@/modules/dashboard/services/messages.service';
-import type { SendOptions } from '@/modules/dashboard/hooks/useDashboard';
+import type { SendOptions, ComposerPoll } from '@/modules/dashboard/hooks/useDashboard';
 
 // The message being followed-up on (WhatsApp-style reply context).
 export interface ReplyContext {
@@ -74,7 +75,17 @@ interface MessageComposerProps {
   bundles: BundleVM[];
   creatingBundle?: boolean;
   onCreateBundle?: (payload: { name: string; communityId: string; subIds: string[] }) => void;
+  // Delete a saved bundle (via the small cross on each bundle row).
+  onDeleteBundle?: (bundleId: string) => void;
+  // The bundle currently being deleted, if any — its row shows a pending state.
+  deletingBundleId?: string | null;
+  // Open a sub-community chat in the feed. Called when the RA picks a bundle so
+  // the feed jumps to the bundle's first sub-community.
+  onSelectSubCommunity?: (subId: string) => void;
   onSend?: (content: string, options?: SendOptions) => void;
+  // Publish a poll (type-6 message). Targeting mirrors a normal send (sidebar
+  // selection / open chat). Returns true when a send was dispatched.
+  onSendPoll?: (poll: ComposerPoll) => boolean;
   disabled?: boolean;
   // Active follow-up reply (set when the RA picks "Follow up message" on a
   // trade card); null when not replying. onCancelReply dismisses it.
@@ -86,7 +97,13 @@ type FilePreview = NonNullable<SendOptions['attachment']> & {
   file: File;
 };
 
-const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, onCreateBundle, onSend, disabled = false, replyTo, onCancelReply }: MessageComposerProps) => {
+// The "Poll" message type (numeric id 6). Pure helper — no component state, so
+// it lives at module scope. Selecting it opens the Create Poll screen, and
+// opening that screen selects it — the two stay in sync.
+const isPollType = (t: MessageTypeOption | null | undefined) =>
+  !!t && (t.id === 6 || /poll/i.test(t.name));
+
+const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, onCreateBundle, onDeleteBundle, deletingBundleId, onSelectSubCommunity, onSend, onSendPoll, disabled = false, replyTo, onCancelReply }: MessageComposerProps) => {
   const [isEditorEmpty, setIsEditorEmpty] = React.useState(true);
   const [selectedBundleId, setSelectedBundleId] = React.useState<string | null>(null);
   const [selectedType, setSelectedType] = React.useState<MessageTypeOption | null>(null);
@@ -101,6 +118,8 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
   const [draftSubIds, setDraftSubIds] = React.useState<string[]>([]);
   const [filePreview, setFilePreview] = React.useState<FilePreview | null>(null);
   const [showFullPreview, setShowFullPreview] = React.useState(false);
+  // Whether the full-screen Create Poll screen is open (its draft lives there).
+  const [pollOpen, setPollOpen] = React.useState(false);
   // Tracks which reply we've already reacted to, so we pre-select the Followup
   // type exactly once per reply target (see the render-time adjustment below).
   const [reactedReplyId, setReactedReplyId] = React.useState<string | null>(replyTo?.id ?? null);
@@ -129,6 +148,8 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
   );
   const selectedBundle = bundles.find((b) => b.id === selectedBundleId) ?? null;
   const messageTypeRequiredText = 'Select message type before sending';
+
+  const pollType = messageTypes.find((t) => isPollType(t)) ?? null;
 
   // Trade messages must always notify users: the toggle is forced on and the RA
   // can't switch it off. Every other type defaults to off and stays toggleable.
@@ -174,24 +195,27 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
     const subs = community?.subCommunities?.filter((s) => draftSubIds.includes(s.id)) ?? [];
     const name = draftName.trim() || subs.map((s) => s.name).join(', ');
 
-    // Catch duplicates up front: the backend only returns a generic "API error"
-    // for an existing bundle, so detect it here (same name, or the same set of
-    // sub-communities in the same community) and show a clear message instead.
-    const sameSet = (a: string[], b: string[]) =>
-      a.length === b.length && [...a].sort().join('|') === [...b].sort().join('|');
-    const alreadyExists = bundles.some(
-      (b) =>
-        b.name.trim().toLowerCase() === name.trim().toLowerCase() ||
-        (b.communityId === draftCommunityId && sameSet(b.subIds, draftSubIds))
-    );
-    if (alreadyExists) {
-      toast.error('This bundle already exists');
-      return;
-    }
-
     onCreateBundle?.({ name, communityId: draftCommunityId, subIds: [...draftSubIds] });
     resetDraft();
     setBundleOpen(false);
+  };
+
+  // ----- Poll (Create Poll screen) ------------------------------------------
+  // Opening the builder also selects the Poll message type, keeping the two in
+  // sync (and vice-versa from the type dropdown / Send button).
+  const openPoll = () => {
+    if (pollType) setSelectedType(pollType);
+    setPollOpen(true);
+  };
+
+  // Publish from the Create Poll screen. Single/Multiple polls send via the
+  // backend; on a successful dispatch we close the screen and clear the type.
+  const handlePublishPoll = (poll: ComposerPoll) => {
+    const sent = onSendPoll?.(poll) ?? false;
+    if (sent) {
+      setPollOpen(false);
+      setSelectedType(null);
+    }
   };
 
   const imageInputRef = React.useRef<HTMLInputElement>(null);
@@ -345,6 +369,37 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
         const clipboard = event.clipboardData;
         const htmlData = clipboard?.getData('text/html') ?? '';
         const textData = clipboard?.getData('text/plain') ?? '';
+
+        // Telegram Web (and some other web apps) encode emojis in the clipboard
+        // HTML as <img alt="😀"> instead of plain unicode. The editor schema has
+        // no image node, so a default paste discards those <img>s and the emojis
+        // vanish — yet the same copy from the Telegram desktop app works because
+        // it puts unicode straight into the text. Replace each <img> with its alt
+        // (the emoji), then paste the cleaned HTML ourselves so formatting and
+        // emojis both survive.
+        if (/<img\b/i.test(htmlData)) {
+          const container = document.createElement('div');
+          container.innerHTML = htmlData;
+          container.querySelectorAll('img').forEach((img) => {
+            img.replaceWith(document.createTextNode(img.getAttribute('alt') ?? ''));
+          });
+          // Default whitespace handling (collapse) — NOT preserveWhitespace:
+          // 'full' — so the newlines/indentation Telegram puts between the <img>
+          // and wrapper tags don't paste as extra spaces around the emojis.
+          const slice = ProseMirrorDOMParser.fromSchema(view.state.schema).parseSlice(container, {
+            context: view.state.selection.$from,
+          });
+          event.preventDefault();
+          view.dispatch(
+            view.state.tr
+              .replaceSelection(slice)
+              .scrollIntoView()
+              .setMeta('paste', true)
+              .setMeta('uiEvent', 'paste')
+          );
+          return true;
+        }
+
         // Real formatting in the clipboard HTML (bold/italic/…) — paste it as-is.
         const hasRichFormatting = /<(strong|b|em|i|s|del|u)\b/i.test(htmlData);
         if (!hasRichFormatting && /[*_~]/.test(textData)) {
@@ -382,6 +437,11 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
     if (!editor) return;
     if (!selectedType) {
       toast.error(messageTypeRequiredText);
+      return;
+    }
+    // Poll messages are composed in the Create Poll screen, not the text editor.
+    if (isPollType(selectedType)) {
+      openPoll();
       return;
     }
     const content = editor.getHTML();
@@ -455,7 +515,7 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
     return (
       <div
         aria-hidden
-        className="w-full max-w-[1100px] min-h-[150px] bg-white border border-slate-200 shadow-sm rounded-[14px]"
+        className="w-full min-h-[150px] bg-white border border-slate-200 shadow-sm rounded-[14px]"
       />
     );
   }
@@ -477,12 +537,6 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
   const undo = () => editor.chain().focus().undo().run();
   const redo = () => editor.chain().focus().redo().run();
 
-  const insertChart = () => {
-    editor.chain().focus().insertContent(
-      '<p>📊 <strong>Market Analysis Chart</strong></p><p>Nifty: 24,250 (+0.8%) | Bank Nifty: 52,100 (+1.2%)</p>'
-    ).run();
-  };
-
   const insertQuickTrade = () => {
     editor.chain().focus().insertContent(
       '<p>⚡ <strong>QUICK TRADE ALERT</strong></p><p>Symbol: ___</p><p>Entry: ___</p><p>SL: ___</p><p>Target: ___</p>'
@@ -499,7 +553,13 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
     if (!filePreview || !mounted || !showFullPreview) return null;
 
     const modalContent = (
-      <div className="fixed inset-0 z-[9999] bg-[#0b141a] text-white flex flex-col select-none animate-in fade-in duration-200">
+      <div
+        className="fixed inset-0 z-[9999] bg-[#0b141a] text-white flex flex-col select-none animate-in fade-in duration-200 cursor-pointer"
+        // Click anywhere to dismiss — easier than aiming for the small close
+        // button. Interactive media (the video + its controls) stops propagation
+        // below so using the controls doesn't close the preview.
+        onClick={() => setShowFullPreview(false)}
+      >
         {/* Header */}
         <div className="h-16 flex items-center justify-between px-6 shrink-0 bg-[#0b141a] border-b border-white/10">
           <div className="flex items-center gap-4">
@@ -539,7 +599,10 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
               />
             </div>
           ) : filePreview.fileType === 'video' ? (
-            <div className="relative max-h-[65vh] max-w-[85vw] flex items-center justify-center">
+            <div
+              className="relative max-h-[65vh] max-w-[85vw] flex items-center justify-center cursor-default"
+              onClick={(e) => e.stopPropagation()}
+            >
               <video
                 src={filePreview.url}
                 controls
@@ -573,8 +636,8 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
   return (
     <Card
       className={cn(
-        "w-full max-w-[1100px] bg-white border-slate-200 shadow-sm rounded-[14px] overflow-hidden flex flex-col transition-all duration-300 focus-within:border-emerald-300/50 focus-within:ring-4 focus-within:ring-emerald-500/5 opacity-100 rotate-0 border-[1px]",
-        filePreview ? "min-h-[360px] h-auto" : isEditorEmpty ? "min-h-[150px] h-auto" : "min-h-[200px] h-auto max-h-[330px]",
+        "w-full bg-white border-slate-200 shadow-sm rounded-[14px] overflow-hidden flex flex-col transition-all duration-300 focus-within:border-emerald-300/50 focus-within:ring-4 focus-within:ring-emerald-500/5 opacity-100 rotate-0 border-[1px]",
+        filePreview ? "min-h-[360px] h-auto" : isEditorEmpty ? "min-h-[150px] h-auto" : "min-h-[200px] h-auto max-h-[calc(var(--app-h)*0.45)]",
         disabled && "opacity-50 pointer-events-none bg-slate-50/50"
       )}
     >
@@ -622,18 +685,42 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
                       there's more below when the list overflows. */}
                   <div className="dropdown-scroll flex flex-col py-1 max-h-[280px] overflow-y-auto">
                     {bundles.map((bundle) => (
-                      <button
+                      <div
                         key={bundle.id}
-                        onClick={() => { setSelectedBundleId(bundle.id); setGroupOpen(false); }}
                         className={cn(
-                          "w-full text-left mx-1 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors hover:bg-slate-50 flex items-center gap-2 cursor-pointer",
-                          selectedBundleId === bundle.id ? "bg-emerald-50 text-emerald-700" : "text-slate-700"
+                          "group/bundle mx-1 rounded-lg transition-colors hover:bg-slate-50 flex items-center cursor-pointer",
+                          selectedBundleId === bundle.id ? "bg-emerald-50" : ""
                         )}
                         style={{ width: 'calc(100% - 0.5rem)' }}
                       >
-                        <span className="flex-1 truncate">{bundle.name}</span>
-                        {selectedBundleId === bundle.id && <Check className="w-4 h-4 text-emerald-600 shrink-0" />}
-                      </button>
+                        <button
+                          onClick={() => {
+                            setSelectedBundleId(bundle.id);
+                            setGroupOpen(false);
+                            // Open the bundle's first sub-community in the feed.
+                            if (bundle.subIds.length > 0) onSelectSubCommunity?.(bundle.subIds[0]);
+                          }}
+                          className={cn(
+                            "flex-1 min-w-0 text-left pl-3 pr-1 py-2.5 text-[13px] font-medium flex items-center gap-2 cursor-pointer",
+                            selectedBundleId === bundle.id ? "text-emerald-700" : "text-slate-700"
+                          )}
+                        >
+                          <span className="flex-1 truncate">{bundle.name}</span>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Delete ${bundle.name}`}
+                          disabled={deletingBundleId === bundle.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (selectedBundleId === bundle.id) setSelectedBundleId(null);
+                            onDeleteBundle?.(bundle.id);
+                          }}
+                          className="shrink-0 mr-1.5 p-1 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover/bundle:opacity-100 focus:opacity-100 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </>
@@ -682,7 +769,12 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
                     {messageTypes.map((type) => (
                       <button
                         key={type._id}
-                        onClick={() => { setSelectedType(type); setTypeOpen(false); }}
+                        onClick={() => {
+                          setSelectedType(type);
+                          setTypeOpen(false);
+                          // Picking the Poll type opens the Create Poll screen.
+                          if (isPollType(type)) setPollOpen(true);
+                        }}
                         className={cn(
                           "text-left mx-1 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors hover:bg-slate-50 flex items-center gap-2 cursor-pointer",
                           selectedType?._id === type._id ? "bg-emerald-50 text-emerald-700" : "text-slate-700"
@@ -739,7 +831,8 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
                   value={draftName}
                   onChange={(e) => setDraftName(e.target.value)}
                   placeholder="Bundle name (optional)"
-                  className="mt-2 w-full h-8 px-2.5 rounded-lg border border-slate-200 bg-white text-[12px] text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/10"
+                  aria-label="Bundle name"
+                  className="mt-2 w-full h-8 px-2.5 rounded-lg border border-slate-200 bg-white text-[12px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/10"
                 />
               </div>
               <div className="max-h-[280px] overflow-y-auto py-1">
@@ -822,7 +915,11 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
               onClick={handleSend}
               disabled={!selectedType}
             >
-              Send <Send className="w-4 h-4 fill-current" />
+              {isPollType(selectedType) ? (
+                <>Send Poll <BarChart2 className="w-4 h-4" /></>
+              ) : (
+                <>Send <Send className="w-4 h-4 fill-current" /></>
+              )}
             </Button>
           </div>
         </div>
@@ -863,7 +960,8 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
           <ToolbarButton onClick={() => { fileInputRef.current?.click(); }}><Paperclip className="h-4 w-4" /></ToolbarButton>
           <ToolbarButton onClick={() => { videoInputRef.current?.click(); }}><Video className="h-4 w-4" /></ToolbarButton>
           <div className="h-5 w-[1px] bg-slate-200 mx-2" />
-          <ToolbarButton onClick={insertChart}><BarChart2 className="h-4 w-4" /></ToolbarButton>
+          {/* Poll — the bar-chart icon opens the full Create Poll screen. */}
+          <ToolbarButton active={pollOpen} onClick={openPoll}><BarChart2 className="h-4 w-4" /></ToolbarButton>
           <ToolbarButton onClick={insertQuickTrade}><Zap className="h-4 w-4" /></ToolbarButton>
         </div>
         <div className="flex items-center gap-0.5 shrink-0">
@@ -873,6 +971,12 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
       </div>
 
       {renderPreviewModal()}
+
+      <CreatePollModal
+        open={pollOpen}
+        onClose={() => setPollOpen(false)}
+        onPublish={handlePublishPoll}
+      />
 
       {/* Follow-up reply context — WhatsApp-style preview of the message being
           replied to, shown just above the input. The send threads under it. */}
@@ -922,12 +1026,13 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
             >
               <X className="w-4 h-4" />
             </button>
-            <div
+            <button
+              type="button"
               onClick={(event) => {
                 event.stopPropagation();
                 setShowFullPreview(true);
               }}
-              className="flex items-center gap-3 cursor-pointer"
+              className="flex w-full items-center gap-3 text-left cursor-pointer"
             >
               {filePreview.fileType === 'image' ? (
                 <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-slate-200 bg-white shrink-0">
@@ -961,7 +1066,7 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
                 <p className="text-xs font-medium text-slate-500 mt-1">{filePreview.size}</p>
                 <p className="text-[11px] font-semibold text-emerald-600 mt-3">Click to preview</p>
               </div>
-            </div>
+            </button>
           </div>
         )}
 
@@ -1107,16 +1212,23 @@ const MessageComposer = ({ communities, messageTypes, bundles, creatingBundle, o
   );
 };
 
-const ToolbarButton = React.forwardRef<
-  HTMLButtonElement,
-  {
-    children: React.ReactNode;
-    onClick?: () => void;
-    active?: boolean;
-    disabled?: boolean;
-    className?: string;
-  }
->(({ children, onClick, active = false, disabled = false, className }, ref) => (
+// React 19: `ref` is a normal prop. The emoji popover uses this as a
+// `PopoverTrigger asChild`, so the ref must still flow to the underlying button.
+const ToolbarButton = ({
+  children,
+  onClick,
+  active = false,
+  disabled = false,
+  className,
+  ref,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  active?: boolean;
+  disabled?: boolean;
+  className?: string;
+  ref?: React.Ref<HTMLButtonElement>;
+}) => (
   <Button
     ref={ref}
     variant="ghost"
@@ -1131,7 +1243,6 @@ const ToolbarButton = React.forwardRef<
   >
     {children}
   </Button>
-));
-ToolbarButton.displayName = "ToolbarButton";
+);
 
 export default MessageComposer;

@@ -43,8 +43,13 @@ export function extractLinks(html: string): DetectedLink[] {
 
 // Turns bare URLs in an HTML body into clickable anchor tags so they render as
 // links. URLs already wrapped in an <a> are left untouched, and text inside any
-// tag is never modified (we only rewrite text nodes outside of tags). The
-// result is still passed through sanitizeHtml before rendering.
+// tag is never modified (we only rewrite text nodes outside of tags).
+//
+// SECURITY CONTRACT: this builds `href="..."` by string interpolation, which is
+// only safe because (a) BARE_URL excludes quotes/<>/whitespace so a URL can't
+// break out of the attribute, AND (b) the result is ALWAYS passed through
+// sanitizeHtml (via <SafeHtml>) before it reaches the DOM. Both invariants must
+// hold — never render linkifyHtml output without sanitizing it first.
 export function linkifyHtml(html: string): string {
   if (!html) return html;
 

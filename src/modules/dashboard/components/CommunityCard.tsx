@@ -69,6 +69,13 @@ const SubCommunityRow = ({ sub, checked, isSelected, sendable, onToggle, onSelec
         e.stopPropagation();
         onSelect();
       }}
+      // Double-click anywhere on the row toggles its selection (same as the
+      // check-circle) — a bigger, easier target than the 16px circle. Stops
+      // propagation so it doesn't also hit the community's "select all".
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        if (sendable) onToggle();
+      }}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
@@ -145,6 +152,17 @@ const CommunityCard = ({ community, active, selectedSubCommunityId, targetSubIds
       role="button"
       tabIndex={0}
       onClick={handleHeaderClick}
+      // Double-click the community selects all of its sub-communities at once
+      // (or the community itself when it has none) — the same action as the
+      // master check-circle. Locked (non-sendable) communities are skipped.
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        if (!community.sendable) return;
+        onToggleCommunityTargets(
+          community.id,
+          hasSubCommunities ? subCommunities.map((s) => s.id) : [community.id]
+        );
+      }}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
@@ -158,12 +176,21 @@ const CommunityCard = ({ community, active, selectedSubCommunityId, targetSubIds
     >
       {/* Header Row */}
       <div className="flex items-center h-[74px] shrink-0">
-        {/* Left Icon Container */}
-        <div className="w-10 h-10 rounded-full bg-[#F1F5F9] flex items-center justify-center shrink-0">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M15 5.25H19.5V9.75" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M19.5 5.25L13.125 11.625L9.375 7.875L4.5 12.75" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+        {/* Left Icon Container — community icon when available, else fallback SVG. */}
+        <div className="w-10 h-10 rounded-full bg-[#F1F5F9] flex items-center justify-center shrink-0 overflow-hidden">
+          {community.iconUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={community.iconUrl}
+              alt={community.name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M15 5.25H19.5V9.75" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M19.5 5.25L13.125 11.625L9.375 7.875L4.5 12.75" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
         </div>
 
         {/* Center Content */}

@@ -10,6 +10,9 @@ export interface SubCommunityVM {
   members: string;
   // No Free/Paid concept on the backend; we surface the sub's status here.
   type: string;
+  // Sub-communities have no icon of their own — they reuse the parent
+  // community's `icon_url`.
+  iconUrl?: string;
 }
 
 export interface CommunityVM {
@@ -20,6 +23,8 @@ export interface CommunityVM {
   time: string;
   views: string;
   pinned: string;
+  // Community icon from the backend (`icon_url`); may be absent.
+  iconUrl?: string;
   // The RA can view every community but may only send to assigned ones.
   sendable: boolean;
   subCommunities?: SubCommunityVM[];

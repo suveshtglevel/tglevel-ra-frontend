@@ -27,6 +27,10 @@ export function useAllTradeJournals(subs: SubScope[]) {
           limit: ALL_LIMIT,
         }),
       enabled: Boolean(s.communityId && s.subCommunityId),
+      // No sockets on the RA panel: refetch on every navigation to this tab so
+      // the table reflects the latest server state. Cached rows stay visible
+      // while the refetch runs in the background (no skeleton flash).
+      refetchOnMount: 'always' as const,
     })),
   });
 

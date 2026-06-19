@@ -31,7 +31,13 @@ function recoverUser(token: string, current: AuthUser | null): AuthUser {
     // Keep the avatar across a refresh when the token carries it (the persisted
     // user is the primary source; this is the fallback).
     avatarUrl: claims?.user?.profile_picture,
-    assignedCommunities: [],
+    // The refresh JWT carries no community assignments, so this profile is
+    // incomplete. Leave it `undefined` ("unknown") rather than `[]` ("none"):
+    // `[]` would silently lock the RA out of sending to every community. All
+    // consumers coalesce with `?? []`, so behaviour is unchanged today, but the
+    // value now honestly signals a missing assignment list (recoverable only
+    // from the persisted user or a future profile fetch).
+    assignedCommunities: undefined,
   };
 
 }

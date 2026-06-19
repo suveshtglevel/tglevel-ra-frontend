@@ -93,7 +93,10 @@ const CommunitySidebar = ({
 
       <section
         className={cn(
-          "fixed inset-y-0 left-0 z-40 w-[85vw] max-w-[320px] flex flex-col bg-white border-r border-slate-200 shrink-0 transition-transform duration-300 ease-in-out",
+          // `select-none` stops the double-click community selection from also
+          // highlighting the card text blue, and makes Ctrl+A a no-op here (the
+          // search input re-enables selection via `select-text`).
+          "fixed inset-y-0 left-0 z-40 w-[85vw] max-w-[320px] flex flex-col bg-white border-r border-slate-200 shrink-0 transition-transform duration-300 ease-in-out select-none",
           "lg:static lg:z-auto lg:w-80 lg:max-w-none lg:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full"
         )}
@@ -122,7 +125,7 @@ const CommunitySidebar = ({
               placeholder="Search For Community"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-10 bg-slate-50 border-none rounded-xl text-sm"
+              className="pl-9 h-10 bg-slate-50 border-none rounded-xl text-sm select-text"
             />
           </div>
         </div>

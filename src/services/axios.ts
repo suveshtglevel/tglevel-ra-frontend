@@ -42,12 +42,28 @@ async function callRefreshEndpoint(): Promise<string> {
     null,
     { withCredentials: true }
   );
-  const token: string | undefined = data?.accessToken ?? data?.data?.accessToken;
+  // Accept the common field-name variants so a backend naming difference can't
+  // make a successful refresh look like a failure (and log the user out).
+  const token: string | undefined =
+    data?.accessToken ??
+    data?.access_token ??
+    data?.token ??
+    data?.data?.accessToken ??
+    data?.data?.access_token ??
+    data?.data?.token;
   if (!token) {
     throw new Error('Refresh response did not include an access token');
   }
   setAccessToken(token);
   return token;
+}
+
+// Whether an error means the session is genuinely unauthorized (so we should
+// log out) vs. a transient failure (network blip, 5xx, rate-limit) that must
+// NOT drop a still-valid session.
+function isUnauthorized(err: unknown): boolean {
+  const status = (err as AxiosError)?.response?.status;
+  return status === 401 || status === 403;
 }
 
 // The backend rotates the refresh-token cookie on every call, so two refreshes
@@ -101,7 +117,13 @@ axiosInstance.interceptors.response.use(
       original.headers.Authorization = `Bearer ${token}`;
       return axiosInstance(original);
     } catch (refreshError) {
-      bounceToLogin();
+      // Only force logout when the refresh token itself is rejected as
+      // unauthorized (invalid/expired). Transient failures — a network blip, a
+      // 5xx, or the backend's refresh rate-limit — must NOT drop a still-valid
+      // session; reject so the request can be retried and the cycle continues.
+      if (isUnauthorized(refreshError)) {
+        bounceToLogin();
+      }
       return Promise.reject(refreshError);
     } finally {
       refreshPromise = null;

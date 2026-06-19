@@ -8,9 +8,15 @@ import { getMessageStats } from '@/modules/dashboard/services/messageStats.servi
 // single/double delivery tick and the "Viewed by" panel, so the cached result
 // is shared between them.
 export function useMessageStats(messageId?: string, enabled = true) {
+  // Optimistic, locally-sent messages use a `msg-<communityId>-<ts>` id that the
+  // stats endpoint doesn't know about; only query for real backend ids.
+  const isServerId = !!messageId && !messageId.startsWith('msg-');
   return useQuery({
     queryKey: ['message-stats', messageId],
     queryFn: () => getMessageStats(messageId!),
-    enabled: Boolean(messageId) && enabled,
+    enabled: isServerId && enabled,
+    // No sockets: the panel only mounts when the tick is clicked, so refetch each
+    // time it opens to show the latest viewers rather than a cached list.
+    refetchOnMount: 'always',
   });
 }

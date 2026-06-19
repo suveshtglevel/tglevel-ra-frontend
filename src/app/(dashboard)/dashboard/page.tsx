@@ -33,6 +33,8 @@ export default function DashboardPage() {
     bundles,
     handleCreateBundle,
     creatingBundle,
+    handleDeleteBundle,
+    deletingBundleId,
     selectedCommunityId,
     selectedSubCommunityId,
     selectedCommunity,
@@ -46,6 +48,7 @@ export default function DashboardPage() {
     handleSelectSubCommunity,
     handleSelectCommunity,
     handleSendMessage,
+    handleSendPoll,
     handleTogglePin,
   } = useDashboard();
 
@@ -64,6 +67,7 @@ export default function DashboardPage() {
   };
 
   const headerTitle = selectedSubCommunity?.name ?? selectedCommunity?.name ?? '';
+  const headerIconUrl = selectedSubCommunity?.iconUrl ?? selectedCommunity?.iconUrl;
   const headerMembers = selectedSubCommunity
     ? `${selectedSubCommunity.members} members`
     : selectedCommunity
@@ -109,6 +113,7 @@ export default function DashboardPage() {
         <ChatHeader
           title={headerTitle}
           members={headerMembers}
+          iconUrl={headerIconUrl}
           messages={currentMessages}
           onMenuClick={() => setMobileSidebarOpen(true)}
         />
@@ -136,7 +141,9 @@ export default function DashboardPage() {
 
         {/* Message Input Section */}
         <div className="p-3 sm:p-4 lg:p-6 bg-[#F8FAFC] shrink-0">
-          <div className="max-w-[991px] mx-auto w-full">
+          {/* Composer fills the chat column so its width tracks the available
+              space (i.e. the screen) instead of a fixed cap. */}
+          <div className="w-full">
             {canSend ? (
               <MessageComposer
                 communities={communities}
@@ -144,7 +151,11 @@ export default function DashboardPage() {
                 bundles={bundles}
                 creatingBundle={creatingBundle}
                 onCreateBundle={handleCreateBundle}
+                onDeleteBundle={handleDeleteBundle}
+                deletingBundleId={deletingBundleId}
+                onSelectSubCommunity={selectSubCommunity}
                 onSend={handleSendMessage}
+                onSendPoll={handleSendPoll}
                 replyTo={replyTo}
                 onCancelReply={() => setReplyTo(null)}
               />

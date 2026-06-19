@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 export default function NotFound() {
   return (
-    <main className="min-h-screen w-full flex flex-col items-center justify-center bg-[#F8FAFC] px-6 text-center">
+    <main className="min-h-[var(--app-h)] w-full flex flex-col items-center justify-center bg-[#F8FAFC] px-6 text-center">
       <p className="text-[64px] font-bold leading-none text-emerald-500">404</p>
       <h1 className="mt-4 text-xl font-semibold text-slate-800">Page not found</h1>
       <p className="mt-2 text-sm text-slate-500 max-w-sm">

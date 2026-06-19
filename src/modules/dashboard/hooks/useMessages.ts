@@ -17,5 +17,9 @@ export function useMessages(communityId?: string, subCommunityId?: string) {
     queryKey: ['messages', communityId, subCommunityId],
     queryFn: () => getMessages(communityId!, subCommunityId!),
     enabled: Boolean(communityId && subCommunityId),
+    // No sockets on the RA panel: refetch the open chat whenever the dashboard
+    // mounts (i.e. on navigating back to it) so the feed catches up with any
+    // messages sent meanwhile. Cached messages stay on screen during the refetch.
+    refetchOnMount: 'always',
   });
 }

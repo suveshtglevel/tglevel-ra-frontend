@@ -200,6 +200,9 @@ export interface UpdateTradeJournalInput {
   profit?: string;
   exit_price?: string;
   high_of?: string;
+  // Split targets the RA can revise (sent as strings, e.g. "182").
+  target1?: string;
+  target2?: string;
 }
 
 interface UpdateTradeJournalResponse {

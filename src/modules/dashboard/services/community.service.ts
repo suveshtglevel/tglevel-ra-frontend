@@ -79,12 +79,15 @@ export function toCommunityVM(c: Community, assigned: string[]): CommunityVM {
     time: '',
     views: String(c.total_users ?? ''),
     pinned: '',
+    iconUrl: c.icon_url,
     sendable: assigned.includes(c.community_id),
+    // Sub-communities reuse the parent community's icon.
     subCommunities: c.sub_communities?.map((s) => ({
       id: s.sub_community_id,
       name: s.name,
       members: formatCount(s.users),
       type: s.status,
+      iconUrl: c.icon_url,
     })),
   };
 }
