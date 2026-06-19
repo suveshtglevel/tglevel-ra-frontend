@@ -7,7 +7,7 @@ import {
   deleteBanner,
   type Banner,
   type BannerTheme,
-} from '@/modules/banner/services/banners.service';
+} from '@/components/banner/services/banners.service';
 
 // The banners API talks through the shared axios instance; mock it so we can
 // assert on the multipart payloads and feed back canned responses.

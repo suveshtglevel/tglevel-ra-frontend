@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import BannerLivePreview from '@/modules/banner/components/BannerLivePreview';
+import BannerLivePreview from '@/components/banner/components/BannerLivePreview';
 
 // next/image renders an <img> in jsdom; mock it to a plain img so alt/role work.
 // Strip the next/image-only props (fill, unoptimized, priority, …) so React

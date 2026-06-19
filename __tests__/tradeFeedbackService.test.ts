@@ -2,7 +2,7 @@ import axiosInstance from '@/services/axios';
 import {
   getTradeFeedbackStats,
   getTradeFeedback,
-} from '@/modules/trade-feedback/services/tradeFeedback.service';
+} from '@/components/trade-feedback/services/tradeFeedback.service';
 
 jest.mock('@/services/axios', () => ({
   __esModule: true,

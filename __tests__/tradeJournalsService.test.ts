@@ -4,7 +4,7 @@ import {
   getUserTradeJournals,
   getTradeStats,
   updateTradeJournal,
-} from '@/modules/trade-journal/services/tradeJournals.service';
+} from '@/components/trade-journal/services/tradeJournals.service';
 
 jest.mock('@/services/axios', () => ({
   __esModule: true,

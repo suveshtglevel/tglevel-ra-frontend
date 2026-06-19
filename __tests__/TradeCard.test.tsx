@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import TradeCard from '@/modules/dashboard/components/TradeCard';
+import TradeCard from '@/components/dashboard/components/TradeCard';
 import type { ChatMessage } from '@/store/slices/messageSlice';
 
 const imageAttachment: NonNullable<ChatMessage['attachment']> = {

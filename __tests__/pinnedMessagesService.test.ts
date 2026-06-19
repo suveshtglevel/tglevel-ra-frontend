@@ -2,7 +2,7 @@ import axiosInstance from '@/services/axios';
 import {
   togglePinnedMessage,
   getPinnedMessages,
-} from '@/modules/dashboard/services/pinnedMessages.service';
+} from '@/components/dashboard/services/pinnedMessages.service';
 
 jest.mock('@/services/axios', () => ({
   __esModule: true,

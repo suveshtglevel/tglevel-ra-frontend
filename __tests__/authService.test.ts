@@ -5,7 +5,7 @@ import {
   logout,
   updateProfileImage,
   type LoginResponse,
-} from '@/modules/auth/services/auth.service';
+} from '@/components/auth/services/auth.service';
 
 // All auth calls go through the shared axios instance; mock it so we can assert
 // on the request payloads and feed back canned responses.

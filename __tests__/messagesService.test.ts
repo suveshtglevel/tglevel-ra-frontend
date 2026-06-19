@@ -3,7 +3,7 @@ import {
   sendMessage,
   getMessages,
   getMessageTypes,
-} from '@/modules/dashboard/services/messages.service';
+} from '@/components/dashboard/services/messages.service';
 
 jest.mock('@/services/axios', () => ({
   __esModule: true,

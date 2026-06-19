@@ -3,7 +3,7 @@ import {
   createBundle,
   getBundles,
   type CreateBundlePayload,
-} from '@/modules/dashboard/services/bundle.service';
+} from '@/components/dashboard/services/bundle.service';
 
 jest.mock('@/services/axios', () => ({
   __esModule: true,

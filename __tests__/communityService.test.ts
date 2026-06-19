@@ -3,7 +3,7 @@ import {
   getCommunities,
   toCommunityVM,
   type Community,
-} from '@/modules/dashboard/services/community.service';
+} from '@/components/dashboard/services/community.service';
 
 jest.mock('@/services/axios', () => ({
   __esModule: true,

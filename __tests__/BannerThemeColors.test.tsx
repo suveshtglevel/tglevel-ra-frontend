@@ -1,10 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import BannerThemeColors from '@/modules/banner/components/BannerThemeColors';
-import { useSuggestedPalette } from '@/modules/banner/hooks/useSuggestedPalette';
-import type { UseBannerForm } from '@/modules/banner/hooks/useBannerForm';
+import BannerThemeColors from '@/components/banner/components/BannerThemeColors';
+import { useSuggestedPalette } from '@/components/banner/hooks/useSuggestedPalette';
+import type { UseBannerForm } from '@/components/banner/hooks/useBannerForm';
 
-jest.mock('@/modules/banner/hooks/useSuggestedPalette');
+jest.mock('@/components/banner/hooks/useSuggestedPalette');
 
 const mockedPalette = useSuggestedPalette as jest.MockedFunction<typeof useSuggestedPalette>;
 

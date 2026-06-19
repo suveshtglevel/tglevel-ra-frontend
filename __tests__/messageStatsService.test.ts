@@ -2,7 +2,7 @@ import axiosInstance from '@/services/axios';
 import {
   getMessageStats,
   type MessageStats,
-} from '@/modules/dashboard/services/messageStats.service';
+} from '@/components/dashboard/services/messageStats.service';
 
 jest.mock('@/services/axios', () => ({
   __esModule: true,
